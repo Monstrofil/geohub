@@ -1,13 +1,38 @@
 services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: tagger_db
+      POSTGRES_USER: tagger_user
+      POSTGRES_PASSWORD: tagger_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tagger_user -d tagger_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   backend:
     build: ./backend
     ports:
       - "8000:8000"
     volumes:
       - ./backend:/app
+    environment:
+      DATABASE_URL: postgres://tagger_user:tagger_password@postgres:5432/tagger_db
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   frontend:
     build: ./frontend
     ports:
       - "8080:8080"
     volumes:
       - ./frontend:/app
+
+volumes:
+  postgres_data:
