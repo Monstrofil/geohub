@@ -68,7 +68,16 @@
         </div>
 
         <div class="editor-main">
-          <div class="editor-placeholder">
+          <!-- GeoTIFF Preview for raster files -->
+          <GeoTiffPreview 
+            v-if="isGeoTiff"
+            :fileId="file.id"
+            :filename="file.name"
+            class="geotiff-preview-container"
+          />
+          
+          <!-- Placeholder for other file types -->
+          <div v-else class="editor-placeholder">
             <div class="placeholder-icon">
               <svg width="64" height="64" viewBox="0 0 64 64">
                 <rect x="8" y="8" width="48" height="48" rx="8" fill="#f8f9fa" stroke="#dee2e6" stroke-width="2"/>
@@ -143,6 +152,7 @@
 import { ref, computed, onMounted } from 'vue'
 import ObjectTypeSelector from './ObjectTypeSelector.vue'
 import TagList from './TagList.vue'
+import GeoTiffPreview from './GeoTiffPreview.vue'
 import { matchTagsToPreset } from '../utils/tagMatcher.js'
 import { loadFieldDefinitions, resolveFields } from '../utils/fieldResolver.js'
 import apiService from '../services/api.js'
@@ -229,6 +239,13 @@ const fileIcon = computed(() => {
     default:
       return ''
   }
+})
+
+// Check if file is a GeoTIFF
+const isGeoTiff = computed(() => {
+  const filename = props.file.name || props.file.original_name || ''
+  const geotiffExtensions = ['.tif', '.tiff', '.geotiff']
+  return geotiffExtensions.some(ext => filename.toLowerCase().endsWith(ext))
 })
 
 // Tags editor functions
@@ -687,5 +704,11 @@ async function handleCommit() {
 .no-changes span {
   font-size: 0.9rem;
   color: #666;
+}
+
+.geotiff-preview-container {
+  margin: 1rem;
+  border-radius: 8px;
+  overflow: hidden;
 }
 </style> 

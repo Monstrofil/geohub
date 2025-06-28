@@ -6,9 +6,13 @@ from pydantic import BaseModel
 
 from models import File_Pydantic
 from services import FileService, TagService
+from mapserver_service import MapServerService
 
 
 router = APIRouter()
+
+# Initialize MapServer service
+mapserver_service = MapServerService()
 
 
 # Pydantic models for request/response
@@ -199,4 +203,33 @@ async def add_tag(file_id: int, key: str, value: str):
 async def remove_tag(file_id: int, key: str):
     """Remove a tag from a file"""
     tags = await TagService.remove_tag(file_id, key)
-    return {"tags": tags} 
+    return {"tags": tags}
+
+
+# MapServer endpoints
+@router.get("/files/{file_id}/preview")
+async def get_file_preview(file_id: int):
+    """Get a preview URL for a file (especially GeoTIFF)"""
+    file_obj = await FileService.get_file(file_id)
+    if not file_obj:
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    preview_url = mapserver_service.get_preview_url(file_obj.name)
+    if not preview_url:
+        raise HTTPException(status_code=400, detail="File type not supported for preview")
+    
+    return {"preview_url": preview_url}
+
+
+@router.get("/files/{file_id}/map")
+async def get_file_map(file_id: int):
+    """Get a MapServer URL for a GeoTIFF file"""
+    file_obj = await FileService.get_file(file_id)
+    if not file_obj:
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    map_url = mapserver_service.get_map_url(file_obj.name)
+    if not map_url:
+        raise HTTPException(status_code=400, detail="File type not supported for mapping")
+    
+    return {"map_url": map_url} 

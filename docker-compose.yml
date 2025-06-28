@@ -34,5 +34,18 @@ services:
     volumes:
       - ./frontend:/app
 
+  mapserver:
+    build: 
+      context: ./mapserver
+      dockerfile: Dockerfile.mapserver
+    container_name: tagger_mapserver
+    ports:
+      - "8081:80"
+    volumes:
+      - ./backend/uploads:/opt/mapserver
+      - ./mapserver/mapserver.conf:/usr/local/etc/mapserver.conf
+    depends_on:
+      - backend
+
 volumes:
   postgres_data:

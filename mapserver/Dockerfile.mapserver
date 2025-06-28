@@ -1,0 +1,72 @@
+FROM httpd:alpine3.21 as build
+
+RUN apk add git
+
+RUN git clone --depth 1 https://github.com/MapServer/MapServer
+
+RUN apk add --no-cache \
+    build-base \
+    cmake \
+    pkgconf \
+    pcre2-dev \
+    protobuf-c-dev \
+    zlib-dev \
+    libpng-dev \
+    libjpeg-turbo-dev \
+    freetype-dev \
+    proj-dev \
+    fribidi-dev \
+    harfbuzz-dev \
+    cairo-dev \
+    fcgi-dev \
+    geos-dev \
+    postgresql-dev \
+    gdal-dev \
+    libxml2-dev \
+    giflib-dev \
+    ca-certificates \
+    git
+
+WORKDIR MapServer
+RUN mkdir build && cd build && cmake -DWITH_FCGI=ON ..
+RUN cd build && make
+
+RUN cd build && DESTDIR=/installroot make install
+
+# create a link that can be used in the apache config
+RUN ln -s ./mapserv /installroot/usr/local/bin/mapserv.fcgi 
+
+## Production image
+FROM httpd:alpine3.21
+
+RUN apk add \
+    apache-mod-fcgid\
+    fcgi \
+    proj \
+    gdal \
+    geos \
+    protobuf-c \
+    zlib \
+    freetype \
+    libpng \
+    libjpeg-turbo \
+    harfbuzz \
+    cairo \
+    fribidi \
+    libxml2 \
+    giflib \
+    pcre2 \
+    postgresql-libs
+
+COPY --from=build /installroot/ /
+
+COPY apache.mapserver.conf /usr/local/apache2/conf/extra/mapserver.conf
+
+RUN echo "Include conf/extra/mapserver.conf" >> /usr/local/apache2/conf/httpd.conf
+
+# Create directories for maps and data
+RUN mkdir -p /opt/mapserver /usr/local/etc
+
+EXPOSE 80
+
+CMD httpd-foreground 
