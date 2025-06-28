@@ -1,0 +1,9 @@
+{
+  "icon": "<svg width='24' height='24' viewBox='0 0 24 24'><rect x='4' y='6' width='16' height='12' rx='2' fill='#f5f5f5' stroke='#ccc' stroke-width='2'/><path d='M8 10h8M8 12h6M8 14h4' stroke='#999' stroke-width='1' fill='none'/></svg>",
+  "fields": ["title", "description"],
+  "geometry": ["file"],
+  "tags": {"mime": "application/msword"},
+  "terms": ["file", "document", "doc", "word"],
+  "name": "Word Document",
+  "matchScore": 0.8
+} 
