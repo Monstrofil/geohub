@@ -4,8 +4,11 @@
     type="number" 
     class="pure-input-1" 
     :value="modelValue ?? ''" 
-    @input="handleInput"
+    @blur="handleBlur"
     :placeholder="field.placeholder"
+    :min="field.min"
+    :max="field.max"
+    :step="field.step"
   />
 </template>
 
@@ -25,8 +28,10 @@ const emit = defineEmits(['update:modelValue'])
 
 const fieldId = `field-${props.field.name}`
 
-function handleInput(event) {
-  const value = event.target.value === '' ? null : Number(event.target.value)
-  emit('update:modelValue', value)
+function handleBlur(event) {
+  const newValue = event.target.value
+  if (newValue !== (props.modelValue ?? '')) {
+    emit('update:modelValue', newValue)
+  }
 }
 </script> 

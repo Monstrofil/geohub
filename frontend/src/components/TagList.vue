@@ -126,6 +126,10 @@ const props = defineProps({
   allFieldDefinitions: {
     type: Object,
     default: () => ({})
+  },
+  changeTracker: {
+    type: Object,
+    required: true
   }
 })
 
@@ -278,14 +282,13 @@ async function emitTagsUpdate() {
   // Emit the tags update event for local state management
   emit('tags-updated', tags)
   
-  // Also update tags via API if we have a current file
-  if (props.currentFile && props.currentFile.id) {
-    try {
-      await apiService.updateFileTags(props.currentFile.id, tags)
-    } catch (error) {
-      console.error('Failed to update tags via API:', error)
-      // You might want to show an error message to the user here
-    }
+  // Add change to tracker instead of making immediate API calls
+  if (props.currentFile) {
+    props.changeTracker.addChange({
+      type: 'tags',
+      fileId: props.currentFile.id,
+      data: tags
+    })
   }
 }
 

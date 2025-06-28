@@ -2,10 +2,10 @@
   <textarea 
     :id="fieldId" 
     class="pure-input-1" 
-    rows="5" 
     :value="modelValue ?? ''" 
-    @input="handleInput"
+    @blur="handleBlur"
     :placeholder="field.placeholder"
+    rows="3"
   ></textarea>
 </template>
 
@@ -16,7 +16,7 @@ const props = defineProps({
     required: true
   },
   modelValue: {
-    type: String,
+    type: [String, Number],
     default: null
   }
 })
@@ -25,7 +25,10 @@ const emit = defineEmits(['update:modelValue'])
 
 const fieldId = `field-${props.field.name}`
 
-function handleInput(event) {
-  emit('update:modelValue', event.target.value)
+function handleBlur(event) {
+  const newValue = event.target.value
+  if (newValue !== (props.modelValue ?? '')) {
+    emit('update:modelValue', newValue)
+  }
 }
 </script> 

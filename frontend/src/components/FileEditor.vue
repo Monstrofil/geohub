@@ -23,7 +23,7 @@
     <!-- Main content area with editor and tags -->
     <div class="editor-content">
       <!-- Left panel: Tags editor -->
-      <div class="left-panel">
+      <div class="left-panel" :class="{ 'collapsed': sidebarCollapsed }">
         <ObjectTypeSelector 
           v-model:selectedType="selectedType" 
           :currentFile="file"
@@ -36,12 +36,37 @@
           :currentFile="file"
           :selectedType="selectedType"
           :allFieldDefinitions="allFieldDefinitions"
-          @tags-updated="updateFileTags"
+          :change-tracker="changeTracker"
+          @tags-updated="handleTagsUpdated"
         />
       </div>
 
       <!-- Right panel: File editor -->
       <div class="right-panel">
+        <!-- Right panel header with commit functionality -->
+        <div class="right-panel-header">
+          <div class="panel-actions">
+            <div v-if="changeTracker.hasChanges.value" class="changes-info">
+              <span class="changes-count">{{ changeTracker.changeCount.value }} change{{ changeTracker.changeCount.value !== 1 ? 's' : '' }} pending</span>
+            </div>
+            
+            <button 
+              v-if="changeTracker.hasChanges.value"
+              class="pure-button pure-button-primary" 
+              @click="handleCommit"
+              :disabled="changeTracker.isCommitting.value"
+            >
+              <i v-if="changeTracker.isCommitting.value" class="fas fa-spinner fa-spin"></i>
+              <i v-else class="fas fa-check"></i>
+              {{ changeTracker.isCommitting.value ? 'Committing...' : 'Commit Changes' }}
+            </button>
+            
+            <div v-else class="no-changes">
+              <span>No pending changes</span>
+            </div>
+          </div>
+        </div>
+
         <div class="editor-main">
           <div class="editor-placeholder">
             <div class="placeholder-icon">
@@ -115,7 +140,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import ObjectTypeSelector from './ObjectTypeSelector.vue'
 import TagList from './TagList.vue'
 import { matchTagsToPreset } from '../utils/tagMatcher.js'
@@ -126,10 +151,14 @@ const props = defineProps({
   file: {
     type: Object,
     required: true
+  },
+  changeTracker: {
+    type: Object,
+    required: true
   }
 })
 
-const emit = defineEmits(['back', 'file-uploaded', 'tags-updated'])
+const emit = defineEmits(['back', 'file-uploaded', 'tags-updated', 'file-updated'])
 
 const fileInput = ref(null)
 const isDragOver = ref(false)
@@ -140,6 +169,7 @@ const selectedType = ref(null)
 const menuOpen = ref(false)
 const allPresets = ref([])
 const allFieldDefinitions = ref({})
+const sidebarCollapsed = ref(false)
 
 // Dynamically import all presets
 const presetModules = import.meta.glob('../data/presets/*/*.json', { eager: true })
@@ -212,18 +242,32 @@ function handleTypeChange(newType) {
       newTags.name = props.file.tags.name
     }
     
-    // Update the file's tags immediately in the parent component
-    updateFileTags(newTags)
+    // Add change to tracker
+    props.changeTracker.addChange({
+      type: 'tags',
+      fileId: props.file.id,
+      data: newTags
+    })
     
-    // Also update the local file object to reflect changes immediately
+    // Update the local file object to reflect changes immediately
     if (props.file) {
       props.file.tags = { ...newTags }
     }
   }
 }
 
-function updateFileTags(newTags) {
-  emit('tags-updated', newTags)
+function handleTagsUpdated(newTags) {
+  // Add change to tracker
+  props.changeTracker.addChange({
+    type: 'tags',
+    fileId: props.file.id,
+    data: newTags
+  })
+  
+  // Update the local file object to reflect changes immediately
+  if (props.file) {
+    props.file.tags = { ...newTags }
+  }
 }
 
 // File upload handlers
@@ -302,6 +346,24 @@ async function processFile(file) {
 
 function triggerFileSelect() {
   fileInput.value?.click()
+}
+
+async function handleCommit() {
+  const result = await props.changeTracker.commitChanges(async (change) => {
+    if (change.type === 'tags') {
+      await apiService.updateFileTags(change.fileId, change.data)
+    }
+  })
+  
+  if (result.success) {
+    // Emit the final tags update with fromCommit flag
+    emit('tags-updated', props.file.tags, true)
+    // Emit file updated event to notify parent
+    emit('file-updated', props.file)
+  } else {
+    console.error('Commit failed:', result.error)
+    // You might want to show an error message to the user
+  }
 }
 </script>
 
@@ -384,6 +446,11 @@ function triggerFileSelect() {
   background: #f8f9fa;
   border-right: 1px solid #eee;
   overflow-y: auto;
+  transition: width 0.3s ease;
+}
+
+.left-panel.collapsed {
+  width: 60px;
 }
 
 .right-panel {
@@ -551,5 +618,74 @@ function triggerFileSelect() {
 .upload-success svg,
 .upload-error svg {
   flex-shrink: 0;
+}
+
+.right-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem;
+  background: white;
+  border-bottom: 1px solid #eee;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.panel-title {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #333;
+}
+
+.panel-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.changes-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.changes-count {
+  font-size: 0.9rem;
+  color: #666;
+}
+
+.pure-button {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: #666;
+  transition: all 0.15s;
+}
+
+.pure-button:hover {
+  color: #007bff;
+}
+
+.pure-button-primary {
+  background: #007bff;
+  color: white;
+  border-radius: 6px;
+  padding: 0.5rem 1rem;
+}
+
+.pure-button-primary:hover {
+  background: #0056b3;
+}
+
+.no-changes {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.no-changes span {
+  font-size: 0.9rem;
+  color: #666;
 }
 </style> 

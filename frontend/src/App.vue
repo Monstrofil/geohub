@@ -1,12 +1,16 @@
 <template>
   <div class="pure-g app-grid">
+    <!-- Top Toolbar -->
+    <TopToolbar 
+      @refresh="loadFiles"
+      @upload="showUploadModal = true"
+    />
+
     <!-- File List View -->
     <div v-if="!selectedFile" class="pure-u-1">
       <div class="section section-feature-list">
         <h3>
           <span>Файли ({{ files.length }})</span>
-          <button @click="loadFiles" class="refresh-btn">🔄 Оновити</button>
-          <button @click="showUploadModal = true" class="upload-btn">📤 Upload</button>
         </h3>
         <div v-if="loading" class="loading">Завантаження файлів...</div>
         <div v-else-if="error" class="error">{{ error }}</div>
@@ -31,9 +35,11 @@
     <div v-else class="pure-u-1">
       <FileEditor 
         :file="selectedFile"
+        :change-tracker="changeTracker"
         @back="backToList"
         @file-uploaded="handleFileUploaded"
         @tags-updated="handleTagsUpdated"
+        @file-updated="handleFileUpdated"
       />
     </div>
 
@@ -51,6 +57,8 @@ import { ref, computed, onMounted } from 'vue'
 import FileCard from './components/FileCard.vue'
 import FileEditor from './components/FileEditor.vue'
 import SimpleUpload from './components/SimpleUpload.vue'
+import TopToolbar from './components/TopToolbar.vue'
+import { useChangeTracker } from './composables/useChangeTracker.js'
 import { loadFieldDefinitions } from './utils/fieldResolver.js'
 import apiService from './services/api.js'
 
@@ -60,6 +68,9 @@ const files = ref([])
 const loading = ref(false)
 const error = ref(null)
 const showUploadModal = ref(false)
+
+// Initialize change tracker
+const changeTracker = useChangeTracker()
 
 onMounted(async () => {
   // Load all field definitions
@@ -116,22 +127,27 @@ async function handleFileUploaded(uploadData) {
   }
 }
 
-async function handleTagsUpdated(newTags) {
+async function handleTagsUpdated(newTags, fromCommit = false) {
   if (selectedFile.value) {
-    try {
-      // Update tags via API
-      await apiService.updateFileTags(selectedFile.value.id, newTags)
-      
-      // Update the file's tags in the files array
-      const fileIndex = files.value.findIndex(f => f.id === selectedFile.value.id)
-      if (fileIndex !== -1) {
-        files.value[fileIndex].tags = { ...newTags }
-        // Update the selectedFile reference to reflect changes
-        selectedFile.value = files.value[fileIndex]
-      }
-    } catch (err) {
-      console.error('Failed to update tags:', err)
-      // You might want to show an error message to the user here
+    if (!fromCommit) {
+      // Add change to tracker instead of immediately updating
+      changeTracker.addChange({
+        type: 'tags',
+        fileId: selectedFile.value.id,
+        data: newTags
+      })
+    }
+  }
+}
+
+function handleFileUpdated(updatedFile) {
+  // Update the file's tags in the files array
+  const fileIndex = files.value.findIndex(f => f.id === updatedFile.id)
+  if (fileIndex !== -1) {
+    files.value[fileIndex].tags = { ...updatedFile.tags }
+    // Update the selectedFile reference if it's the same file
+    if (selectedFile.value && selectedFile.value.id === updatedFile.id) {
+      selectedFile.value = files.value[fileIndex]
     }
   }
 }
@@ -168,32 +184,5 @@ async function handleTagsUpdated(newTags) {
   background: #ffebee;
   border-radius: 4px;
   margin: 1rem 0;
-}
-
-.refresh-btn, .upload-btn {
-  margin-left: 1rem;
-  padding: 0.5rem 1rem;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 0.9rem;
-}
-
-.refresh-btn {
-  background: #2196f3;
-  color: white;
-}
-
-.refresh-btn:hover {
-  background: #1976d2;
-}
-
-.upload-btn {
-  background: #4caf50;
-  color: white;
-}
-
-.upload-btn:hover {
-  background: #388e3c;
 }
 </style> 

@@ -4,7 +4,7 @@
     type="text" 
     class="pure-input-1" 
     :value="modelValue ?? ''" 
-    @input="handleInput"
+    @blur="handleBlur"
     :placeholder="field.placeholder"
   />
 </template>
@@ -25,7 +25,10 @@ const emit = defineEmits(['update:modelValue'])
 
 const fieldId = `field-${props.field.name}`
 
-function handleInput(event) {
-  emit('update:modelValue', event.target.value)
+function handleBlur(event) {
+  const newValue = event.target.value
+  if (newValue !== (props.modelValue ?? '')) {
+    emit('update:modelValue', newValue)
+  }
 }
 </script> 
