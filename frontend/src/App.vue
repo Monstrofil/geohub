@@ -1,16 +1,18 @@
 <template>
   <div class="pure-g app-grid">
-    <!-- Top Toolbar -->
-    <TopToolbar 
-      @refresh="loadFiles"
-      @upload="showUploadModal = true"
-    />
-
     <!-- File List View -->
     <div v-if="!selectedFile" class="pure-u-1">
       <div class="section section-feature-list">
         <h3>
           <span>Файли ({{ files.length }})</span>
+          <div class="file-actions">
+            <button @click="loadFiles" class="action-btn refresh-btn" :disabled="loading">
+              <i class="fas fa-sync-alt"></i> Refresh
+            </button>
+            <button @click="showUploadModal = true" class="action-btn upload-btn">
+              <i class="fas fa-upload"></i> Upload
+            </button>
+          </div>
         </h3>
         <div v-if="loading" class="loading">Завантаження файлів...</div>
         <div v-else-if="error" class="error">{{ error }}</div>
@@ -57,7 +59,6 @@ import { ref, computed, onMounted } from 'vue'
 import FileCard from './components/FileCard.vue'
 import FileEditor from './components/FileEditor.vue'
 import SimpleUpload from './components/SimpleUpload.vue'
-import TopToolbar from './components/TopToolbar.vue'
 import { useChangeTracker } from './composables/useChangeTracker.js'
 import { loadFieldDefinitions } from './utils/fieldResolver.js'
 import apiService from './services/api.js'
@@ -162,6 +163,60 @@ function handleFileUpdated(updatedFile) {
 .section-feature-list {
   padding: 1rem;
   background: #f8f9fa;
+}
+
+.section-feature-list h3 {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.file-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: white;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.15s;
+}
+
+.action-btn:hover:not(:disabled) {
+  background: #f8f9fa;
+  border-color: #007bff;
+  color: #007bff;
+}
+
+.action-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.refresh-btn {
+  color: #666;
+}
+
+.refresh-btn:hover:not(:disabled) {
+  border-color: #2196f3;
+  color: #2196f3;
+}
+
+.upload-btn {
+  color: #666;
+}
+
+.upload-btn:hover:not(:disabled) {
+  border-color: #4caf50;
+  color: #4caf50;
 }
 
 .feature-list {
