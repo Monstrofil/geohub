@@ -328,8 +328,8 @@ watch(
         values[key] = null
       })
       
-      // Clear added more fields
-      addedMoreFields.value.clear()
+      // Don't clear addedMoreFields - let user-added fields persist
+      // addedMoreFields.value.clear()
       
       // Set new values from file tags
       Object.entries(file.tags).forEach(([key, value]) => {
@@ -357,8 +357,8 @@ watch(
         values[key] = null
       })
       
-      // Clear added more fields
-      addedMoreFields.value.clear()
+      // Don't clear addedMoreFields - let user-added fields persist
+      // addedMoreFields.value.clear()
       
       // Set new values from file tags
       Object.entries(newTags).forEach(([key, value]) => {
