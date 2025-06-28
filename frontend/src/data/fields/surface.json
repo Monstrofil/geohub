@@ -1,0 +1,18 @@
+{
+    "key": "surface",
+    "type": "combo",
+    "label": "Surface Type",
+    "strings": {
+        "options": {
+            "asphalt": "Asphalt",
+            "concrete": "Concrete",
+            "paved": "Paved",
+            "unpaved": "Unpaved",
+            "gravel": "Gravel",
+            "dirt": "Dirt",
+            "grass": "Grass"
+        }
+    },
+    "autoSuggestions": false,
+    "customValues": true
+} 

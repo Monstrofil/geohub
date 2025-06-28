@@ -1,0 +1,8 @@
+{
+    "icon": "temaki-nuclear",
+    "fields": ["name"],
+    "geometry": ["point", "area"],
+    "tags": {"military": "nuclear_explosion_site"},
+    "terms": ["nuclear", "explosion", "test", "site"],
+    "name": "Nuclear Explosion Site"
+} 

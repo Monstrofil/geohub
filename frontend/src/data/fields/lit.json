@@ -1,0 +1,15 @@
+{
+    "key": "lit",
+    "type": "combo",
+    "label": "Lighting",
+    "strings": {
+        "options": {
+            "yes": "Yes",
+            "no": "No",
+            "automatic": "Automatic",
+            "disused": "Disused"
+        }
+    },
+    "autoSuggestions": false,
+    "customValues": true
+} 

@@ -1,0 +1,30 @@
+{
+    "icon": "temaki-military",
+    "fields": ["name", "building_area_yes", "office_type"],
+    "moreFields": [
+        "gnis/feature_id-US",
+        "level"
+    ],
+    "geometry": [
+        "point",
+        "area"
+    ],
+    "tags": {
+        "military": "office"
+    },
+    "terms": [
+        "air force",
+        "army",
+        "base",
+        "enlist",
+        "fight",
+        "force",
+        "guard",
+        "marine",
+        "navy",
+        "recruit",
+        "troop",
+        "war"
+    ],
+    "name": "Military Office"
+} 

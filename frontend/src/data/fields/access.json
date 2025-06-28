@@ -1,0 +1,20 @@
+{
+    "key": "access",
+    "type": "combo",
+    "label": "Access",
+    "strings": {
+        "options": {
+            "yes": "Yes",
+            "no": "No",
+            "private": "Private",
+            "permissive": "Permissive",
+            "destination": "Destination",
+            "customers": "Customers",
+            "delivery": "Delivery",
+            "agricultural": "Agricultural",
+            "forestry": "Forestry"
+        }
+    },
+    "autoSuggestions": false,
+    "customValues": true
+} 

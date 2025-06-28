@@ -1,0 +1,14 @@
+{
+    "key": "bunker_material",
+    "type": "combo",
+    "label": "Bunker Material",
+    "strings": {
+        "options": {
+            "concrete": "Concrete",
+            "steel": "Steel",
+            "earth": "Earth"
+        }
+    },
+    "autoSuggestions": false,
+    "customValues": false
+} 

@@ -1,0 +1,14 @@
+{
+    "key": "office_type",
+    "type": "combo",
+    "label": "Office Type",
+    "strings": {
+        "options": {
+            "recruitment": "Recruitment",
+            "administration": "Administration",
+            "logistics": "Logistics"
+        }
+    },
+    "autoSuggestions": false,
+    "customValues": false
+} 

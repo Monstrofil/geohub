@@ -1,0 +1,7 @@
+{
+  "icon": "<svg width='24' height='24' viewBox='0 0 24 24'><rect x='2' y='4' width='20' height='16' rx='3' fill='#e0e7ef' stroke='#7faaff' stroke-width='2'/><circle cx='8' cy='16' r='3' fill='#7faaff'/><rect x='12' y='8' width='7' height='5' fill='#b3d1ff'/></svg>",
+  "fields": ["name", "type"],
+  "geometry": ["file"],
+  "tags": {"type": "raster"},
+  "name": "Generic Raster Graphic"
+} 
