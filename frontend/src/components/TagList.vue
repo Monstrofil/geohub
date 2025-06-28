@@ -142,6 +142,7 @@ const addedMoreFields = ref(new Set())
 // Raw tag editor state
 const showRawEditor = ref(false)
 const rawTagText = ref('')
+const isEditingRawTags = ref(false) // Flag to prevent watcher interference
 
 // Computed properties
 const allTagsCount = computed(() => {
@@ -212,6 +213,8 @@ function getFieldTypeLabel(fieldType) {
 
 // Raw tag editor functions
 function updateRawTagText() {
+  if (isEditingRawTags.value) return // Don't update if user is editing
+  
   const tags = Object.entries(values)
     .filter(([key, value]) => value !== null && value !== '')
     .map(([key, value]) => `${key}=${value}`)
@@ -220,6 +223,8 @@ function updateRawTagText() {
 }
 
 function parseRawTags() {
+  isEditingRawTags.value = true
+  
   const lines = rawTagText.value.split('\n')
   const newValues = {}
   
@@ -234,15 +239,20 @@ function parseRawTags() {
     }
   })
   
+  // Clear all existing values first
   Object.keys(values).forEach(key => {
-    values[key] = newValues[key] || null
+    values[key] = null
   })
   
+  // Set new values from parsed text
   Object.entries(newValues).forEach(([key, value]) => {
-    if (!(key in values)) {
-      values[key] = value
-    }
+    values[key] = value
   })
+  
+  // Reset the flag after a short delay to allow the change to propagate
+  setTimeout(() => {
+    isEditingRawTags.value = false
+  }, 100)
   
   emitTagsUpdate()
 }
@@ -296,6 +306,8 @@ async function emitTagsUpdate() {
 watch(
   () => props.fields,
   (fields) => {
+    if (isEditingRawTags.value) return // Don't interfere if user is editing raw tags
+    
     fields.forEach(field => {
       if (!(field.name in values)) {
         values[field.name] = null
@@ -308,6 +320,8 @@ watch(
 watch(
   () => props.currentFile,
   (file) => {
+    if (isEditingRawTags.value) return // Don't interfere if user is editing raw tags
+    
     if (file && file.tags) {
       // Clear all existing values first
       Object.keys(values).forEach(key => {
@@ -335,6 +349,8 @@ watch(
 watch(
   () => props.currentFile?.tags,
   (newTags) => {
+    if (isEditingRawTags.value) return // Don't interfere if user is editing raw tags
+    
     if (newTags) {
       // Clear all existing values first
       Object.keys(values).forEach(key => {
