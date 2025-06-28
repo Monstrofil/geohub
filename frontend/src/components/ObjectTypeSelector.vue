@@ -98,8 +98,12 @@ watch(() => props.currentFile?.tags, (newTags) => {
 function selectType(idx) {
   const newType = filteredTypes.value[idx]
   currentType.value = newType
+  selectedIndex.value = idx
+  
+  // Emit all the necessary events
   emit('update:selectedType', currentType.value)
   emit('type-changed', newType)
+  
   openMenu.value = false
   emit('menu-open', false)
 }

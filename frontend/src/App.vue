@@ -5,15 +5,19 @@
       <div class="section section-feature-list">
         <h3>
           <span>Файли ({{ files.length }})</span>
+          <button @click="loadFiles" class="refresh-btn">🔄 Оновити</button>
+          <button @click="showUploadModal = true" class="upload-btn">📤 Upload</button>
         </h3>
-        <div class="disclosure-wrap disclosure-wrap-feature_list">
+        <div v-if="loading" class="loading">Завантаження файлів...</div>
+        <div v-else-if="error" class="error">{{ error }}</div>
+        <div v-else class="disclosure-wrap disclosure-wrap-feature_list">
           <div class="feature-list">
             <FileCard 
               v-for="file in files" 
               :key="file.id"
               :file="file"
               :type="getFileType(file)"
-              :name="file.name"
+              :name="file.original_name"
               :selected="false"
               @click="selectFile(file)"
               @file-selected="handleFileSelected"
@@ -32,6 +36,13 @@
         @tags-updated="handleTagsUpdated"
       />
     </div>
+
+    <!-- Upload Modal -->
+    <SimpleUpload 
+      :is-open="showUploadModal"
+      @uploaded="handleFileUploaded"
+      @close="showUploadModal = false"
+    />
   </div>
 </template>
 
@@ -39,25 +50,38 @@
 import { ref, computed, onMounted } from 'vue'
 import FileCard from './components/FileCard.vue'
 import FileEditor from './components/FileEditor.vue'
+import SimpleUpload from './components/SimpleUpload.vue'
 import { loadFieldDefinitions } from './utils/fieldResolver.js'
+import apiService from './services/api.js'
 
 const selectedFile = ref(null)
 const allFieldDefinitions = ref({})
-
-// Central files array management
-const files = ref([
-  { id: 1, name: 'photo.jpg', tags: {"type": "raster", "name": "photo.jpg"} },
-  { id: 2, name: 'map.svg', tags: {"type": "vector", "name": "map.svg"} },
-  { id: 3, name: 'checkpoint.jpg', tags: {"military": "checkpoint", "name": "checkpoint.jpg"} },
-  { id: 4, name: 'trench.jpg', tags: {"military": "trench", "name": "trench.jpg"} },
-  { id: 5, name: 'unknown.bin', tags: {"name": "unknown.bin"} },
-  { id: 6, name: 'highway.jpg', tags: {"highway": "motorway", "name": "highway.jpg", "ref_road_number": "M1", "maxspeed": "120"} }
-])
+const files = ref([])
+const loading = ref(false)
+const error = ref(null)
+const showUploadModal = ref(false)
 
 onMounted(async () => {
   // Load all field definitions
   allFieldDefinitions.value = await loadFieldDefinitions()
+  // Load files from API
+  await loadFiles()
 })
+
+async function loadFiles() {
+  loading.value = true
+  error.value = null
+  
+  try {
+    const response = await apiService.getFiles()
+    files.value = response.files || []
+  } catch (err) {
+    console.error('Failed to load files:', err)
+    error.value = 'Помилка завантаження файлів: ' + err.message
+  } finally {
+    loading.value = false
+  }
+}
 
 function getFileType(file) {
   const tags = file.tags || {}
@@ -79,26 +103,35 @@ function backToList() {
   selectedFile.value = null
 }
 
-function handleFileUploaded(uploadData) {
-  // Here you would typically handle the file upload
-  // For now, we'll just log the upload data
-  console.log('File uploaded:', uploadData)
+async function handleFileUploaded(uploadData) {
+  // Refresh the file list after upload
+  await loadFiles()
   
-  // You could update the file in the files array here
-  // const fileIndex = files.value.findIndex(f => f.id === uploadData.originalFile.id)
-  // if (fileIndex !== -1) {
-  //   files.value[fileIndex] = { ...uploadData.originalFile, uploadedFile: uploadData.file }
-  // }
+  // If we have the uploaded file, select it
+  if (uploadData && uploadData.id) {
+    const uploadedFile = files.value.find(f => f.id === uploadData.id)
+    if (uploadedFile) {
+      selectedFile.value = uploadedFile
+    }
+  }
 }
 
-function handleTagsUpdated(newTags) {
+async function handleTagsUpdated(newTags) {
   if (selectedFile.value) {
-    // Update the file's tags in the files array
-    const fileIndex = files.value.findIndex(f => f.id === selectedFile.value.id)
-    if (fileIndex !== -1) {
-      files.value[fileIndex].tags = { ...newTags }
-      // Update the selectedFile reference to reflect changes
-      selectedFile.value = files.value[fileIndex]
+    try {
+      // Update tags via API
+      await apiService.updateFileTags(selectedFile.value.id, newTags)
+      
+      // Update the file's tags in the files array
+      const fileIndex = files.value.findIndex(f => f.id === selectedFile.value.id)
+      if (fileIndex !== -1) {
+        files.value[fileIndex].tags = { ...newTags }
+        // Update the selectedFile reference to reflect changes
+        selectedFile.value = files.value[fileIndex]
+      }
+    } catch (err) {
+      console.error('Failed to update tags:', err)
+      // You might want to show an error message to the user here
     }
   }
 }
@@ -120,5 +153,47 @@ function handleTagsUpdated(newTags) {
   flex-wrap: wrap;
   gap: 0.5rem;
   justify-content: flex-start;
+}
+
+.loading {
+  text-align: center;
+  padding: 2rem;
+  color: #666;
+}
+
+.error {
+  text-align: center;
+  padding: 1rem;
+  color: #d32f2f;
+  background: #ffebee;
+  border-radius: 4px;
+  margin: 1rem 0;
+}
+
+.refresh-btn, .upload-btn {
+  margin-left: 1rem;
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.refresh-btn {
+  background: #2196f3;
+  color: white;
+}
+
+.refresh-btn:hover {
+  background: #1976d2;
+}
+
+.upload-btn {
+  background: #4caf50;
+  color: white;
+}
+
+.upload-btn:hover {
+  background: #388e3c;
 }
 </style> 

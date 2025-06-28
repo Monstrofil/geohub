@@ -120,6 +120,7 @@ import ObjectTypeSelector from './ObjectTypeSelector.vue'
 import TagList from './TagList.vue'
 import { matchTagsToPreset } from '../utils/tagMatcher.js'
 import { loadFieldDefinitions, resolveFields } from '../utils/fieldResolver.js'
+import apiService from '../services/api.js'
 
 const props = defineProps({
   file: {
@@ -207,11 +208,17 @@ function handleTypeChange(newType) {
     const newTags = { ...newType.tags }
     
     // Preserve the name tag if it exists
-    if (props.file.tags.name) {
+    if (props.file.tags && props.file.tags.name) {
       newTags.name = props.file.tags.name
     }
     
+    // Update the file's tags immediately in the parent component
     updateFileTags(newTags)
+    
+    // Also update the local file object to reflect changes immediately
+    if (props.file) {
+      props.file.tags = { ...newTags }
+    }
   }
 }
 
@@ -247,31 +254,50 @@ function handleFileSelect(event) {
   }
 }
 
-function processFile(file) {
-  // Simulate upload process
+async function processFile(file) {
   uploadStatus.value = { state: 'uploading', progress: 0 }
   
-  const interval = setInterval(() => {
-    uploadStatus.value.progress += 10
-    if (uploadStatus.value.progress >= 100) {
-      clearInterval(interval)
-      uploadStatus.value = { state: 'success' }
-      
-      // Emit the uploaded file
-      emit('file-uploaded', {
-        file: file,
-        originalFile: props.file
-      })
-      
-      // Reset after 3 seconds
-      setTimeout(() => {
-        uploadStatus.value = null
-        if (fileInput.value) {
-          fileInput.value.value = ''
-        }
-      }, 3000)
+  try {
+    // Prepare tags for the new file
+    const tags = {
+      name: file.name,
+      // Preserve some tags from the original file if they exist
+      ...(props.file.tags.type && { type: props.file.tags.type }),
+      ...(props.file.tags.military && { military: props.file.tags.military }),
+      ...(props.file.tags.highway && { highway: props.file.tags.highway })
     }
-  }, 200)
+    
+    // Upload file via API
+    const uploadedFile = await apiService.uploadFile(file, tags)
+    
+    uploadStatus.value = { state: 'success' }
+    
+    // Emit the uploaded file data
+    emit('file-uploaded', uploadedFile)
+    
+    // Reset after 3 seconds
+    setTimeout(() => {
+      uploadStatus.value = null
+      if (fileInput.value) {
+        fileInput.value.value = ''
+      }
+    }, 3000)
+    
+  } catch (error) {
+    console.error('Upload failed:', error)
+    uploadStatus.value = { 
+      state: 'error', 
+      error: error.message || 'Помилка завантаження файлу'
+    }
+    
+    // Reset after 5 seconds
+    setTimeout(() => {
+      uploadStatus.value = null
+      if (fileInput.value) {
+        fileInput.value.value = ''
+      }
+    }, 5000)
+  }
 }
 
 function triggerFileSelect() {

@@ -108,6 +108,7 @@
 import { reactive, watch, nextTick, ref, computed } from 'vue'
 import { resolveFields } from '../utils/fieldResolver.js'
 import FieldRenderer from './fields/FieldRenderer.vue'
+import apiService from '../services/api.js'
 
 const props = defineProps({
   fields: {
@@ -266,14 +267,26 @@ function addMoreField(fieldKey) {
   emitTagsUpdate()
 }
 
-function emitTagsUpdate() {
+async function emitTagsUpdate() {
   const tags = {}
   Object.entries(values).forEach(([key, value]) => {
     if (value !== null && value !== '') {
       tags[key] = value
     }
   })
+  
+  // Emit the tags update event for local state management
   emit('tags-updated', tags)
+  
+  // Also update tags via API if we have a current file
+  if (props.currentFile && props.currentFile.id) {
+    try {
+      await apiService.updateFileTags(props.currentFile.id, tags)
+    } catch (error) {
+      console.error('Failed to update tags via API:', error)
+      // You might want to show an error message to the user here
+    }
+  }
 }
 
 // Watchers
@@ -293,12 +306,15 @@ watch(
   () => props.currentFile,
   (file) => {
     if (file && file.tags) {
+      // Clear all existing values first
       Object.keys(values).forEach(key => {
         values[key] = null
       })
       
+      // Clear added more fields
       addedMoreFields.value.clear()
       
+      // Set new values from file tags
       Object.entries(file.tags).forEach(([key, value]) => {
         values[key] = value
         if (props.selectedType?.moreFields?.includes(key)) {
@@ -309,7 +325,34 @@ watch(
       updateRawTagText()
     }
   },
-  { immediate: true }
+  { immediate: true, deep: true }
+)
+
+// Also watch for changes in the file's tags specifically
+watch(
+  () => props.currentFile?.tags,
+  (newTags) => {
+    if (newTags) {
+      // Clear all existing values first
+      Object.keys(values).forEach(key => {
+        values[key] = null
+      })
+      
+      // Clear added more fields
+      addedMoreFields.value.clear()
+      
+      // Set new values from file tags
+      Object.entries(newTags).forEach(([key, value]) => {
+        values[key] = value
+        if (props.selectedType?.moreFields?.includes(key)) {
+          addedMoreFields.value.add(key)
+        }
+      })
+      
+      updateRawTagText()
+    }
+  },
+  { immediate: true, deep: true }
 )
 </script>
 
