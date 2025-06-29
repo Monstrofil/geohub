@@ -5,18 +5,14 @@ import os
 from pydantic import BaseModel
 
 from models import File_Pydantic
-from services import FileService, TagService
+from services import FileService, TagService, FileTypeService
 from mapserver_service import MapServerService
 
 
-router = APIRouter()
+router = APIRouter(prefix="/api/v1", tags=["files"])
 
-# Initialize MapServer service with shared directory
-mapserver_service = MapServerService(
-    uploads_dir="/opt/shared/uploads",
-    mapserver_url="http://localhost:8082",
-    shared_mapserver_dir="/opt/shared/mapserver"
-)
+# Initialize MapServer service
+mapserver_service = MapServerService()
 
 
 # Pydantic models for request/response
@@ -26,6 +22,7 @@ class FileResponse(BaseModel):
     original_name: str
     file_size: int
     mime_type: str
+    base_file_type: str
     tags: Dict[str, str]
     created_at: str
     updated_at: str
@@ -44,6 +41,7 @@ class TagUpdateRequest(BaseModel):
 
 class FileSearchRequest(BaseModel):
     tags: Dict[str, str]
+    base_type: Optional[str] = None
     skip: int = 0
     limit: int = 100
 
@@ -52,9 +50,10 @@ class FileSearchRequest(BaseModel):
 @router.post("/files/upload", response_model=FileResponse)
 async def upload_file(
     file: UploadFile = File(...),
-    tags: Optional[str] = Form(None)
+    tags: Optional[str] = Form(None),
+    expected_type: Optional[str] = Form(None)
 ):
-    """Upload a new file with optional tags"""
+    """Upload a new file with optional tags and type validation"""
     if not file.filename:
         raise HTTPException(status_code=400, detail="No file provided")
     
@@ -67,9 +66,13 @@ async def upload_file(
         except json.JSONDecodeError:
             raise HTTPException(status_code=400, detail="Invalid tags format")
     
+    # Validate expected type if provided
+    if expected_type and expected_type not in ["raster", "vector", "raw"]:
+        raise HTTPException(status_code=400, detail="Invalid expected_type. Must be 'raster', 'vector', or 'raw'")
+    
     # Create file
     file_data = {"file": file}
-    file_obj = await FileService.create_file(file_data, file_tags)
+    file_obj = await FileService.create_file(file_data, file_tags, expected_type)
     
     return FileResponse(
         id=file_obj.id,
@@ -77,6 +80,7 @@ async def upload_file(
         original_name=file_obj.original_name,
         file_size=file_obj.file_size,
         mime_type=file_obj.mime_type,
+        base_file_type=file_obj.base_file_type,
         tags=file_obj.tags,
         created_at=file_obj.created_at.isoformat(),
         updated_at=file_obj.updated_at.isoformat()
@@ -96,6 +100,7 @@ async def list_files(skip: int = 0, limit: int = 100):
                 original_name=file.original_name,
                 file_size=file.file_size,
                 mime_type=file.mime_type,
+                base_file_type=file.base_file_type,
                 tags=file.tags,
                 created_at=file.created_at.isoformat(),
                 updated_at=file.updated_at.isoformat()
@@ -120,6 +125,7 @@ async def get_file(file_id: int):
         original_name=file_obj.original_name,
         file_size=file_obj.file_size,
         mime_type=file_obj.mime_type,
+        base_file_type=file_obj.base_file_type,
         tags=file_obj.tags,
         created_at=file_obj.created_at.isoformat(),
         updated_at=file_obj.updated_at.isoformat()
@@ -158,6 +164,7 @@ async def search_files(request: FileSearchRequest):
     """Search files by tags"""
     files = await FileService.search_files_by_tags(
         tags=request.tags,
+        base_type=request.base_type,
         skip=request.skip,
         limit=request.limit
     )
@@ -170,6 +177,7 @@ async def search_files(request: FileSearchRequest):
                 original_name=file.original_name,
                 file_size=file.file_size,
                 mime_type=file.mime_type,
+                base_file_type=file.base_file_type,
                 tags=file.tags,
                 created_at=file.created_at.isoformat(),
                 updated_at=file.updated_at.isoformat()

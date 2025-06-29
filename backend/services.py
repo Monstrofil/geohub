@@ -3,8 +3,122 @@ from tortoise.expressions import Q
 import os
 import uuid
 import aiofiles
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 from fastapi import UploadFile, HTTPException
+
+
+class FileTypeService:
+    """Service for detecting file types using GDAL and GeoPandas"""
+    
+    @classmethod
+    def detect_file_type(cls, filename: str, mime_type: str = None) -> Tuple[str, str]:
+        """
+        Detect the base file type using GDAL and GeoPandas
+        
+        Returns:
+            Tuple[str, str]: (base_file_type, description)
+        """
+        if not filename:
+            return "raw", "Unknown file type"
+        
+        file_path = os.path.join(FileService.UPLOAD_DIR, filename)
+        
+        # Check if file exists
+        if not os.path.exists(file_path):
+            return "raw", "File not found"
+        
+        try:
+            # Try to detect as raster using GDAL
+            if cls._is_raster(file_path):
+                return "raster", "Georeferenced raster"
+            
+            # Try to detect as vector using GeoPandas
+            if cls._is_vector(file_path):
+                return "vector", "Georeferenced vector"
+            
+            # If neither, it's a raw file
+            return "raw", "Document or data file"
+            
+        except Exception as e:
+            print(f"Error detecting file type for {filename}: {e}")
+            return "raw", "Document or data file"
+    
+    @classmethod
+    def _is_raster(cls, file_path: str) -> bool:
+        """
+        Check if file is a raster using GDAL
+        """
+        try:
+            from osgeo import gdal
+            
+            dataset = gdal.Open(file_path)
+            if dataset is None:
+                return False
+            
+            # Check if it has geotransform (extent)
+            geotransform = dataset.GetGeoTransform()
+            if geotransform is None:
+                dataset = None
+                return False
+            
+            dataset = None
+            return True
+            
+        except ImportError:
+            print("GDAL not available")
+            return False
+        except Exception as e:
+            print(f"Error checking raster with GDAL: {e}")
+            return False
+    
+    @classmethod
+    def _is_vector(cls, file_path: str) -> bool:
+        """
+        Check if file is a vector using GeoPandas
+        """
+        try:
+            import geopandas as gpd
+            
+            gdf = gpd.read_file(file_path)
+            return True
+            
+        except ImportError:
+            print("GeoPandas not available")
+            return False
+        except Exception as e:
+            print(f"Error checking vector with GeoPandas: {e}")
+            return False
+    
+    @classmethod
+    def validate_file_type(cls, filename: str, expected_type: str) -> bool:
+        """
+        Validate if a file matches the expected base type
+        
+        Args:
+            filename: The filename to check
+            expected_type: Expected base type ('raster', 'vector', 'raw')
+        
+        Returns:
+            bool: True if file type matches expected type
+        """
+        if not filename:
+            return False
+        
+        # For validation, we need to actually check the file
+        file_path = os.path.join(FileService.UPLOAD_DIR, filename)
+        
+        if not os.path.exists(file_path):
+            return False
+        
+        if expected_type == "raster":
+            return cls._is_raster(file_path)
+        elif expected_type == "vector":
+            return cls._is_vector(file_path)
+        elif expected_type == "raw":
+            # Raw accepts anything that's not raster or vector
+            return not cls._is_raster(file_path) and not cls._is_vector(file_path)
+        else:
+            return False
 
 
 class FileService:
@@ -39,9 +153,33 @@ class FileService:
         }
     
     @classmethod
-    async def create_file(cls, file_data: Dict[str, Any], tags: Dict[str, str] = None) -> File_Pydantic:
-        """Create a new file record"""
+    async def create_file(cls, file_data: Dict[str, Any], tags: Dict[str, str] = None, expected_type: str = None) -> File_Pydantic:
+        """Create a new file record with automatic type detection"""
         file_info = await cls.save_uploaded_file(file_data["file"])
+        
+        # Detect file type
+        base_file_type, description = FileTypeService.detect_file_type(
+            file_info["original_name"], 
+            file_info["mime_type"]
+        )
+        
+        # Validate against expected type if provided
+        if expected_type and not FileTypeService.validate_file_type(file_info["original_name"], expected_type):
+            # Delete the uploaded file if validation fails
+            if os.path.exists(file_info["file_path"]):
+                os.remove(file_info["file_path"])
+            raise HTTPException(
+                status_code=400, 
+                detail=f"File type not allowed for '{expected_type}'. Expected: {', '.join(FileTypeService.get_accepted_extensions(expected_type))}"
+            )
+        
+        # Prepare tags with type information
+        file_tags = tags or {}
+        file_tags.update({
+            "base_type": base_file_type,
+            "type_description": description,
+            "original_extension": os.path.splitext(file_info["original_name"])[1].lower()
+        })
         
         # Create file record
         file_obj = await File.create(
@@ -50,7 +188,8 @@ class FileService:
             file_path=file_info["file_path"],
             file_size=file_info["file_size"],
             mime_type=file_info["mime_type"],
-            tags=tags or {}
+            base_file_type=base_file_type,
+            tags=file_tags
         )
         
         return await File_Pydantic.from_tortoise_orm(file_obj)
@@ -95,10 +234,15 @@ class FileService:
         return True
     
     @classmethod
-    async def search_files_by_tags(cls, tags: Dict[str, str], skip: int = 0, limit: int = 100) -> List[File_Pydantic]:
-        """Search files by tags"""
+    async def search_files_by_tags(cls, tags: Dict[str, str], base_type: str = None, skip: int = 0, limit: int = 100) -> List[File_Pydantic]:
+        """Search files by tags and optionally filter by base type"""
         query = File.all()
         
+        # Filter by base type if provided
+        if base_type:
+            query = query.filter(base_file_type=base_type)
+        
+        # Filter by tags
         for key, value in tags.items():
             query = query.filter(tags__contains={key: value})
         

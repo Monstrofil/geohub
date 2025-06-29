@@ -1,9 +1,14 @@
 FROM python:3.11-slim
 
-# Install system dependencies for GDAL
+# Install system dependencies for GDAL and GeoPandas
 RUN apt-get update && apt-get install -y \
     gdal-bin \
     libgdal-dev \
+    libgeos-dev \
+    libproj-dev \
+    proj-data \
+    proj-bin \
+    libspatialindex-dev \
     gcc \
     g++ \
     && rm -rf /var/lib/apt/lists/*
@@ -11,6 +16,7 @@ RUN apt-get update && apt-get install -y \
 # Set GDAL environment variables
 ENV CPLUS_INCLUDE_PATH=/usr/include/gdal
 ENV C_INCLUDE_PATH=/usr/include/gdal
+ENV PROJ_LIB=/usr/share/proj
 
 WORKDIR /app
 COPY requirements.txt ./

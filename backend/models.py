@@ -11,6 +11,7 @@ class File(models.Model):
     file_path = fields.CharField(max_length=500)
     file_size = fields.BigIntField()
     mime_type = fields.CharField(max_length=100)
+    base_file_type = fields.CharField(max_length=20, default="raw")  # raster, vector, raw
     tags = fields.JSONField(default=dict)
     created_at = fields.DatetimeField(auto_now_add=True)
     updated_at = fields.DatetimeField(auto_now=True)
@@ -19,7 +20,7 @@ class File(models.Model):
         table = "files"
 
     def __str__(self):
-        return f"File(id={self.id}, name='{self.name}')"
+        return f"File(id={self.id}, name='{self.name}', type='{self.base_file_type}')"
 
 
 class Tag(models.Model):

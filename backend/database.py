@@ -17,19 +17,13 @@ TORTOISE_ORM = {
     },
     "apps": {
         "models": {
-            "models": ["models"],
+            "models": ["models", "aerich.models"],
             "default_connection": "default",
         }
     },
     "use_tz": False,
     "timezone": "UTC"
 }
-
-
-async def init_db():
-    """Initialize database connection and create tables"""
-    await Tortoise.init(config=TORTOISE_ORM)
-    await Tortoise.generate_schemas()
 
 
 async def close_db():

@@ -3,14 +3,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import os
 
-from database import init_db, close_db
+from database import TORTOISE_ORM, close_db
 from api import router as api_router
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    await init_db()
+    from tortoise import Tortoise
+    await Tortoise.init(config=TORTOISE_ORM)
     yield
     # Shutdown
     await close_db()
