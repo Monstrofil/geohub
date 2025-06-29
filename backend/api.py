@@ -11,8 +11,12 @@ from mapserver_service import MapServerService
 
 router = APIRouter()
 
-# Initialize MapServer service
-mapserver_service = MapServerService()
+# Initialize MapServer service with shared directory
+mapserver_service = MapServerService(
+    uploads_dir="/opt/shared/uploads",
+    mapserver_url="http://localhost:8082",
+    shared_mapserver_dir="/opt/shared/mapserver"
+)
 
 
 # Pydantic models for request/response
@@ -232,4 +236,28 @@ async def get_file_map(file_id: int):
     if not map_url:
         raise HTTPException(status_code=400, detail="File type not supported for mapping")
     
-    return {"map_url": map_url} 
+    return {"map_url": map_url}
+
+
+@router.get("/files/{file_id}/extent")
+async def get_file_extent(file_id: int):
+    """Get the extent (bounding box) of a GeoTIFF file"""
+    file_obj = await FileService.get_file(file_id)
+    if not file_obj:
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    extent = mapserver_service.get_file_extent(file_obj.name)
+    if not extent:
+        raise HTTPException(status_code=400, detail="File type not supported for extent calculation")
+    
+    return {"extent": extent}
+
+
+@router.post("/mapserver/cleanup")
+async def cleanup_mapserver_configs(max_age_hours: int = 24):
+    """Clean up old MapServer configuration files"""
+    try:
+        mapserver_service.cleanup_old_configs(max_age_hours)
+        return {"message": f"Cleaned up MapServer configs older than {max_age_hours} hours"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Cleanup failed: {str(e)}") 

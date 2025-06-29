@@ -21,6 +21,8 @@ services:
       - "8000:8000"
     volumes:
       - ./backend:/app
+      - ./backend/uploads:/opt/shared/uploads
+      - mapserver_configs:/opt/shared/mapserver
     environment:
       DATABASE_URL: postgres://tagger_user:tagger_password@postgres:5432/tagger_db
     depends_on:
@@ -40,12 +42,14 @@ services:
       dockerfile: Dockerfile.mapserver
     container_name: tagger_mapserver
     ports:
-      - "8081:80"
+      - "8082:80"
     volumes:
       - ./backend/uploads:/opt/mapserver
+      - mapserver_configs:/opt/shared/mapserver
       - ./mapserver/mapserver.conf:/usr/local/etc/mapserver.conf
     depends_on:
       - backend
 
 volumes:
   postgres_data:
+  mapserver_configs:

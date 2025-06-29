@@ -65,7 +65,10 @@ COPY apache.mapserver.conf /usr/local/apache2/conf/extra/mapserver.conf
 RUN echo "Include conf/extra/mapserver.conf" >> /usr/local/apache2/conf/httpd.conf
 
 # Create directories for maps and data
-RUN mkdir -p /opt/mapserver /usr/local/etc
+RUN mkdir -p /opt/mapserver /usr/local/etc /opt/shared/mapserver
+
+# Set proper permissions for shared directory
+RUN chmod 755 /opt/shared/mapserver
 
 EXPOSE 80
 

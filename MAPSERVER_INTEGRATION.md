@@ -16,7 +16,7 @@ MapServer is a platform for publishing spatial data and interactive mapping appl
 
 1. **MapServer Container** (`mapserver` service in docker-compose.yml)
    - Built from custom Dockerfile.mapserver
-   - Runs on port 8081
+   - Runs on port 8082
    - Serves GeoTIFF files via FastCGI
    - Apache web server with MapServer modules
 
@@ -60,7 +60,7 @@ This will start:
 - PostgreSQL (port 5432)
 - Backend API (port 8000)
 - Frontend (port 8080)
-- MapServer (port 8081)
+- MapServer (port 8082)
 
 ### GeoTIFF Preview
 

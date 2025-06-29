@@ -39,58 +39,8 @@
           :change-tracker="changeTracker"
           @tags-updated="handleTagsUpdated"
         />
-      </div>
-
-      <!-- Right panel: File editor -->
-      <div class="right-panel">
-        <!-- Right panel header with commit functionality -->
-        <div class="right-panel-header">
-          <div class="panel-actions">
-            <div v-if="changeTracker.hasChanges.value" class="changes-info">
-              <span class="changes-count">{{ changeTracker.changeCount.value }} change{{ changeTracker.changeCount.value !== 1 ? 's' : '' }} pending</span>
-            </div>
-            
-            <button 
-              v-if="changeTracker.hasChanges.value"
-              class="pure-button pure-button-primary" 
-              @click="handleCommit"
-              :disabled="changeTracker.isCommitting.value"
-            >
-              <i v-if="changeTracker.isCommitting.value" class="fas fa-spinner fa-spin"></i>
-              <i v-else class="fas fa-check"></i>
-              {{ changeTracker.isCommitting.value ? 'Committing...' : 'Commit Changes' }}
-            </button>
-            
-            <div v-else class="no-changes">
-              <span>No pending changes</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="editor-main">
-          <!-- GeoTIFF Preview for raster files -->
-          <GeoTiffPreview 
-            v-if="isGeoTiff"
-            :fileId="file.id"
-            :filename="file.name"
-            class="geotiff-preview-container"
-          />
-          
-          <!-- Placeholder for other file types -->
-          <div v-else class="editor-placeholder">
-            <div class="placeholder-icon">
-              <svg width="64" height="64" viewBox="0 0 64 64">
-                <rect x="8" y="8" width="48" height="48" rx="8" fill="#f8f9fa" stroke="#dee2e6" stroke-width="2"/>
-                <path d="M20 24h24M20 32h16M20 40h12" stroke="#6c757d" stroke-width="2" fill="none"/>
-              </svg>
-            </div>
-            <h3>Редактор файлу</h3>
-            <p>Тут буде розміщено інлайн редактор для файлу {{ file.name }}</p>
-            <p class="placeholder-note">Функціональність редактора буде додана пізніше</p>
-          </div>
-        </div>
-
-        <!-- File upload section -->
+        
+        <!-- File upload section moved to left panel -->
         <div class="upload-section">
           <div class="upload-header">
             <h3>Завантажити нову версію</h3>
@@ -144,6 +94,56 @@
           </div>
         </div>
       </div>
+
+      <!-- Right panel: File editor -->
+      <div class="right-panel">
+        <!-- Right panel header with commit functionality -->
+        <div class="right-panel-header">
+          <div class="panel-actions">
+            <div v-if="changeTracker.hasChanges.value" class="changes-info">
+              <span class="changes-count">{{ changeTracker.changeCount.value }} change{{ changeTracker.changeCount.value !== 1 ? 's' : '' }} pending</span>
+            </div>
+            
+            <button 
+              v-if="changeTracker.hasChanges.value"
+              class="pure-button pure-button-primary" 
+              @click="handleCommit"
+              :disabled="changeTracker.isCommitting.value"
+            >
+              <i v-if="changeTracker.isCommitting.value" class="fas fa-spinner fa-spin"></i>
+              <i v-else class="fas fa-check"></i>
+              {{ changeTracker.isCommitting.value ? 'Committing...' : 'Commit Changes' }}
+            </button>
+            
+            <div v-else class="no-changes">
+              <span>No pending changes</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="editor-main">
+          <!-- Interactive Map for GeoTIFF files -->
+          <InteractiveMap 
+            v-if="isGeoTiff"
+            :fileId="file.id"
+            :filename="file.name"
+            class="interactive-map-container"
+          />
+          
+          <!-- Placeholder for other file types -->
+          <div v-else class="editor-placeholder">
+            <div class="placeholder-icon">
+              <svg width="64" height="64" viewBox="0 0 64 64">
+                <rect x="8" y="8" width="48" height="48" rx="8" fill="#f8f9fa" stroke="#dee2e6" stroke-width="2"/>
+                <path d="M20 24h24M20 32h16M20 40h12" stroke="#6c757d" stroke-width="2" fill="none"/>
+              </svg>
+            </div>
+            <h3>Редактор файлу</h3>
+            <p>Тут буде розміщено інлайн редактор для файлу {{ file.name }}</p>
+            <p class="placeholder-note">Функціональність редактора буде додана пізніше</p>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -153,6 +153,7 @@ import { ref, computed, onMounted } from 'vue'
 import ObjectTypeSelector from './ObjectTypeSelector.vue'
 import TagList from './TagList.vue'
 import GeoTiffPreview from './GeoTiffPreview.vue'
+import InteractiveMap from './InteractiveMap.vue'
 import { matchTagsToPreset } from '../utils/tagMatcher.js'
 import { loadFieldDefinitions, resolveFields } from '../utils/fieldResolver.js'
 import apiService from '../services/api.js'
@@ -516,32 +517,35 @@ async function handleCommit() {
 .upload-section {
   background: white;
   border-top: 1px solid #eee;
-  padding: 1.5rem;
+  padding: 1rem;
+  margin-top: 1rem;
 }
 
 .upload-header {
-  margin-bottom: 1rem;
+  margin-bottom: 0.75rem;
 }
 
 .upload-header h3 {
-  margin: 0 0 0.5rem 0;
+  margin: 0 0 0.25rem 0;
   color: #333;
+  font-size: 1rem;
 }
 
 .upload-header p {
   margin: 0;
   color: #666;
-  font-size: 0.9rem;
+  font-size: 0.8rem;
 }
 
 .upload-area {
   position: relative;
   border: 2px dashed #ddd;
-  border-radius: 8px;
-  padding: 2rem;
+  border-radius: 6px;
+  padding: 1rem;
   text-align: center;
   transition: all 0.15s;
   cursor: pointer;
+  min-height: 80px;
 }
 
 .upload-area:hover {
@@ -569,42 +573,49 @@ async function handleCommit() {
 }
 
 .upload-icon {
-  margin-bottom: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.upload-icon svg {
+  width: 32px;
+  height: 32px;
 }
 
 .upload-title {
-  font-size: 1.1rem;
+  font-size: 0.9rem;
   font-weight: 500;
   color: #333;
-  margin: 0 0 0.5rem 0;
+  margin: 0 0 0.25rem 0;
 }
 
 .upload-subtitle {
   color: #666;
   margin: 0;
+  font-size: 0.75rem;
 }
 
 .upload-status {
-  margin-top: 1rem;
-  padding: 1rem;
-  border-radius: 6px;
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  border-radius: 4px;
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  font-size: 0.8rem;
 }
 
 .upload-progress {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 0.75rem;
   width: 100%;
 }
 
 .progress-bar {
   flex: 1;
-  height: 8px;
+  height: 6px;
   background: #e9ecef;
-  border-radius: 4px;
+  border-radius: 3px;
   overflow: hidden;
 }
 
@@ -615,9 +626,9 @@ async function handleCommit() {
 }
 
 .progress-text {
-  font-size: 0.9rem;
+  font-size: 0.8rem;
   color: #666;
-  min-width: 40px;
+  min-width: 35px;
 }
 
 .upload-success {
@@ -706,9 +717,10 @@ async function handleCommit() {
   color: #666;
 }
 
-.geotiff-preview-container {
+.interactive-map-container {
   margin: 1rem;
   border-radius: 8px;
   overflow: hidden;
+  height: 600px;
 }
 </style> 
