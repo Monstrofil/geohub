@@ -8,32 +8,25 @@ export function matchTagsToPreset(fileTags, allPresets) {
   let bestScore = 0
 
   for (const preset of allPresets) {
+    console.log("Checking preset", preset)
     const presetTags = preset.tags || {}
-    let score = 0
-    let totalPossibleMatches = Object.keys(presetTags).length
 
-    // If preset has no tags, it's a generic fallback
-    if (totalPossibleMatches === 0) {
-      if (preset.name === 'Generic File') {
-        bestMatch = preset
-        bestScore = preset.matchScore || 0.1
-      }
-      continue
-    }
-
-    // Check how many tags match
+    // Check if all preset tags exist in fileTags with the same value
+    let allMatch = true
     for (const [key, value] of Object.entries(presetTags)) {
-      if (fileTags[key] === value) {
-        score += 1
+      if (fileTags[key] !== value) {
+        allMatch = false
+        break
       }
     }
 
-    // Calculate match percentage
-    const matchPercentage = score / totalPossibleMatches
-
-    if (matchPercentage > bestScore) {
-      bestScore = matchPercentage
-      bestMatch = preset
+    if (allMatch) {
+      // Use matchScore to break ties, or just pick the first match
+      const score = preset.matchScore || 1
+      if (!bestMatch || score > bestScore) {
+        bestMatch = preset
+        bestScore = score
+      }
     }
   }
 
