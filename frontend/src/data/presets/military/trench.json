@@ -1,8 +1,0 @@
-{
-    "icon": "temaki-trench",
-    "fields": ["name"],
-    "geometry": ["line", "area"],
-    "tags": {"military": "trench"},
-    "terms": ["trench", "military", "defense"],
-    "name": "Military Trench"
-} 

@@ -334,9 +334,6 @@ async function processFile(file) {
     // Prepare tags for the new file
     const tags = {
       name: file.name,
-      // Preserve some tags from the original file if they exist
-      ...(props.file.tags.military && { military: props.file.tags.military }),
-      ...(props.file.tags.highway && { highway: props.file.tags.highway })
     }
     
     // Upload file via API

@@ -12,6 +12,9 @@
           <div class="label">
             <div class="label-inner">
               <div class="namepart">{{ currentType ? currentType.name : '' }}</div>
+              <div v-if="!isCurrentTypeCompatible" class="incompatible-warning">
+                Несумісний з типом файлу
+              </div>
             </div>
           </div>
         </button>
@@ -30,7 +33,10 @@
       <div class="type-modal-search">
         <input type="search" v-model="search" placeholder="Пошук" class="pure-input-1" />
       </div>
-      <div class="type-modal-list">
+      <div v-if="filteredTypes.length === 0" class="no-compatible-types">
+        <p>Немає сумісних типів для файлу типу "{{ props.currentFile?.base_file_type || 'невідомий' }}"</p>
+      </div>
+      <div v-else class="type-modal-list">
         <button v-for="(type, idx) in filteredTypes" :key="type.name" class="type-modal-item" @click="selectType(idx)">
           <span v-html="type.icon" class="preset-icon"></span>
           <span>{{ type.name }}</span>
@@ -69,8 +75,31 @@ onMounted(async () => {
   await loadFieldDefinitions()
   
   if (types.value.length > 0) {
-    // Set current type to the first one as default, but allow override from props
-    currentType.value = props.selectedType || types.value[0]
+    // If we have a selectedType from props, use it if it's compatible
+    if (props.selectedType && props.currentFile?.base_file_type) {
+      const isCompatible = props.selectedType.base_file_type && 
+                          props.selectedType.base_file_type.includes(props.currentFile.base_file_type)
+      if (isCompatible) {
+        currentType.value = props.selectedType
+      } else {
+        // Find first compatible type
+        const compatibleType = types.value.find(preset => 
+          preset.base_file_type && preset.base_file_type.includes(props.currentFile.base_file_type)
+        )
+        currentType.value = compatibleType || types.value[0]
+      }
+    } else {
+      // Set current type to the first compatible one, or first available as fallback
+      if (props.currentFile?.base_file_type) {
+        const compatibleType = types.value.find(preset => 
+          preset.base_file_type && preset.base_file_type.includes(props.currentFile.base_file_type)
+        )
+        currentType.value = compatibleType || types.value[0]
+      } else {
+        currentType.value = props.selectedType || types.value[0]
+      }
+    }
+    
     selectedIndex.value = types.value.findIndex(t => t.name === currentType.value?.name) || 0
     emit('update:selectedType', currentType.value)
   }
@@ -118,9 +147,45 @@ watch(openMenu, (val) => {
 })
 
 const filteredTypes = computed(() => {
-  if (!search.value) return types.value
-  return types.value.filter(t => t.name.toLowerCase().includes(search.value.toLowerCase()))
+  // First filter by file type compatibility
+  let compatibleTypes = types.value
+  
+  if (props.currentFile?.base_file_type) {
+    compatibleTypes = types.value.filter(preset => {
+      // Check if the preset's base_file_type array includes the current file's type
+      return preset.base_file_type && preset.base_file_type.includes(props.currentFile.base_file_type)
+    })
+  }
+  
+  // Then filter by search term
+  if (!search.value) return compatibleTypes
+  return compatibleTypes.filter(t => t.name.toLowerCase().includes(search.value.toLowerCase()))
 })
+
+// Add a computed property to check if current type is still compatible
+const isCurrentTypeCompatible = computed(() => {
+  if (!currentType.value || !props.currentFile?.base_file_type) return true
+  return currentType.value.base_file_type && currentType.value.base_file_type.includes(props.currentFile.base_file_type)
+})
+
+// Watch for file type changes and update current type if needed
+watch(() => props.currentFile?.base_file_type, (newFileType) => {
+  if (newFileType && types.value.length > 0) {
+    // Check if current type is still compatible
+    if (!isCurrentTypeCompatible.value) {
+      // Find the first compatible type
+      const compatibleType = types.value.find(preset => 
+        preset.base_file_type && preset.base_file_type.includes(newFileType)
+      )
+      
+      if (compatibleType) {
+        currentType.value = compatibleType
+        emit('update:selectedType', currentType.value)
+        emit('type-changed', compatibleType)
+      }
+    }
+  }
+}, { immediate: true })
 </script>
 
 <style scoped>
@@ -144,6 +209,12 @@ const filteredTypes = computed(() => {
 .label-inner {
   font-weight: bold;
   color: #333;
+}
+.incompatible-warning {
+  font-size: 0.75rem;
+  color: #dc3545;
+  font-weight: normal;
+  margin-top: 0.25rem;
 }
 .pure-input-1-2 {
   min-width: 120px;
@@ -207,5 +278,17 @@ const filteredTypes = computed(() => {
   font-size: 1.5rem;
   cursor: pointer;
   color: #888;
+}
+.no-compatible-types {
+  padding: 1rem;
+  text-align: center;
+  color: #666;
+  background: #f8f9fa;
+  border-radius: 4px;
+  margin: 1rem 0;
+}
+.no-compatible-types p {
+  margin: 0;
+  font-style: italic;
 }
 </style> 

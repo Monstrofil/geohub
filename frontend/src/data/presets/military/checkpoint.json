@@ -1,8 +1,0 @@
-{
-    "icon": "temaki-checkpoint",
-    "fields": ["name"],
-    "geometry": ["point", "area"],
-    "tags": {"military": "checkpoint"},
-    "terms": ["checkpoint", "guard", "military"],
-    "name": "Military Checkpoint"
-} 
