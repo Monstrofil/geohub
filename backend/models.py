@@ -39,27 +39,9 @@ def calculate_file_obj_hash(file_obj: File):
     return sha1
 
 
-
-class Tag(models.Model):
-    id = fields.IntField(pk=True)
-    file = fields.ForeignKeyField('models.File', related_name='tag_entries')
-    key = fields.CharField(max_length=100)
-    value = fields.CharField(max_length=500)
-    created_at = fields.DatetimeField(auto_now_add=True)
-
-    class Meta:
-        table = "tags"
-        unique_together = (("file", "key"),)
-
-    def __str__(self):
-        return f"Tag(id={self.id}, file_id={self.file_id}, {self.key}={self.value})"
-
-
 # Pydantic models for API
 File_Pydantic = pydantic_model_creator(File, name="File")
 FileIn_Pydantic = pydantic_model_creator(File, name="FileIn", exclude_readonly=True)
-Tag_Pydantic = pydantic_model_creator(Tag, name="Tag")
-TagIn_Pydantic = pydantic_model_creator(Tag, name="TagIn", exclude_readonly=True)
 
 
 class Tree(models.Model):
@@ -69,9 +51,9 @@ class Tree(models.Model):
 
 class TreeEntry(models.Model):
     id = fields.IntField(pk=True)
-    sha1 = fields.CharField(max_length=40)  # unique tree identifier
-    object_type = fields.CharField(max_length=10)  # e.g., 'file'
-    object_id = fields.IntField()  # points to file (File.id)
+    sha1 = fields.CharField(max_length=40)
+    object_type = fields.CharField(max_length=10)
+    object_id = fields.IntField()
 
 
 class Commit(models.Model):
