@@ -75,32 +75,12 @@ class ApiService {
   }
 
   // Tag operations
-  async getFileTags(fileId) {
-    const response = await this.request(`/files/${fileId}/tags`)
-    return response.tags || {}
-  }
-
   async updateFileTags(fileId, tags) {
-    const response = await this.request(`/files/${fileId}/tags`, {
+    // Use the unified endpoint to update tags
+    return await this.request(`/files/${fileId}`, {
       method: 'PUT',
       body: JSON.stringify({ tags }),
     })
-    return response.tags || {}
-  }
-
-  async addTag(fileId, key, value) {
-    const response = await this.request(`/files/${fileId}/tags/${encodeURIComponent(key)}`, {
-      method: 'POST',
-      body: JSON.stringify({ value }),
-    })
-    return response.tags || {}
-  }
-
-  async removeTag(fileId, key) {
-    const response = await this.request(`/files/${fileId}/tags/${encodeURIComponent(key)}`, {
-      method: 'DELETE',
-    })
-    return response.tags || {}
   }
 
   // Health check

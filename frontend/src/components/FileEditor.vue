@@ -376,7 +376,11 @@ function triggerFileSelect() {
 async function handleCommit() {
   const result = await props.changeTracker.commitChanges(async (change) => {
     if (change.type === 'tags') {
-      await apiService.updateFileTags(change.fileId, change.data)
+      const updatedFile = await apiService.updateFileTags(change.fileId, change.data)
+      // Update the local file object with the response
+      if (updatedFile && props.file) {
+        Object.assign(props.file, updatedFile)
+      }
     }
   })
   

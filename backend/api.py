@@ -6,7 +6,7 @@ import os
 import json
 from pydantic import BaseModel
 
-from models import File_Pydantic
+import models
 from services import FileService, TagService, FileTypeService
 from mapserver_service import MapServerService
 
@@ -37,7 +37,7 @@ class FileListResponse(BaseModel):
     limit: int
 
 
-class TagUpdateRequest(BaseModel):
+class FileUpdateRequest(BaseModel):
     tags: Dict[str, str]
 
 
@@ -190,33 +190,29 @@ async def search_files(request: FileSearchRequest):
     )
 
 
-# Tag endpoints
-@router.get("/files/{file_id}/tags")
-async def get_file_tags(file_id: int):
-    """Get all tags for a file"""
-    tags = await TagService.get_file_tags(file_id)
-    return {"tags": tags}
+@router.put("/files/{file_id}", response_model=FileResponse)
+async def update_file(file_id: int, request: FileUpdateRequest):
+    """Update file tags (and in the future, other fields)"""
+    file_obj = await models.File.get_or_none(id=file_id)
+    if not file_obj:
+        raise HTTPException(status_code=404, detail="File not found")
 
+    # Update tags
+    file_obj.tags = request.tags
+    await file_obj.save()
 
-@router.put("/files/{file_id}/tags")
-async def update_file_tags(file_id: int, request: TagUpdateRequest):
-    """Update all tags for a file"""
-    tags = await TagService.update_file_tags(file_id, request.tags)
-    return {"tags": tags}
-
-
-@router.post("/files/{file_id}/tags/{key}")
-async def add_tag(file_id: int, key: str, value: str):
-    """Add a single tag to a file"""
-    tags = await TagService.add_tag(file_id, key, value)
-    return {"tags": tags}
-
-
-@router.delete("/files/{file_id}/tags/{key}")
-async def remove_tag(file_id: int, key: str):
-    """Remove a tag from a file"""
-    tags = await TagService.remove_tag(file_id, key)
-    return {"tags": tags}
+    # Return the updated file as a dict with ISO-formatted datetimes
+    return {
+        "id": file_obj.id,
+        "name": file_obj.name,
+        "original_name": file_obj.original_name,
+        "file_size": file_obj.file_size,
+        "mime_type": file_obj.mime_type,
+        "base_file_type": file_obj.base_file_type,
+        "tags": file_obj.tags,
+        "created_at": file_obj.created_at.isoformat(),
+        "updated_at": file_obj.updated_at.isoformat(),
+    }
 
 
 # MapServer endpoints

@@ -8,7 +8,6 @@ export function matchTagsToPreset(fileTags, allPresets) {
   let bestScore = 0
 
   for (const preset of allPresets) {
-    console.log("Checking preset", preset)
     const presetTags = preset.tags || {}
 
     // Check if all preset tags exist in fileTags with the same value
