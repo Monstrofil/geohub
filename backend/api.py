@@ -49,6 +49,31 @@ class FileSearchRequest(BaseModel):
     limit: int = 100
 
 
+class RefResponse(BaseModel):
+    name: str
+    commit_id: str
+
+
+class CommitResponse(BaseModel):
+    id: str
+    tree_id: str
+    parent_id: Optional[str]
+    message: str
+    timestamp: str
+
+
+class TreeEntryResponse(BaseModel):
+    id: int
+    sha1: str
+    object_type: str
+    object_id: int
+
+
+class TreeResponse(BaseModel):
+    id: str
+    entries: list[TreeEntryResponse]
+
+
 # File endpoints
 @router.post("/files/upload", response_model=FileResponse)
 async def upload_file(
@@ -268,4 +293,61 @@ async def cleanup_mapserver_configs(max_age_hours: int = 24):
         mapserver_service.cleanup_old_configs(max_age_hours)
         return {"message": f"Cleaned up MapServer configs older than {max_age_hours} hours"}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Cleanup failed: {str(e)}") 
+        raise HTTPException(status_code=500, detail=f"Cleanup failed: {str(e)}")
+
+
+@router.get("/refs", response_model=List[RefResponse])
+async def list_refs():
+    refs = await models.Ref.all().prefetch_related("commit")
+    return [
+        RefResponse(name=ref.name, commit_id=ref.commit_id)
+        for ref in refs
+    ]
+
+
+@router.get("/commits", response_model=List[CommitResponse])
+async def list_commits():
+    commits = await models.Commit.all().prefetch_related("tree", "parent")
+    return [
+        CommitResponse(
+            id=commit.id,
+            tree_id=commit.tree_id,
+            parent_id=commit.parent_id,
+            message=commit.message,
+            timestamp=commit.timestamp.isoformat(),
+        ) for commit in commits
+    ]
+
+
+@router.get("/commits/{commit_id}", response_model=CommitResponse)
+async def get_commit(commit_id: str):
+    commit = await models.Commit.get_or_none(id=commit_id)
+    if not commit:
+        raise HTTPException(status_code=404, detail="Commit not found")
+    return CommitResponse(
+        id=commit.id,
+        tree_id=commit.tree_id,
+        parent_id=commit.parent_id,
+        message=commit.message,
+        timestamp=commit.timestamp.isoformat(),
+    )
+
+
+@router.get("/trees/{tree_id}", response_model=TreeResponse)
+async def get_tree(tree_id: str):
+    tree = await models.Tree.get_or_none(id=tree_id)
+    if not tree:
+        raise HTTPException(status_code=404, detail="Tree not found")
+    
+    entries = await models.TreeEntry.filter(sha1__in=tree.entries)
+    return TreeResponse(
+        id=tree.id,
+        entries=[
+            TreeEntryResponse(
+                id=entry.id,
+                sha1=entry.sha1,
+                object_type=entry.object_type,
+                object_id=entry.object_id
+            ) for entry in entries
+        ]
+    ) 

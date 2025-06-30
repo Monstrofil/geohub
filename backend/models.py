@@ -1,5 +1,7 @@
 from tortoise import fields, models
 from tortoise.contrib.pydantic import pydantic_model_creator
+from tortoise.contrib.postgres.fields import ArrayField
+
 from typing import Dict, Any
 import json
 
@@ -48,11 +50,11 @@ TagIn_Pydantic = pydantic_model_creator(Tag, name="TagIn", exclude_readonly=True
 
 class Tree(models.Model):
     id = fields.CharField(pk=True, max_length=40)  # hash of entries
+    entries = ArrayField(element_type="varchar(40)")
 
 
 class TreeEntry(models.Model):
     id = fields.IntField(pk=True)
-    tree = fields.ForeignKeyField('models.Tree', related_name='entries')
     sha1 = fields.CharField(max_length=40)  # unique tree identifier
     object_type = fields.CharField(max_length=10)  # e.g., 'file'
     object_id = fields.IntField()  # points to file (File.id)

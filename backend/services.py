@@ -1,4 +1,4 @@
-from models import File, Tag, File_Pydantic, Tag_Pydantic
+from models import File, Tag, File_Pydantic, Tag_Pydantic, Tree, TreeEntry, Commit, Ref
 from tortoise.expressions import Q
 import os
 import uuid
@@ -9,6 +9,8 @@ from typing import List, Dict, Any, Optional, Tuple
 from fastapi import UploadFile, HTTPException
 import hashlib
 from datetime import datetime, timezone
+import json
+import random
 
 
 class FileTypeService:
@@ -108,7 +110,7 @@ class FileService:
         os.makedirs(cls.UPLOAD_DIR, exist_ok=True)
     
     @classmethod
-    async def save_uploaded_file(cls, file: UploadFile) -> Dict[str, Any]:
+    async def save_uploaded_file(cls, file: UploadFile, tags: Dict[str, str] = None) -> Dict[str, Any]:
         """Save uploaded file to disk and return file info"""
         await cls.ensure_upload_dir()
         
@@ -119,8 +121,9 @@ class FileService:
         
         # Save file and calculate sha1
         content = await file.read()
-        now = datetime.now(timezone.utc).isoformat()
-        sha1 = hashlib.sha1(content + now.encode('utf-8')).hexdigest()
+        tags = tags or {}
+        tags_json = json.dumps(tags, sort_keys=True, separators=(",", ":"))
+        sha1 = hashlib.sha1(content + tags_json.encode('utf-8')).hexdigest()
         async with aiofiles.open(file_path, 'wb') as f:
             await f.write(content)
         
@@ -135,8 +138,8 @@ class FileService:
     
     @classmethod
     async def create_file(cls, file_data: Dict[str, Any], tags: Dict[str, str] = None, expected_type: str = None) -> File_Pydantic:
-        """Create a new file record with automatic type detection"""
-        file_info = await cls.save_uploaded_file(file_data["file"])
+        """Create a new file record with automatic type detection and versioning"""
+        file_info = await cls.save_uploaded_file(file_data["file"], tags)
         
         # Detect file type
         base_file_type = FileTypeService.detect_file_type(
@@ -169,6 +172,41 @@ class FileService:
             tags=file_tags,
             sha1=file_info["sha1"]
         )
+
+        ref = await Ref.get_or_none(name="main")
+        print("ref", ref)
+        head = await ref.commit.get()
+
+        print("Head", head)
+
+        tree_entry_sha1 = hashlib.sha1(str(random.getrandbits(256)).encode()).hexdigest()
+        tree_entry = await TreeEntry.create(
+            sha1=tree_entry_sha1,
+            object_type='file',
+            object_id=file_obj.id
+        )
+
+        head_entries = (await head.tree).entries
+        entries_sha1s = [entry.sha1 for entry in head_entries] + [tree_entry.sha1]
+        tree_id = hashlib.sha1((''.join(entries_sha1s)).encode()).hexdigest()
+        tree = await Tree.create(
+            id=tree_id,
+            entries=entries_sha1s
+        )
+        await tree_entry.save()
+
+        # Create Commit (hash of tree id + parent id + message)
+        commit_message = f"Add file {file_obj.name}"
+        commit_content = tree_id + head.id + commit_message
+        commit_id = hashlib.sha1(commit_content.encode()).hexdigest()
+        commit = await Commit.create(
+            id=commit_id,
+            tree=tree,
+            parent=head,
+            message=commit_message
+        )
+        ref.commit = commit
+        await ref.save()
         
         return await File_Pydantic.from_tortoise_orm(file_obj)
     
