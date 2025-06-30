@@ -1,5 +1,7 @@
 <template>
   <div class="pure-g app-grid">
+    <!-- Branch Selector -->
+    <BranchSelector v-model="currentBranch" @onBranchChange="handleBranchChange" />
     <!-- File List View -->
     <div v-if="!selectedFile" class="pure-u-1">
       <div class="section section-feature-list">
@@ -58,6 +60,7 @@ import { ref, computed, onMounted } from 'vue'
 import FileCard from './components/FileCard.vue'
 import FileEditor from './components/FileEditor.vue'
 import SimpleUpload from './components/SimpleUpload.vue'
+import BranchSelector from './components/BranchSelector.vue'
 import { useChangeTracker } from './composables/useChangeTracker.js'
 import { loadFieldDefinitions } from './utils/fieldResolver.js'
 import apiService from './services/api.js'
@@ -69,6 +72,9 @@ const loading = ref(false)
 const error = ref(null)
 const showUploadModal = ref(false)
 
+// Branch selector state
+const currentBranch = ref('main')
+
 // Initialize change tracker
 const changeTracker = useChangeTracker()
 
@@ -78,6 +84,12 @@ onMounted(async () => {
   // Load files from API
   await loadFiles()
 })
+
+function handleBranchChange(branch) {
+  // You can add logic here to reload files/commits for the selected branch
+  // For now, just log the branch change
+  console.log('Switched to branch:', branch)
+}
 
 async function loadFiles() {
   loading.value = true
@@ -230,5 +242,18 @@ function handleFileUpdated(updatedFile) {
   background: #ffebee;
   border-radius: 4px;
   margin: 1rem 0;
+}
+
+.section-branch-selector {
+  padding: 1rem;
+  background: #e9f5ff;
+  border-bottom: 1px solid #b3d8fd;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.current-branch {
+  font-weight: bold;
+  color: #1976d2;
 }
 </style> 

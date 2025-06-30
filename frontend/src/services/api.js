@@ -83,6 +83,11 @@ class ApiService {
     })
   }
 
+  // Branch/Ref operations
+  async getRefs() {
+    return await this.request('/refs')
+  }
+
   // Health check
   async healthCheck() {
     return await fetch('http://localhost:8000/health').then(res => res.json())
