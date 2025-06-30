@@ -3,6 +3,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from tortoise.contrib.fastapi import register_tortoise
 from contextlib import asynccontextmanager
 import os
+import hashlib
+from tortoise.transactions import in_transaction
+from models import Tree, Commit, Ref
 
 from database import TORTOISE_ORM
 from api import router as api_router
@@ -45,4 +48,25 @@ def read_root():
 
 @app.get("/health")
 def health_check():
-    return {"status": "healthy"} 
+    return {"status": "healthy"}
+
+
+@app.on_event("startup")
+async def create_default_branch_and_commit():
+    # Check if any commits exist
+    if not await Commit.exists():
+        async with in_transaction():
+            # Create empty tree (hash of empty list)
+            empty_tree_hash = hashlib.sha1(b'').hexdigest()
+            empty_tree, _ = await Tree.get_or_create(id=empty_tree_hash)
+            # Create initial commit (hash of tree id + message)
+            commit_content = empty_tree_hash + "Initial empty commit"
+            initial_commit_hash = hashlib.sha1(commit_content.encode('utf-8')).hexdigest()
+            initial_commit, _ = await Commit.get_or_create(
+                id=initial_commit_hash,
+                tree=empty_tree,
+                parent=None,
+                message="Initial empty commit"
+            )
+            # Create 'main' branch ref
+            await Ref.get_or_create(name="main", commit=initial_commit) 

@@ -43,4 +43,32 @@ class Tag(models.Model):
 File_Pydantic = pydantic_model_creator(File, name="File")
 FileIn_Pydantic = pydantic_model_creator(File, name="FileIn", exclude_readonly=True)
 Tag_Pydantic = pydantic_model_creator(Tag, name="Tag")
-TagIn_Pydantic = pydantic_model_creator(Tag, name="TagIn", exclude_readonly=True) 
+TagIn_Pydantic = pydantic_model_creator(Tag, name="TagIn", exclude_readonly=True)
+
+
+class Tree(models.Model):
+    id = fields.CharField(pk=True, max_length=40)  # hash of entries
+
+
+class TreeEntry(models.Model):
+    id = fields.IntField(pk=True)
+    tree = fields.ForeignKeyField('models.Tree', related_name='entries')
+    sha1 = fields.CharField(max_length=40)  # unique tree identifier
+    object_type = fields.CharField(max_length=10)  # e.g., 'file'
+    object_id = fields.IntField()  # points to file (File.id)
+
+
+class Commit(models.Model):
+    id = fields.CharField(pk=True, max_length=40)  # hash of commit
+    tree = fields.ForeignKeyField('models.Tree', related_name='commits')
+    parent = fields.ForeignKeyField('models.Commit', related_name='children', null=True)
+    message = fields.CharField(max_length=255)
+    timestamp = fields.DatetimeField(auto_now_add=True)
+
+
+class Ref(models.Model):
+    name = fields.CharField(pk=True, max_length=100)
+    commit = fields.ForeignKeyField('models.Commit', related_name='refs')
+
+    class Meta:
+        table = "refs"
