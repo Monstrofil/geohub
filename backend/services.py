@@ -3,6 +3,8 @@ from tortoise.expressions import Q
 import os
 import uuid
 import aiofiles
+from osgeo import gdal
+import geopandas as gpd
 from typing import List, Dict, Any, Optional, Tuple
 from fastapi import UploadFile, HTTPException
 
@@ -40,28 +42,16 @@ class FileTypeService:
         """
         Check if file is a raster using GDAL
         """
-        try:
-            from osgeo import gdal
-            
-            dataset = gdal.Open(file_path)
-            if dataset is None:
-                return False
-            
-            # Check if it has geotransform (extent)
-            geotransform = dataset.GetGeoTransform()
-            if geotransform is None:
-                dataset = None
-                return False
-            
-            dataset = None
-            return True
-            
-        except ImportError:
-            print("GDAL not available")
+        dataset = gdal.Open(file_path)
+        if dataset is None:
             return False
-        except Exception as e:
-            print(f"Error checking raster with GDAL: {e}")
+        
+        # Check if it has geotransform (extent)
+        geotransform = dataset.GetGeoTransform()
+        if geotransform is None:
             return False
+        
+        return True
     
     @classmethod
     def _is_vector(cls, file_path: str) -> bool:
@@ -69,14 +59,8 @@ class FileTypeService:
         Check if file is a vector using GeoPandas
         """
         try:
-            import geopandas as gpd
-            
             gdf = gpd.read_file(file_path)
             return True
-            
-        except ImportError:
-            print("GeoPandas not available")
-            return False
         except Exception as e:
             print(f"Error checking vector with GeoPandas: {e}")
             return False
