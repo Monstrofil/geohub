@@ -13,12 +13,12 @@ class FileTypeService:
     """Service for detecting file types using GDAL and GeoPandas"""
     
     @classmethod
-    def detect_file_type(cls, file_path: str, mime_type: str = None) -> Tuple[str, str]:
+    def detect_file_type(cls, file_path: str) -> str:
         """
         Detect the base file type using GDAL and GeoPandas
         
         Returns:
-            Tuple[str, str]: (base_file_type, description)
+            str: base_file_type
         """
         
         # Check if file exists
@@ -27,14 +27,14 @@ class FileTypeService:
         
         # Try to detect as raster using GDAL
         if cls._is_raster(file_path):
-            return "raster", "Georeferenced raster"
+            return "raster"
         
         # Try to detect as vector using GeoPandas
         if cls._is_vector(file_path):
-            return "vector", "Georeferenced vector"
+            return "vector"
         
         # If neither, it's a raw file
-        return "raw", "Document or data file"
+        return "raw"
 
     
     @classmethod
@@ -134,9 +134,8 @@ class FileService:
         file_info = await cls.save_uploaded_file(file_data["file"])
         
         # Detect file type
-        base_file_type, description = FileTypeService.detect_file_type(
-            file_info["file_path"], 
-            file_info["mime_type"]
+        base_file_type = FileTypeService.detect_file_type(
+            file_info["file_path"],
         )
         
         # Validate against expected type if provided
@@ -144,18 +143,15 @@ class FileService:
             # Delete the uploaded file if validation fails
             if os.path.exists(file_info["file_path"]):
                 os.remove(file_info["file_path"])
+
             raise HTTPException(
                 status_code=400, 
-                detail=f"File type not allowed for '{expected_type}'. Expected: {', '.join(FileTypeService.get_accepted_extensions(expected_type))}"
+                detail=f"File type not allowed for '{expected_type}'. Expected: {', '.join(
+                    FileTypeService.get_accepted_extensions(expected_type))}"
             )
         
         # Prepare tags with type information
         file_tags = tags or {}
-        file_tags.update({
-            "base_type": base_file_type,
-            "type_description": description,
-            "original_extension": os.path.splitext(file_info["original_name"])[1].lower()
-        })
         
         # Create file record
         file_obj = await File.create(
