@@ -9,7 +9,6 @@
           v-for="file in files" 
           :key="file.id"
           :file="file"
-          :type="getFileType(file)"
           :name="file.name"
           :selected="selectedFile && selectedFile.id === file.id"
           @click="selectFile(file)"
@@ -34,14 +33,6 @@ const props = defineProps({
 const emit = defineEmits(['file-selected'])
 
 const selectedFile = ref(null)
-
-function getFileType(file) {
-  const tags = file.tags || {}
-  if (tags.type === 'raster') return 'raster'
-  if (tags.type === 'vector') return 'vector'
-  if (tags.type === 'text') return 'text'
-  return 'binary'
-}
 
 function selectFile(file) {
   selectedFile.value = file

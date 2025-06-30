@@ -210,19 +210,15 @@ const selectedFields = computed(() => {
 
 // File type detection and icon
 const fileType = computed(() => {
-  const tags = props.file.tags || {}
-  if (tags.type === 'raster') return 'raster'
-  if (tags.type === 'vector') return 'vector'
-  if (tags.type === 'text') return 'text'
-  return 'binary'
+  // Use base_file_type from API instead of guessing
+  return props.file.base_file_type || 'raw'
 })
 
 const fileTypeLabel = computed(() => {
   const labels = {
-    'raster': 'Растрове зображення',
-    'vector': 'Векторне зображення', 
-    'text': 'Текстовий файл',
-    'binary': 'Бінарний файл'
+    'raster': 'Геоприв\'язане растрове зображення',
+    'vector': 'Геоприв\'язаний векторний файл', 
+    'raw': 'Звичайний файл'
   }
   return labels[fileType.value] || 'Невідомий тип'
 })
@@ -230,23 +226,38 @@ const fileTypeLabel = computed(() => {
 const fileIcon = computed(() => {
   switch (fileType.value) {
     case 'raster':
-      return `<svg width="32" height="32" viewBox="0 0 32 32"><rect x="2" y="6" width="28" height="20" rx="3" fill="#e0e7ef" stroke="#7faaff" stroke-width="1.5"/><circle cx="11" cy="19" r="3" fill="#7faaff"/><rect x="16" y="13" width="10" height="6" fill="#b3d1ff"/></svg>`
+      return `<svg width="32" height="32" viewBox="0 0 32 32">
+        <rect x="2" y="6" width="28" height="20" rx="3" fill="#e0e7ef" stroke="#7faaff" stroke-width="1.5"/>
+        <circle cx="11" cy="19" r="3" fill="#7faaff"/>
+        <rect x="16" y="13" width="10" height="6" fill="#b3d1ff"/>
+        <path d="M4 4l4 4M8 4l4 4M12 4l4 4" stroke="#7faaff" stroke-width="1" fill="none"/>
+      </svg>`
     case 'vector':
-      return `<svg width="32" height="32" viewBox="0 0 32 32"><rect x="2" y="6" width="28" height="20" rx="3" fill="#e0f7e7" stroke="#2ecc71" stroke-width="1.5"/><circle cx="10" cy="22" r="2.5" fill="#2ecc71"/><circle cx="22" cy="11" r="2.5" fill="#2ecc71"/><line x1="10" y1="22" x2="22" y2="11" stroke="#27ae60" stroke-width="1.5"/></svg>`
-    case 'text':
-      return `<svg width="32" height="32" viewBox="0 0 32 32"><rect x="4" y="6" width="24" height="20" rx="3" fill="#f7f7e7" stroke="#f1c40f" stroke-width="1.5"/><rect x="9" y="13" width="14" height="1.5" fill="#f1c40f"/><rect x="9" y="18" width="8" height="1.5" fill="#f1c40f"/></svg>`
-    case 'binary':
-      return `<svg width="32" height="32" viewBox="0 0 32 32"><rect x="6" y="6" width="20" height="20" rx="5" fill="#f7e0ef" stroke="#e67ec7" stroke-width="1.5"/><circle cx="16" cy="16" r="5" fill="#e67ec7"/><rect x="13" y="13" width="6" height="6" fill="#fff"/></svg>`
+      return `<svg width="32" height="32" viewBox="0 0 32 32">
+        <rect x="2" y="6" width="28" height="20" rx="3" fill="#e0f7e7" stroke="#2ecc71" stroke-width="1.5"/>
+        <circle cx="10" cy="22" r="2.5" fill="#2ecc71"/>
+        <circle cx="22" cy="11" r="2.5" fill="#2ecc71"/>
+        <line x1="10" y1="22" x2="22" y2="11" stroke="#27ae60" stroke-width="1.5"/>
+        <path d="M4 4l4 4M8 4l4 4M12 4l4 4" stroke="#2ecc71" stroke-width="1" fill="none"/>
+      </svg>`
+    case 'raw':
+      return `<svg width="32" height="32" viewBox="0 0 32 32">
+        <rect x="4" y="6" width="24" height="20" rx="3" fill="#f7f7e7" stroke="#6c757d" stroke-width="1.5"/>
+        <rect x="9" y="13" width="14" height="1.5" fill="#6c757d"/>
+        <rect x="9" y="18" width="8" height="1.5" fill="#6c757d"/>
+        <rect x="9" y="23" width="12" height="1.5" fill="#6c757d"/>
+      </svg>`
     default:
-      return ''
+      return `<svg width="32" height="32" viewBox="0 0 32 32">
+        <rect x="6" y="6" width="20" height="20" rx="5" fill="#f8f9fa" stroke="#dee2e6" stroke-width="1.5"/>
+        <path d="M12 12h8M12 16h6M12 20h4" stroke="#6c757d" stroke-width="1.5" fill="none"/>
+      </svg>`
   }
 })
 
-// Check if file is a GeoTIFF
+// Check if file is a GeoTIFF (raster type)
 const isGeoTiff = computed(() => {
-  const filename = props.file.name || props.file.original_name || ''
-  const geotiffExtensions = ['.tif', '.tiff', '.geotiff']
-  return geotiffExtensions.some(ext => filename.toLowerCase().endsWith(ext))
+  return fileType.value === 'raster'
 })
 
 // Tags editor functions
@@ -324,7 +335,6 @@ async function processFile(file) {
     const tags = {
       name: file.name,
       // Preserve some tags from the original file if they exist
-      ...(props.file.tags.type && { type: props.file.tags.type }),
       ...(props.file.tags.military && { military: props.file.tags.military }),
       ...(props.file.tags.highway && { highway: props.file.tags.highway })
     }

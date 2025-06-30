@@ -22,7 +22,6 @@
               v-for="file in files" 
               :key="file.id"
               :file="file"
-              :type="getFileType(file)"
               :name="file.original_name"
               :selected="false"
               @click="selectFile(file)"
@@ -93,14 +92,6 @@ async function loadFiles() {
   } finally {
     loading.value = false
   }
-}
-
-function getFileType(file) {
-  const tags = file.tags || {}
-  if (tags.type === 'raster') return 'raster'
-  if (tags.type === 'vector') return 'vector'
-  if (tags.type === 'text') return 'text'
-  return 'binary'
 }
 
 function selectFile(file) {

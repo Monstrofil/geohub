@@ -4,26 +4,25 @@ import os
 
 TORTOISE_ORM = {
     "connections": {
-        "default": {
-            "engine": "tortoise.backends.asyncpg",
-            "credentials": {
-                "host": os.getenv("DB_HOST", "postgres"),
-                "port": int(os.getenv("DB_PORT", "5432")),
-                "user": os.getenv("DB_USER", "tagger_user"),
-                "password": os.getenv("DB_PASSWORD", "tagger_password"),
-                "database": os.getenv("DB_NAME", "tagger_db"),
-            }
-        }
+        "default": f"postgres://{os.getenv('DB_USER', 'tagger_user')}:"
+                   f"{os.getenv('DB_PASSWORD', 'tagger_password')}@"
+                   f"{os.getenv('DB_HOST', 'postgres')}:{os.getenv('DB_PORT', '5432')}/"
+                   f"{os.getenv('DB_NAME', 'tagger_db')}"
     },
     "apps": {
         "models": {
             "models": ["models", "aerich.models"],
             "default_connection": "default",
-        }
+        },
     },
-    "use_tz": False,
-    "timezone": "UTC"
 }
+
+
+async def init_db():
+    await Tortoise.init(
+        db_url=TORTOISE_ORM["connections"]["default"],
+        modules=TORTOISE_ORM["apps"]["models"]["models"]
+    )
 
 
 async def close_db():

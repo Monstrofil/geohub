@@ -1,27 +1,24 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from tortoise.contrib.fastapi import register_tortoise
 from contextlib import asynccontextmanager
 import os
 
-from database import TORTOISE_ORM, close_db
+from database import TORTOISE_ORM
 from api import router as api_router
-
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Startup
-    from tortoise import Tortoise
-    await Tortoise.init(config=TORTOISE_ORM)
-    yield
-    # Shutdown
-    await close_db()
-
 
 app = FastAPI(
     title="File Tagger API",
     description="API for uploading, managing, and tagging files",
-    version="1.0.0",
-    lifespan=lifespan
+    version="1.0.0"
+)
+
+register_tortoise(
+    app,
+    db_url=TORTOISE_ORM["connections"]["default"],
+    modules={"models": TORTOISE_ORM["apps"]["models"]["models"]},
+    generate_schemas=True,
+    add_exception_handlers=True,
 )
 
 # Add CORS middleware

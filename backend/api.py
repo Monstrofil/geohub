@@ -2,6 +2,8 @@ from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends
 from fastapi.responses import FileResponse as FastAPIFileResponse
 from typing import List, Dict, Optional
 import os
+
+import json
 from pydantic import BaseModel
 
 from models import File_Pydantic
@@ -9,7 +11,7 @@ from services import FileService, TagService, FileTypeService
 from mapserver_service import MapServerService
 
 
-router = APIRouter(prefix="/api/v1", tags=["files"])
+router = APIRouter(tags=["files"])
 
 # Initialize MapServer service
 mapserver_service = MapServerService()
@@ -61,7 +63,6 @@ async def upload_file(
     file_tags = {}
     if tags:
         try:
-            import json
             file_tags = json.loads(tags)
         except json.JSONDecodeError:
             raise HTTPException(status_code=400, detail="Invalid tags format")

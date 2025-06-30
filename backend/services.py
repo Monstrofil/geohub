@@ -11,37 +11,29 @@ class FileTypeService:
     """Service for detecting file types using GDAL and GeoPandas"""
     
     @classmethod
-    def detect_file_type(cls, filename: str, mime_type: str = None) -> Tuple[str, str]:
+    def detect_file_type(cls, file_path: str, mime_type: str = None) -> Tuple[str, str]:
         """
         Detect the base file type using GDAL and GeoPandas
         
         Returns:
             Tuple[str, str]: (base_file_type, description)
         """
-        if not filename:
-            return "raw", "Unknown file type"
-        
-        file_path = os.path.join(FileService.UPLOAD_DIR, filename)
         
         # Check if file exists
         if not os.path.exists(file_path):
-            return "raw", "File not found"
+            raise RuntimeError("Uploaded file is missing: check disk storage")
         
-        try:
-            # Try to detect as raster using GDAL
-            if cls._is_raster(file_path):
-                return "raster", "Georeferenced raster"
-            
-            # Try to detect as vector using GeoPandas
-            if cls._is_vector(file_path):
-                return "vector", "Georeferenced vector"
-            
-            # If neither, it's a raw file
-            return "raw", "Document or data file"
-            
-        except Exception as e:
-            print(f"Error detecting file type for {filename}: {e}")
-            return "raw", "Document or data file"
+        # Try to detect as raster using GDAL
+        if cls._is_raster(file_path):
+            return "raster", "Georeferenced raster"
+        
+        # Try to detect as vector using GeoPandas
+        if cls._is_vector(file_path):
+            return "vector", "Georeferenced vector"
+        
+        # If neither, it's a raw file
+        return "raw", "Document or data file"
+
     
     @classmethod
     def _is_raster(cls, file_path: str) -> bool:
@@ -159,7 +151,7 @@ class FileService:
         
         # Detect file type
         base_file_type, description = FileTypeService.detect_file_type(
-            file_info["original_name"], 
+            file_info["file_path"], 
             file_info["mime_type"]
         )
         
