@@ -174,10 +174,7 @@ class FileService:
         )
 
         ref = await Ref.get_or_none(name="main")
-        print("ref", ref)
         head = await ref.commit.get()
-
-        print("Head", head)
 
         tree_entry_sha1 = hashlib.sha1(str(random.getrandbits(256)).encode()).hexdigest()
         tree_entry = await TreeEntry.create(
@@ -187,7 +184,7 @@ class FileService:
         )
 
         head_entries = (await head.tree).entries
-        entries_sha1s = [entry.sha1 for entry in head_entries] + [tree_entry.sha1]
+        entries_sha1s = head_entries + [tree_entry.sha1]
         tree_id = hashlib.sha1((''.join(entries_sha1s)).encode()).hexdigest()
         tree = await Tree.create(
             id=tree_id,
