@@ -11,6 +11,7 @@ import hashlib
 from datetime import datetime, timezone
 import json
 import random
+from git_service import add_file, update_file, delete_file
 
 
 class FileTypeService:
@@ -142,17 +143,14 @@ class FileService:
         file_info = await cls.save_uploaded_file(file_data["file"], tags)
         
         # Detect file type
-        base_file_type = FileTypeService.detect_file_type(
-            file_info["file_path"],
-        )
+        base_file_type = FileTypeService.detect_file_type(file_info["file_path"])
         
         # Validate against expected type if provided
         if expected_type and not FileTypeService.validate_file_type(file_info["original_name"], expected_type):
             # Delete the uploaded file if validation fails
             if os.path.exists(file_info["file_path"]):
                 os.remove(file_info["file_path"])
-            expected = ', '.join(
-                    FileTypeService.get_accepted_extensions(expected_type))
+            expected = ', '.join(FileTypeService.get_accepted_extensions(expected_type))
             raise HTTPException(
                 status_code=400, 
                 detail=f"File type not allowed for '{expected_type}'. Expected: {expected}"
@@ -173,37 +171,7 @@ class FileService:
             sha1=file_info["sha1"]
         )
 
-        ref = await Ref.get_or_none(name="main")
-        head = await ref.commit.get()
-
-        tree_entry_sha1 = hashlib.sha1(str(random.getrandbits(256)).encode()).hexdigest()
-        tree_entry = await TreeEntry.create(
-            sha1=tree_entry_sha1,
-            object_type='file',
-            object_id=file_obj.id
-        )
-
-        head_entries = (await head.tree).entries
-        entries_sha1s = head_entries + [tree_entry.sha1]
-        tree_id = hashlib.sha1((''.join(entries_sha1s)).encode()).hexdigest()
-        tree = await Tree.create(
-            id=tree_id,
-            entries=entries_sha1s
-        )
-        await tree_entry.save()
-
-        # Create Commit (hash of tree id + parent id + message)
-        commit_message = f"Add file {file_obj.name}"
-        commit_content = tree_id + head.id + commit_message
-        commit_id = hashlib.sha1(commit_content.encode()).hexdigest()
-        commit = await Commit.create(
-            id=commit_id,
-            tree=tree,
-            parent=head,
-            message=commit_message
-        )
-        ref.commit = commit
-        await ref.save()
+        await add_file(file_obj, message=f"Add file {file_obj.name}")
         
         return await File_Pydantic.from_tortoise_orm(file_obj)
     
@@ -247,50 +215,7 @@ class FileService:
         new_file_obj.sha1 = calculate_file_obj_hash(new_file_obj)
         await new_file_obj.save()
 
-        # Versioning: create new tree, tree entry, commit
-        ref = await Ref.get_or_none(name="main")
-        head = await ref.commit.get()
-        head_tree = await head.tree
-        head_entries = set(head_tree.entries)
-
-        # Find and replace the tree entry for this file
-        entries_objs = await TreeEntry.filter(object_id=orig_file_obj_id, object_type="file")
-
-        tree_entry_obj = None
-        for entry in entries_objs:
-            if entry.sha1 in head_entries:
-                tree_entry_obj = entry
-                break
-        assert tree_entry_obj is not None, "Unexpected file without tree entry"
-
-        tree_entry_sha1 = hashlib.sha1(str(random.getrandbits(256)).encode()).hexdigest()
-        tree_entry = await TreeEntry.create(
-            sha1=tree_entry_sha1,
-            object_type='file',
-            object_id=new_file_obj.id
-        )
-        await tree_entry.save()
-
-        head_entries.remove(tree_entry_obj.sha1)
-        head_entries.add(tree_entry.sha1)
-
-        tree_id = hashlib.sha1((''.join(list(head_entries))).encode()).hexdigest()
-        tree = await Tree.create(
-            id=tree_id,
-            entries=list(head_entries)
-        )
-
-        commit_message = f"Update tags for file {new_file_obj.name}"
-        commit_content = tree_id + head.id + commit_message
-        commit_id = hashlib.sha1(commit_content.encode()).hexdigest()
-        commit = await Commit.create(
-            id=commit_id,
-            tree=tree,
-            parent=head,
-            message=commit_message
-        )
-        ref.commit = commit
-        await ref.save()
+        await update_file(orig_file_obj_id, new_file_obj, message=f"Update tags for file {new_file_obj.name}")
 
         return new_file_obj.id
     
@@ -305,40 +230,8 @@ class FileService:
         if os.path.exists(file_obj.file_path):
             os.remove(file_obj.file_path)
         
-        # Versioning: create new tree, commit without this file
-        ref = await Ref.get_or_none(name="main")
-        head = await ref.commit.get()
-        head_tree = await head.tree
-        head_entries = set(head_tree.entries)
-
-        # Find and replace the tree entry for this file
-        entries_objs = await TreeEntry.filter(object_id=file_obj.id, object_type="file")
-
-        tree_entry_obj = None
-        for entry in entries_objs:
-            if entry.sha1 in head_entries:
-                tree_entry_obj = entry
-                break
-        assert tree_entry_obj is not None, "Unexpected file without tree entry"
-
-        head_entries.remove(tree_entry_obj.sha1)
-
-        tree_id = hashlib.sha1((''.join(list(head_entries))).encode()).hexdigest()
-        tree = await Tree.create(
-            id=tree_id,
-            entries=list(head_entries)
-        )
-        commit_message = f"Delete file {file_obj.name}"
-        commit_content = tree_id + head.id + commit_message
-        commit_id = hashlib.sha1(commit_content.encode()).hexdigest()
-        commit = await Commit.create(
-            id=commit_id,
-            tree=tree,
-            parent=head,
-            message=commit_message
-        )
-        ref.commit = commit
-        await ref.save()
+        await delete_file(file_obj, message=f"Delete file {file_obj.name}")
+        await file_obj.delete()
 
         return True
     
