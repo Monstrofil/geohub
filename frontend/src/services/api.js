@@ -55,8 +55,10 @@ class ApiService {
     return await response.json()
   }
 
-  async getFiles(skip = 0, limit = 100) {
-    return await this.request(`/files?skip=${skip}&limit=${limit}`)
+  async getFiles(skip = 0, limit = 100, commit = null) {
+    let query = `/files?skip=${skip}&limit=${limit}`
+    if (commit) query += `&commit=${encodeURIComponent(commit)}`
+    return await this.request(query)
   }
 
   async getFile(fileId) {

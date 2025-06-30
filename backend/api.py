@@ -116,16 +116,17 @@ async def upload_file(
 
 
 @router.get("/files", response_model=FileListResponse)
-async def list_files(skip: int = 0, limit: int = 100):
-    """List all files with pagination"""
-    files = await FileService.list_files(skip=skip, limit=limit)
-    
+async def list_files(skip: int = 0, limit: int = 100, commit: str = None):
+    """List files for a specific commit (commit is required)"""
+    if not commit:
+        raise HTTPException(status_code=400, detail="commit parameter is required")
+    files = await FileService.list_files(skip=skip, limit=limit, commit=commit)
     return FileListResponse(
         files=[
             FileResponse(
                 id=file.id,
                 name=file.name,
-                sha1=file.sha1,
+                sha1=getattr(file, 'sha1', None),
                 original_name=file.original_name,
                 file_size=file.file_size,
                 mime_type=file.mime_type,
@@ -135,7 +136,7 @@ async def list_files(skip: int = 0, limit: int = 100):
                 updated_at=file.updated_at.isoformat()
             ) for file in files
         ],
-        total=len(files),  # In a real app, you'd get total count separately
+        total=len(files),
         skip=skip,
         limit=limit
     )

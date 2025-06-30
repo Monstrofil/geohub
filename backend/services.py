@@ -219,9 +219,19 @@ class FileService:
         return None
     
     @classmethod
-    async def list_files(cls, skip: int = 0, limit: int = 100) -> List[File_Pydantic]:
-        """List all files with pagination"""
-        files = await File.all().offset(skip).limit(limit).order_by("-created_at")
+    async def list_files(cls, commit: str, skip: int = 0, limit: int = 100) -> List[File_Pydantic]:
+        """List files for a specific commit (commit is required)"""
+        if not commit:
+            return []
+        commit_obj = await Commit.get_or_none(id=commit)
+        if not commit_obj:
+            return []
+        tree = await commit_obj.tree
+        if not tree:
+            return []
+        entries = await TreeEntry.filter(sha1__in=tree.entries, object_type="file")
+        file_ids = [entry.object_id for entry in entries]
+        files = await File.filter(id__in=file_ids).offset(skip).limit(limit).order_by("-created_at")
         return [await File_Pydantic.from_tortoise_orm(file) for file in files]
     
     @classmethod

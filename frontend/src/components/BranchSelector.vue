@@ -2,7 +2,7 @@
   <div class="section section-branch-selector">
     <label for="branch-select">Гілка:</label>
     <select id="branch-select" v-model="selectedBranch" @change="emitBranchChange">
-      <option v-for="ref in refs" :key="ref.name" :value="ref.name">
+      <option v-for="ref in refs" :key="ref.name" :value="ref">
         {{ ref.name }}
       </option>
     </select>
@@ -20,7 +20,7 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue', 'onBranchChange'])
 
 const refs = ref([])
-const selectedBranch = ref(props.modelValue || 'main')
+const selectedBranch = ref(null)
 
 onMounted(async () => {
   await loadRefs()
@@ -36,15 +36,16 @@ async function loadRefs() {
   try {
     const response = await apiService.getRefs()
     refs.value = response
-    if (!refs.value.find(r => r.name === selectedBranch.value) && refs.value.length > 0) {
-      selectedBranch.value = refs.value[0].name
-    }
+    selectedBranch.value = refs.value[0]
   } catch (err) {
     console.error('Failed to load refs:', err)
   }
+
+  emitBranchChange(selectedBranch.value)
 }
 
 function emitBranchChange() {
+  const refObj = refs.value.find(r => r.name === selectedBranch.value)
   emit('update:modelValue', selectedBranch.value)
   emit('onBranchChange', selectedBranch.value)
 }

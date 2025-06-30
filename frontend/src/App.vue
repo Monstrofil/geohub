@@ -73,7 +73,8 @@ const error = ref(null)
 const showUploadModal = ref(false)
 
 // Branch selector state
-const currentBranch = ref('main')
+const currentBranch = ref(null)
+const currentCommit = ref(null)
 
 // Initialize change tracker
 const changeTracker = useChangeTracker()
@@ -86,17 +87,15 @@ onMounted(async () => {
 })
 
 function handleBranchChange(branch) {
-  // You can add logic here to reload files/commits for the selected branch
-  // For now, just log the branch change
-  console.log('Switched to branch:', branch)
+  currentBranch.value = branch
+  loadFiles()
 }
 
 async function loadFiles() {
   loading.value = true
   error.value = null
-  
   try {
-    const response = await apiService.getFiles()
+    const response = await apiService.getFiles(0, 100, currentBranch.value.commit_id)
     files.value = response.files || []
   } catch (err) {
     console.error('Failed to load files:', err)
