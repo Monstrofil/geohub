@@ -143,11 +143,11 @@ class FileService:
             # Delete the uploaded file if validation fails
             if os.path.exists(file_info["file_path"]):
                 os.remove(file_info["file_path"])
-
+            expected = ', '.join(
+                    FileTypeService.get_accepted_extensions(expected_type))
             raise HTTPException(
                 status_code=400, 
-                detail=f"File type not allowed for '{expected_type}'. Expected: {', '.join(
-                    FileTypeService.get_accepted_extensions(expected_type))}"
+                detail=f"File type not allowed for '{expected_type}'. Expected: {expected}"
             )
         
         # Prepare tags with type information
