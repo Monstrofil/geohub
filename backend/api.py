@@ -21,6 +21,7 @@ mapserver_service = MapServerService()
 class FileResponse(BaseModel):
     id: int
     name: str
+    sha1: str | None
     original_name: str
     file_size: int
     mime_type: str
@@ -78,6 +79,7 @@ async def upload_file(
     return FileResponse(
         id=file_obj.id,
         name=file_obj.name,
+        sha1=file_obj.sha1,
         original_name=file_obj.original_name,
         file_size=file_obj.file_size,
         mime_type=file_obj.mime_type,
@@ -98,6 +100,7 @@ async def list_files(skip: int = 0, limit: int = 100):
             FileResponse(
                 id=file.id,
                 name=file.name,
+                sha1=file.sha1,
                 original_name=file.original_name,
                 file_size=file.file_size,
                 mime_type=file.mime_type,

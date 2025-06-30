@@ -7,6 +7,8 @@ from osgeo import gdal
 import geopandas as gpd
 from typing import List, Dict, Any, Optional, Tuple
 from fastapi import UploadFile, HTTPException
+import hashlib
+from datetime import datetime, timezone
 
 
 class FileTypeService:
@@ -115,9 +117,11 @@ class FileService:
         unique_filename = f"{uuid.uuid4()}{file_extension}"
         file_path = os.path.join(cls.UPLOAD_DIR, unique_filename)
         
-        # Save file
+        # Save file and calculate sha1
+        content = await file.read()
+        now = datetime.now(timezone.utc).isoformat()
+        sha1 = hashlib.sha1(content + now.encode('utf-8')).hexdigest()
         async with aiofiles.open(file_path, 'wb') as f:
-            content = await file.read()
             await f.write(content)
         
         return {
@@ -125,7 +129,8 @@ class FileService:
             "name": unique_filename,
             "file_path": file_path,
             "file_size": len(content),
-            "mime_type": file.content_type or "application/octet-stream"
+            "mime_type": file.content_type or "application/octet-stream",
+            "sha1": sha1
         }
     
     @classmethod
@@ -161,7 +166,8 @@ class FileService:
             file_size=file_info["file_size"],
             mime_type=file_info["mime_type"],
             base_file_type=base_file_type,
-            tags=file_tags
+            tags=file_tags,
+            sha1=file_info["sha1"]
         )
         
         return await File_Pydantic.from_tortoise_orm(file_obj)

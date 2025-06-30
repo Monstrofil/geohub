@@ -13,6 +13,7 @@ class File(models.Model):
     mime_type = fields.CharField(max_length=100)
     base_file_type = fields.CharField(max_length=20, default="raw")  # raster, vector, raw
     tags = fields.JSONField(default=dict)
+    sha1 = fields.CharField(max_length=40, unique=True, null=True)
     created_at = fields.DatetimeField(auto_now_add=True)
     updated_at = fields.DatetimeField(auto_now=True)
 
