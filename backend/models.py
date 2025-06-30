@@ -2,6 +2,9 @@ from tortoise import fields, models
 from tortoise.contrib.pydantic import pydantic_model_creator
 from tortoise.contrib.postgres.fields import ArrayField
 
+import hashlib
+from pathlib import Path
+
 from typing import Dict, Any
 import json
 
@@ -24,6 +27,17 @@ class File(models.Model):
 
     def __str__(self):
         return f"File(id={self.id}, name='{self.name}', type='{self.base_file_type}')"
+    
+
+def calculate_file_obj_hash(file_obj: File):
+    content = Path(file_obj.file_path).read_bytes()
+    tags = file_obj.tags
+
+    tags_json = json.dumps(tags, sort_keys=True, separators=(",", ":"))
+    sha1 = hashlib.sha1(content + tags_json.encode('utf-8')).hexdigest()
+
+    return sha1
+
 
 
 class Tag(models.Model):

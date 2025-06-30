@@ -7,7 +7,7 @@ import json
 from pydantic import BaseModel
 
 import models
-from services import FileService, TagService, FileTypeService
+from services import FileService, FileTypeService
 from mapserver_service import MapServerService
 
 
@@ -227,13 +227,17 @@ async def update_file(file_id: int, request: FileUpdateRequest):
         raise HTTPException(status_code=404, detail="File not found")
 
     # Update tags
-    file_obj.tags = request.tags
-    await file_obj.save()
+    new_file_id = await FileService.update_file_tags(file_id, tags=request.tags)
+
+    file_obj = await models.File.get_or_none(id=new_file_id)
+    if not file_obj:
+        raise HTTPException(status_code=500, detail="Updated file not found")
 
     # Return the updated file as a dict with ISO-formatted datetimes
     return {
         "id": file_obj.id,
         "name": file_obj.name,
+        "sha1": file_obj.sha1,
         "original_name": file_obj.original_name,
         "file_size": file_obj.file_size,
         "mime_type": file_obj.mime_type,

@@ -1,4 +1,4 @@
-from models import File, Tag, File_Pydantic, Tag_Pydantic, Tree, TreeEntry, Commit, Ref
+from models import File, Tag, File_Pydantic, Tag_Pydantic, Tree, TreeEntry, Commit, Ref, calculate_file_obj_hash
 from tortoise.expressions import Q
 import os
 import uuid
@@ -233,27 +233,113 @@ class FileService:
     
     @classmethod
     async def update_file_tags(cls, file_id: int, tags: Dict[str, str]) -> Optional[File_Pydantic]:
-        """Update file tags"""
-        file_obj = await File.get_or_none(id=file_id)
-        if not file_obj:
+        """Update file tags and create a new commit"""
+        orig_file_obj = await File.get_or_none(id=file_id)
+        if not orig_file_obj:
             return None
         
-        file_obj.tags = tags
-        await file_obj.save()
-        return await File_Pydantic.from_tortoise_orm(file_obj)
+        orig_file_obj_id = orig_file_obj.id
+        
+        # Copy file record, assign new tags
+        new_file_obj = orig_file_obj
+        new_file_obj.id = None
+        new_file_obj.tags = tags
+        new_file_obj.sha1 = calculate_file_obj_hash(new_file_obj)
+        await new_file_obj.save()
+
+        # Versioning: create new tree, tree entry, commit
+        ref = await Ref.get_or_none(name="main")
+        head = await ref.commit.get()
+        head_tree = await head.tree
+        head_entries = set(head_tree.entries)
+
+        # Find and replace the tree entry for this file
+        entries_objs = await TreeEntry.filter(object_id=orig_file_obj_id, object_type="file")
+
+        tree_entry_obj = None
+        for entry in entries_objs:
+            if entry.sha1 in head_entries:
+                tree_entry_obj = entry
+                break
+        assert tree_entry_obj is not None, "Unexpected file without tree entry"
+
+        tree_entry_sha1 = hashlib.sha1(str(random.getrandbits(256)).encode()).hexdigest()
+        tree_entry = await TreeEntry.create(
+            sha1=tree_entry_sha1,
+            object_type='file',
+            object_id=new_file_obj.id
+        )
+        await tree_entry.save()
+
+        head_entries.remove(tree_entry_obj.sha1)
+        head_entries.add(tree_entry.sha1)
+
+        tree_id = hashlib.sha1((''.join(list(head_entries))).encode()).hexdigest()
+        tree = await Tree.create(
+            id=tree_id,
+            entries=list(head_entries)
+        )
+
+        commit_message = f"Update tags for file {new_file_obj.name}"
+        commit_content = tree_id + head.id + commit_message
+        commit_id = hashlib.sha1(commit_content.encode()).hexdigest()
+        commit = await Commit.create(
+            id=commit_id,
+            tree=tree,
+            parent=head,
+            message=commit_message
+        )
+        ref.commit = commit
+        await ref.save()
+
+        return new_file_obj.id
     
     @classmethod
     async def delete_file(cls, file_id: int) -> bool:
-        """Delete file and its physical file"""
+        """Delete file and its physical file, and create a new commit"""
         file_obj = await File.get_or_none(id=file_id)
         if not file_obj:
             return False
         
+        # Remove file from disk
         if os.path.exists(file_obj.file_path):
             os.remove(file_obj.file_path)
         
-        # Delete database record
-        await file_obj.delete()
+        # Versioning: create new tree, commit without this file
+        ref = await Ref.get_or_none(name="main")
+        head = await ref.commit.get()
+        head_tree = await head.tree
+        head_entries = set(head_tree.entries)
+
+        # Find and replace the tree entry for this file
+        entries_objs = await TreeEntry.filter(object_id=file_obj.id, object_type="file")
+
+        tree_entry_obj = None
+        for entry in entries_objs:
+            if entry.sha1 in head_entries:
+                tree_entry_obj = entry
+                break
+        assert tree_entry_obj is not None, "Unexpected file without tree entry"
+
+        head_entries.remove(tree_entry_obj.sha1)
+
+        tree_id = hashlib.sha1((''.join(list(head_entries))).encode()).hexdigest()
+        tree = await Tree.create(
+            id=tree_id,
+            entries=list(head_entries)
+        )
+        commit_message = f"Delete file {file_obj.name}"
+        commit_content = tree_id + head.id + commit_message
+        commit_id = hashlib.sha1(commit_content.encode()).hexdigest()
+        commit = await Commit.create(
+            id=commit_id,
+            tree=tree,
+            parent=head,
+            message=commit_message
+        )
+        ref.commit = commit
+        await ref.save()
+
         return True
     
     @classmethod
@@ -271,51 +357,3 @@ class FileService:
         
         files = await query.offset(skip).limit(limit).order_by("-created_at")
         return [await File_Pydantic.from_tortoise_orm(file) for file in files]
-
-
-class TagService:
-    @classmethod
-    async def get_file_tags(cls, file_id: int) -> Dict[str, str]:
-        """Get all tags for a file"""
-        file_obj = await File.get_or_none(id=file_id)
-        if not file_obj:
-            return {}
-        return file_obj.tags or {}
-    
-    @classmethod
-    async def update_file_tags(cls, file_id: int, tags: Dict[str, str]) -> Dict[str, str]:
-        """Update tags for a file"""
-        file_obj = await File.get_or_none(id=file_id)
-        if not file_obj:
-            raise HTTPException(status_code=404, detail="File not found")
-        
-        file_obj.tags = tags
-        await file_obj.save()
-        return file_obj.tags
-    
-    @classmethod
-    async def add_tag(cls, file_id: int, key: str, value: str) -> Dict[str, str]:
-        """Add a single tag to a file"""
-        file_obj = await File.get_or_none(id=file_id)
-        if not file_obj:
-            raise HTTPException(status_code=404, detail="File not found")
-        
-        if not file_obj.tags:
-            file_obj.tags = {}
-        
-        file_obj.tags[key] = value
-        await file_obj.save()
-        return file_obj.tags
-    
-    @classmethod
-    async def remove_tag(cls, file_id: int, key: str) -> Dict[str, str]:
-        """Remove a tag from a file"""
-        file_obj = await File.get_or_none(id=file_id)
-        if not file_obj:
-            raise HTTPException(status_code=404, detail="File not found")
-        
-        if file_obj.tags and key in file_obj.tags:
-            del file_obj.tags[key]
-            await file_obj.save()
-        
-        return file_obj.tags 
