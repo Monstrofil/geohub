@@ -45,19 +45,19 @@ FileIn_Pydantic = pydantic_model_creator(File, name="FileIn", exclude_readonly=T
 
 
 class Tree(models.Model):
-    id = fields.CharField(pk=True, max_length=40)  # hash of entries
+    id = fields.UUIDField(pk=True)
     entries = ArrayField(element_type="varchar(40)")
 
 
 class TreeEntry(models.Model):
-    id = fields.IntField(pk=True)
-    sha1 = fields.CharField(max_length=40)
+    id = fields.UUIDField(pk=True)
+    path = fields.CharField(max_length=40)
     object_type = fields.CharField(max_length=10)
     object_id = fields.IntField()
 
 
 class Commit(models.Model):
-    id = fields.CharField(pk=True, max_length=40)  # hash of commit
+    id = fields.UUIDField(pk=True)
     tree = fields.ForeignKeyField('models.Tree', related_name='commits')
     parent = fields.ForeignKeyField('models.Commit', related_name='children', null=True)
     message = fields.CharField(max_length=255)

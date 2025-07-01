@@ -4,6 +4,7 @@ from typing import List, Dict, Optional
 import os
 import datetime 
 import json
+import uuid
 from pydantic import BaseModel, ConfigDict
 
 import models
@@ -73,7 +74,7 @@ class FileSearchRequest(BaseModel):
 
 class RefResponse(BaseModel):
     name: str
-    commit_id: str
+    commit_id: uuid.UUID
 
 
 class CommitResponse(BaseModel):
@@ -142,7 +143,7 @@ async def list_tree(commit_id: str, skip: int = 0, limit: int = 100):
     commit = await models.Commit.get_or_none(id=commit_id)
     tree = await commit.tree
 
-    entries = await models.TreeEntry.filter(sha1__in=tree.entries).offset(skip).limit(limit)
+    entries = await models.TreeEntry.filter(id__in=tree.entries).offset(skip).limit(limit)
 
     files = await models.File.filter(id__in=[
         entry.object_id for entry in entries if entry.object_type == 'file'

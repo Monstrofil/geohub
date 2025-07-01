@@ -194,7 +194,7 @@ class FileService:
         tree = await commit_obj.tree
         if not tree:
             return []
-        entries = await TreeEntry.filter(sha1__in=tree.entries, object_type="file")
+        entries = await TreeEntry.filter(id__in=tree.entries, object_type="file")
         file_ids = [entry.object_id for entry in entries]
         files = await File.filter(id__in=file_ids).offset(skip).limit(limit).order_by("-created_at")
         return [await File_Pydantic.from_tortoise_orm(file) for file in files]

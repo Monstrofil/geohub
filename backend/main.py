@@ -54,19 +54,16 @@ def health_check():
 @app.on_event("startup")
 async def create_default_branch_and_commit():
     # Check if any commits exist
-    if not await Commit.exists():
-        async with in_transaction():
-            # Create empty tree (hash of empty list)
-            empty_tree_hash = hashlib.sha1(b'').hexdigest()
-            empty_tree, _ = await Tree.get_or_create(id=empty_tree_hash)
-            # Create initial commit (hash of tree id + message)
-            commit_content = empty_tree_hash + "Initial empty commit"
-            initial_commit_hash = hashlib.sha1(commit_content.encode('utf-8')).hexdigest()
-            initial_commit, _ = await Commit.get_or_create(
-                id=initial_commit_hash,
-                tree=empty_tree,
-                parent=None,
-                message="Initial empty commit"
-            )
-            # Create 'main' branch ref
-            await Ref.get_or_create(name="main", commit=initial_commit) 
+    if await Commit.exists():
+        return
+
+    async with in_transaction():
+        # Create empty tree (hash of empty list)
+        empty_tree = await Tree.create(entries=[])
+        initial_commit = await Commit.create(
+            tree=empty_tree,
+            parent=None,
+            message="Initial empty commit"
+        )
+        # Create 'main' branch ref
+        await Ref.get_or_create(name="main", commit=initial_commit) 

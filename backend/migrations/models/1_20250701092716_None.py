@@ -12,16 +12,30 @@ async def upgrade(db: BaseDBAsyncClient) -> str:
     "mime_type" VARCHAR(100) NOT NULL,
     "base_file_type" VARCHAR(20) NOT NULL  DEFAULT 'raw',
     "tags" JSONB NOT NULL,
+    "sha1" VARCHAR(40)  UNIQUE,
     "created_at" TIMESTAMPTZ NOT NULL  DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMPTZ NOT NULL  DEFAULT CURRENT_TIMESTAMP
 );
-CREATE TABLE IF NOT EXISTS "tags" (
-    "id" SERIAL NOT NULL PRIMARY KEY,
-    "key" VARCHAR(100) NOT NULL,
-    "value" VARCHAR(500) NOT NULL,
-    "created_at" TIMESTAMPTZ NOT NULL  DEFAULT CURRENT_TIMESTAMP,
-    "file_id" INT NOT NULL REFERENCES "files" ("id") ON DELETE CASCADE,
-    CONSTRAINT "uid_tags_file_id_36a1d2" UNIQUE ("file_id", "key")
+CREATE TABLE IF NOT EXISTS "tree" (
+    "id" UUID NOT NULL  PRIMARY KEY,
+    "entries" varchar(40)[] NOT NULL
+);
+CREATE TABLE IF NOT EXISTS "commit" (
+    "id" UUID NOT NULL  PRIMARY KEY,
+    "message" VARCHAR(255) NOT NULL,
+    "timestamp" TIMESTAMPTZ NOT NULL  DEFAULT CURRENT_TIMESTAMP,
+    "parent_id" UUID REFERENCES "commit" ("id") ON DELETE CASCADE,
+    "tree_id" UUID NOT NULL REFERENCES "tree" ("id") ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS "refs" (
+    "name" VARCHAR(100) NOT NULL  PRIMARY KEY,
+    "commit_id" UUID NOT NULL REFERENCES "commit" ("id") ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS "treeentry" (
+    "id" UUID NOT NULL  PRIMARY KEY,
+    "path" VARCHAR(40) NOT NULL,
+    "object_type" VARCHAR(10) NOT NULL,
+    "object_id" INT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS "aerich" (
     "id" SERIAL NOT NULL PRIMARY KEY,

@@ -4,12 +4,7 @@ import random
 
 
 async def create_commit(tree, parent_commit, message):
-    tree_id = tree.id
-    parent_id = parent_commit.id
-    commit_content = tree_id + parent_id + message
-    commit_id = hashlib.sha1(commit_content.encode()).hexdigest()
     commit = await Commit.create(
-        id=commit_id, 
         tree=tree, 
         parent=parent_commit, 
         message=message
@@ -24,15 +19,16 @@ async def add_object(obj, message=None, object_type="file"):
     ref = await Ref.get_or_none(name="main")
     head = await ref.commit.get()
     head_entries = list((await head.tree).entries)
-    tree_entry_sha1 = hashlib.sha1(str(random.getrandbits(256)).encode()).hexdigest()
+
+    tree_entry_path = hashlib.sha1(str(random.getrandbits(256)).encode()).hexdigest()
     tree_entry = await TreeEntry.create(
-        sha1=tree_entry_sha1, object_type=object_type, object_id=obj.id
+        path=tree_entry_path, object_type=object_type, object_id=obj.id
     )
     await tree_entry.save()
-    entries_sha1s = head_entries + [tree_entry.sha1]
-    tree_id = hashlib.sha1(("".join(entries_sha1s)).encode()).hexdigest()
-    tree = await Tree.create(id=tree_id, entries=entries_sha1s)
-    commit_message = message or f"Add {object_type} {obj.name if hasattr(obj, 'name') else obj.id}"
+
+    entries_sha1s = head_entries + [str(tree_entry.id)]
+    tree = await Tree.create(entries=entries_sha1s)
+    commit_message = message or f"Add {object_type} {obj.id}"
     return await create_commit(tree, head, commit_message)
 
 
@@ -51,9 +47,8 @@ async def update_object(orig_obj_id, new_obj, message=None, object_type="file"):
             break
 
     assert tree_entry_obj is not None, f"Unexpected {object_type} without tree entry"
-    tree_entry_sha1 = hashlib.sha1(str(random.getrandbits(256)).encode()).hexdigest()
     tree_entry = await TreeEntry.create(
-        sha1=tree_entry_sha1, object_type=object_type, object_id=new_obj.id
+        path=tree_entry_obj.path, object_type=object_type, object_id=new_obj.id
     )
 
     await tree_entry.save()
