@@ -2,9 +2,9 @@ from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends
 from fastapi.responses import FileResponse as FastAPIFileResponse
 from typing import List, Dict, Optional
 import os
-
+import datetime 
 import json
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 import models
 from services import FileService, FileTypeService
@@ -19,6 +19,8 @@ mapserver_service = MapServerService()
 
 # Pydantic models for request/response
 class FileResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     name: str
     sha1: str | None
@@ -27,12 +29,32 @@ class FileResponse(BaseModel):
     mime_type: str
     base_file_type: str
     tags: Dict[str, str]
-    created_at: str
-    updated_at: str
+    created_at: datetime.datetime
+    updated_at: datetime.datetime
 
 
 class FileListResponse(BaseModel):
-    files: List[FileResponse]
+    files: list[FileResponse]
+    total: int
+    skip: int
+    limit: int
+
+
+class TreeEntryResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: object
+
+    object_type: str
+    object: FileResponse
+
+    sha1: str
+
+
+class ObjectsListResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    
+    objects: list[TreeEntryResponse]
     total: int
     skip: int
     limit: int
@@ -115,6 +137,32 @@ async def upload_file(
     )
 
 
+@router.get("/{commit_id}/objects", response_model=ObjectsListResponse)
+async def list_tree(commit_id: str, skip: int = 0, limit: int = 100):
+    commit = await models.Commit.get_or_none(id=commit_id)
+    tree = await commit.tree
+
+    entries = await models.TreeEntry.filter(sha1__in=tree.entries).offset(skip).limit(limit)
+
+    files = await models.File.filter(id__in=[
+        entry.object_id for entry in entries if entry.object_type == 'file'
+    ])
+
+    files_mapping = {
+        f.id: f for f in files
+    }
+
+    for entry in entries:
+        # TODO: this is not going to work when type > 1
+        entry.object = files_mapping.get(entry.object_id)
+
+    return ObjectsListResponse(
+        objects=entries,
+        total=len(entries),
+        skip=skip,
+        limit=limit
+    )
+
 @router.get("/files", response_model=FileListResponse)
 async def list_files(skip: int = 0, limit: int = 100, commit: str = None):
     """List files for a specific commit (commit is required)"""
@@ -126,7 +174,7 @@ async def list_files(skip: int = 0, limit: int = 100, commit: str = None):
             FileResponse(
                 id=file.id,
                 name=file.name,
-                sha1=getattr(file, 'sha1', None),
+                sha1=file.sha1,
                 original_name=file.original_name,
                 file_size=file.file_size,
                 mime_type=file.mime_type,

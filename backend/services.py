@@ -1,4 +1,4 @@
-from models import File, Tag, File_Pydantic, Tag_Pydantic, Tree, TreeEntry, Commit, Ref, calculate_file_obj_hash
+from models import File, File_Pydantic, Tree, TreeEntry, Commit, Ref, calculate_file_obj_hash
 from tortoise.expressions import Q
 import os
 import uuid
@@ -11,7 +11,7 @@ import hashlib
 from datetime import datetime, timezone
 import json
 import random
-from git_service import add_file, update_file, delete_file
+from git_service import add_object, update_object, delete_object
 
 
 class FileTypeService:
@@ -171,7 +171,7 @@ class FileService:
             sha1=file_info["sha1"]
         )
 
-        await add_file(file_obj, message=f"Add file {file_obj.name}")
+        await add_object(file_obj, message=f"Add file {file_obj.name}")
         
         return await File_Pydantic.from_tortoise_orm(file_obj)
     
@@ -215,7 +215,7 @@ class FileService:
         new_file_obj.sha1 = calculate_file_obj_hash(new_file_obj)
         await new_file_obj.save()
 
-        await update_file(orig_file_obj_id, new_file_obj, message=f"Update tags for file {new_file_obj.name}")
+        await update_object(orig_file_obj_id, new_file_obj, message=f"Update tags for file {new_file_obj.name}")
 
         return new_file_obj.id
     
@@ -230,7 +230,7 @@ class FileService:
         if os.path.exists(file_obj.file_path):
             os.remove(file_obj.file_path)
         
-        await delete_file(file_obj, message=f"Delete file {file_obj.name}")
+        await delete_object(file_obj, message=f"Delete file {file_obj.name}")
         await file_obj.delete()
 
         return True
