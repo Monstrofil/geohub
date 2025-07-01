@@ -166,6 +166,14 @@ const props = defineProps({
   changeTracker: {
     type: Object,
     required: true
+  },
+  commitId: {
+    type: [String, Number],
+    required: true
+  },
+  treeEntryId: {
+    type: [String, Number],
+    required: true
   }
 })
 
@@ -376,10 +384,10 @@ function triggerFileSelect() {
 async function handleCommit() {
   const result = await props.changeTracker.commitChanges(async (change) => {
     if (change.type === 'tags') {
-      const updatedFile = await apiService.updateFileTags(change.fileId, change.data)
+      const updatedEntry = await apiService.updateObjectInTree(props.commitId, props.treeEntryId, change.data)
       // Update the local file object with the response
-      if (updatedFile && props.file) {
-        Object.assign(props.file, updatedFile)
+      if (updatedEntry && updatedEntry.object && props.file) {
+        Object.assign(props.file, updatedEntry.object)
       }
     }
   })

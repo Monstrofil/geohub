@@ -55,10 +55,12 @@ class ApiService {
     return await response.json()
   }
 
-  async getFiles(skip = 0, limit = 100, commit = null) {
-    let query = `/files?skip=${skip}&limit=${limit}`
-    if (commit) query += `&commit=${encodeURIComponent(commit)}`
-    return await this.request(query)
+  // Get objects (tree entries) for a commit
+  async getObjects(commitId, skip = 0, limit = 100) {
+    if (!commitId) throw new Error('commitId is required')
+    const response = await this.request(`/${commitId}/objects?skip=${skip}&limit=${limit}`)
+    // Return the objects array as files for compatibility
+    return { files: response.objects, total: response.total, skip: response.skip, limit: response.limit }
   }
 
   async getFile(fileId) {
@@ -93,6 +95,15 @@ class ApiService {
   // Health check
   async healthCheck() {
     return await fetch('http://localhost:8000/health').then(res => res.json())
+  }
+
+  // Update a file object in a tree (by tree entry)
+  async updateObjectInTree(commitId, treeEntryId, tags) {
+    if (!commitId || !treeEntryId) throw new Error('commitId and treeEntryId are required')
+    return await this.request(`/${commitId}/objects/${treeEntryId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ tags }),
+    })
   }
 }
 

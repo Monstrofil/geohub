@@ -3,7 +3,7 @@
     <!-- Branch Selector -->
     <BranchSelector v-model="currentBranch" @onBranchChange="handleBranchChange" />
     <!-- File List View -->
-    <div v-if="!selectedFile" class="pure-u-1">
+    <div v-if="!selectedEntry" class="pure-u-1">
       <div class="section section-feature-list">
         <h3>
           <span>Файли ({{ files.length }})</span>
@@ -21,12 +21,12 @@
         <div v-else class="disclosure-wrap disclosure-wrap-feature_list">
           <div class="feature-list">
             <FileCard 
-              v-for="file in files" 
-              :key="file.id"
-              :file="file"
-              :name="file.original_name"
-              :selected="false"
-              @click="selectFile(file)"
+              v-for="entry in files" 
+              :key="entry.id"
+              :file="entry.object"
+              :name="entry.object?.original_name || ''"
+              :selected="selectedEntry && selectedEntry.object && selectedEntry.object.id === entry.object?.id"
+              @click="selectFile(entry.object)"
               @file-selected="handleFileSelected"
             />
           </div>
@@ -37,8 +37,11 @@
     <!-- File Editor View -->
     <div v-else class="pure-u-1">
       <FileEditor 
-        :file="selectedFile"
+        v-if="selectedEntry"
+        :file="selectedEntry.object"
         :change-tracker="changeTracker"
+        :commit-id="currentBranch && currentBranch.commit_id"
+        :tree-entry-id="selectedEntry.id"
         @back="backToList"
         @file-uploaded="handleFileUploaded"
         @tags-updated="handleTagsUpdated"
@@ -65,7 +68,7 @@ import { useChangeTracker } from './composables/useChangeTracker.js'
 import { loadFieldDefinitions } from './utils/fieldResolver.js'
 import apiService from './services/api.js'
 
-const selectedFile = ref(null)
+const selectedEntry = ref(null)
 const allFieldDefinitions = ref({})
 const files = ref([])
 const loading = ref(false)
@@ -95,7 +98,11 @@ async function loadFiles() {
   loading.value = true
   error.value = null
   try {
-    const response = await apiService.getFiles(0, 100, currentBranch.value.commit_id)
+    if (!currentBranch.value || !currentBranch.value.commit_id) {
+      files.value = []
+      return
+    }
+    const response = await apiService.getObjects(currentBranch.value.commit_id, 0, 100)
     files.value = response.files || []
   } catch (err) {
     console.error('Failed to load files:', err)
@@ -106,15 +113,19 @@ async function loadFiles() {
 }
 
 function selectFile(file) {
-  selectedFile.value = file
+  // Find the entry that matches this file
+  const entry = files.value.find(e => e.object && e.object.id === file.id)
+  selectedEntry.value = entry
 }
 
 function handleFileSelected(file) {
-  selectedFile.value = file
+  // Find the entry that matches this file
+  const entry = files.value.find(e => e.object && e.object.id === file.id)
+  selectedEntry.value = entry
 }
 
 function backToList() {
-  selectedFile.value = null
+  selectedEntry.value = null
 }
 
 async function handleFileUploaded(uploadData) {
@@ -125,18 +136,18 @@ async function handleFileUploaded(uploadData) {
   if (uploadData && uploadData.id) {
     const uploadedFile = files.value.find(f => f.id === uploadData.id)
     if (uploadedFile) {
-      selectedFile.value = uploadedFile
+      selectedEntry.value = uploadedFile
     }
   }
 }
 
 async function handleTagsUpdated(newTags, fromCommit = false) {
-  if (selectedFile.value) {
+  if (selectedEntry.value) {
     if (!fromCommit) {
       // Add change to tracker instead of immediately updating
       changeTracker.addChange({
         type: 'tags',
-        fileId: selectedFile.value.id,
+        fileId: selectedEntry.value.id,
         data: newTags
       })
     }
@@ -148,9 +159,9 @@ function handleFileUpdated(updatedFile) {
   const fileIndex = files.value.findIndex(f => f.id === updatedFile.id)
   if (fileIndex !== -1) {
     files.value[fileIndex].tags = { ...updatedFile.tags }
-    // Update the selectedFile reference if it's the same file
-    if (selectedFile.value && selectedFile.value.id === updatedFile.id) {
-      selectedFile.value = files.value[fileIndex]
+    // Update the selectedEntry reference if it's the same file
+    if (selectedEntry.value && selectedEntry.value.id === updatedFile.id) {
+      selectedEntry.value = files.value[fileIndex]
     }
   }
 }

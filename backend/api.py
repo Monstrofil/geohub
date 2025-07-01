@@ -1,10 +1,11 @@
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends, Path
 from fastapi.responses import FileResponse as FastAPIFileResponse
 from typing import List, Dict, Optional
 import os
 import datetime 
 import json
 import uuid
+import git_service
 from pydantic import BaseModel, ConfigDict
 
 import models
@@ -44,12 +45,12 @@ class FileListResponse(BaseModel):
 class TreeEntryResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    id: object
+    id: uuid.UUID
 
     object_type: str
     object: FileResponse
 
-    sha1: str
+    path: str
 
 
 class ObjectsListResponse(BaseModel):
@@ -85,11 +86,11 @@ class CommitResponse(BaseModel):
     timestamp: str
 
 
-class TreeEntryResponse(BaseModel):
-    id: int
-    sha1: str
-    object_type: str
-    object_id: int
+# class TreeEntryResponse(BaseModel):
+#     id: int
+#     path: str
+#     object_type: str
+#     object_id: int
 
 
 class TreeResponse(BaseModel):
@@ -404,4 +405,57 @@ async def get_tree(tree_id: str):
                 object_id=entry.object_id
             ) for entry in entries
         ]
+    )
+
+
+@router.put("/{commit_id}/objects/{tree_entry_id}", response_model=TreeEntryResponse)
+async def update_object_in_tree(
+    commit_id: str = Path(..., description="Commit ID"),
+    tree_entry_id: str = Path(..., description="TreeEntry (object) ID"),
+    request: FileUpdateRequest = None
+):
+    """Update a file object in a tree (by tree entry). Only file objects are supported for now."""
+    ref = await models.Ref.get_or_none(name="main")
+
+    # Find the commit
+    commit = await models.Commit.get_or_none(id=commit_id)
+    if not commit:
+        raise HTTPException(status_code=404, detail="Commit not found")
+
+
+    entry = await models.TreeEntry.get_or_none(id=tree_entry_id)
+    if not entry:
+        raise HTTPException(status_code=404, detail="Tree entry not found")
+
+    # TODO: add support for other object types
+    if entry.object_type != 'file':
+        raise HTTPException(status_code=400, detail="Only file objects can be updated at this time")
+    
+    orig_file_obj = await models.File.get_or_none(id=entry.object_id)
+    if not orig_file_obj:
+        raise HTTPException(status_code=404, detail="File not found")
+        
+    # Copy file record, assign new tags
+    new_file_obj = orig_file_obj
+    new_file_obj.id = None
+    new_file_obj.tags = request.tags
+    new_file_obj.sha1 = models.calculate_file_obj_hash(new_file_obj)
+    await new_file_obj.save()
+
+    async with git_service.stage_changes(head=commit) as index:
+        new_entry = await git_service.create_tree_entry(
+            entry.object_type, new_file_obj.id, entry.path)
+        await index.update_tree_entry(entry, new_entry)
+
+        await index.commit("Update file %s", ref)
+
+    file_obj = await models.File.get_or_none(id=new_file_obj.id)
+    if not file_obj:
+        raise HTTPException(status_code=500, detail="Updated file not found")
+
+    return TreeEntryResponse(
+        id=entry.id,
+        object_type=entry.object_type,
+        object=file_obj,
+        path=entry.path
     ) 
