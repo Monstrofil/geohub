@@ -1,7 +1,12 @@
 <template>
-  <div class="tree-card" :class="{ 'selected': selected }" @click="selectTree">
-    <div class="tree-icon" v-html="icon"></div>
-    <div class="tree-name">{{ name }}sdfsdf</div>
+  <div class="tree-card" :class="{ 'selected': selected }">
+    <div class="tree-icon" v-html="icon" @click="editTree" title="Edit category"></div>
+    <div class="tree-name" @click="editTree" title="Edit category">{{ name }}</div>
+    <button class="view-contents-btn" @click.stop="viewContents" title="View files in this category">
+      <svg width="20" height="20" viewBox="0 0 20 20">
+        <path d="M5 10h10M12 7l3 3-3 3" stroke="#ffb300" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </button>
   </div>
 </template>
 
@@ -14,7 +19,7 @@ const props = defineProps({
   tree: { type: Object, required: true }
 })
 
-const emit = defineEmits(['click', 'tree-selected'])
+const emit = defineEmits(['edit', 'view-contents'])
 
 const icon = computed(() => {
   // Simple folder icon
@@ -24,9 +29,12 @@ const icon = computed(() => {
   </svg>`
 })
 
-function selectTree() {
-  emit('click')
-  emit('tree-selected', props.tree)
+function editTree() {
+  emit('edit', props.tree)
+}
+
+function viewContents() {
+  emit('view-contents', props.tree)
 }
 </script>
 
@@ -45,6 +53,7 @@ function selectTree() {
   min-height: 140px;
   transition: box-shadow 0.15s, border-color 0.15s, background-color 0.15s;
   cursor: pointer;
+  position: relative;
 }
 .tree-card:hover {
   box-shadow: 0 4px 16px rgba(0,0,0,0.10);
@@ -62,5 +71,20 @@ function selectTree() {
   color: #333;
   text-align: center;
   word-break: break-all;
+  margin-bottom: 0.5rem;
+}
+.view-contents-btn {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.2rem;
+  border-radius: 4px;
+  transition: background 0.15s;
+}
+.view-contents-btn:hover {
+  background: #fff3cd;
 }
 </style> 
