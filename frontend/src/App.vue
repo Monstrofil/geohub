@@ -4,35 +4,15 @@
     <BranchSelector v-model="currentBranch" @onBranchChange="handleBranchChange" />
     <!-- File List View -->
     <div v-if="!selectedEntry" class="pure-u-1">
-      <div class="section section-feature-list">
-        <h3>
-          <span>Файли ({{ files.length }})</span>
-          <div class="file-actions">
-            <button @click="loadFiles" class="action-btn refresh-btn" :disabled="loading">
-              <i class="fas fa-sync-alt"></i> Refresh
-            </button>
-            <button @click="showUploadModal = true" class="action-btn upload-btn">
-              <i class="fas fa-upload"></i> Upload
-            </button>
-          </div>
-        </h3>
-        <div v-if="loading" class="loading">Завантаження файлів...</div>
-        <div v-else-if="error" class="error">{{ error }}</div>
-        <div v-else class="disclosure-wrap disclosure-wrap-feature_list">
-          <div class="feature-list">
-            <component 
-              :is="entry.object_type === 'file' ? FileCard : TreeCard"
-              v-for="entry in files" 
-              :key="entry.id"
-              :file="entry.object"
-              :name="entry.object?.original_name || ''"
-              :selected="selectedEntry && selectedEntry.object && selectedEntry.object.id === entry.object?.id"
-              @click="selectFile(entry.object)"
-              @file-selected="handleFileSelected"
-            />
-          </div>
-        </div>
-      </div>
+      <FileList
+        :commit-id="currentBranch && currentBranch.commit_id"
+        :selected-entry="selectedEntry"
+        @refresh="() => {}"
+        @show-upload="showUploadModal = true"
+        @select-file="selectFile"
+        @file-selected="handleFileSelected"
+        @files-loaded="files = $event"
+      />
     </div>
 
     <!-- File Editor View -->
@@ -67,6 +47,7 @@ import TreeCard from './components/TreeCard.vue'
 import FileEditor from './components/FileEditor.vue'
 import SimpleUpload from './components/SimpleUpload.vue'
 import BranchSelector from './components/BranchSelector.vue'
+import FileList from './components/FileList.vue'
 import { useChangeTracker } from './composables/useChangeTracker.js'
 import { loadFieldDefinitions } from './utils/fieldResolver.js'
 import apiService from './services/api.js'
@@ -74,8 +55,6 @@ import apiService from './services/api.js'
 const selectedEntry = ref(null)
 const allFieldDefinitions = ref({})
 const files = ref([])
-const loading = ref(false)
-const error = ref(null)
 const showUploadModal = ref(false)
 
 // Branch selector state
@@ -88,31 +67,11 @@ const changeTracker = useChangeTracker()
 onMounted(async () => {
   // Load all field definitions
   allFieldDefinitions.value = await loadFieldDefinitions()
-  // Load files from API
-  await loadFiles()
 })
 
 function handleBranchChange(branch) {
   currentBranch.value = branch
-  loadFiles()
-}
-
-async function loadFiles() {
-  loading.value = true
-  error.value = null
-  try {
-    if (!currentBranch.value || !currentBranch.value.commit_id) {
-      files.value = []
-      return
-    }
-    const response = await apiService.getObjects(currentBranch.value.commit_id, 0, 100)
-    files.value = response.files || []
-  } catch (err) {
-    console.error('Failed to load files:', err)
-    error.value = 'Помилка завантаження файлів: ' + err.message
-  } finally {
-    loading.value = false
-  }
+  selectedEntry.value = null
 }
 
 function selectFile(file) {
@@ -132,10 +91,7 @@ function backToList() {
 }
 
 async function handleFileUploaded(uploadData) {
-  // Refresh the file list after upload
-  await loadFiles()
-  
-  // If we have the uploaded file, select it
+  // FileList will reload files automatically on prop change, so just select the uploaded file
   if (uploadData && uploadData.id) {
     const uploadedFile = files.value.find(f => f.id === uploadData.id)
     if (uploadedFile) {
