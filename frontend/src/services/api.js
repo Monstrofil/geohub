@@ -37,12 +37,13 @@ class ApiService {
   }
 
   // File operations
-  async uploadFile(file, tags = {}) {
+  async uploadFile(file, tags = {}, commitId) {
+    if (!commitId) throw new Error('commitId is required for upload')
     const formData = new FormData()
     formData.append('file', file)
     formData.append('tags', JSON.stringify(tags))
 
-    const response = await fetch(`${this.baseUrl}/files/upload`, {
+    const response = await fetch(`${this.baseUrl}/${commitId}/objects`, {
       method: 'POST',
       body: formData,
     })
@@ -63,27 +64,10 @@ class ApiService {
     return { files: response.objects, total: response.total, skip: response.skip, limit: response.limit }
   }
 
-  async getFile(fileId) {
-    return await this.request(`/files/${fileId}`)
-  }
-
-  async deleteFile(fileId) {
-    return await this.request(`/files/${fileId}`, { method: 'DELETE' })
-  }
-
   async searchFiles(tags, skip = 0, limit = 100) {
     return await this.request('/files/search', {
       method: 'POST',
       body: JSON.stringify({ tags, skip, limit }),
-    })
-  }
-
-  // Tag operations
-  async updateFileTags(fileId, tags) {
-    // Use the unified endpoint to update tags
-    return await this.request(`/files/${fileId}`, {
-      method: 'PUT',
-      body: JSON.stringify({ tags }),
     })
   }
 

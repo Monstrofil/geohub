@@ -10,7 +10,7 @@ import json
 
 
 class File(models.Model):
-    id = fields.IntField(pk=True)
+    id = fields.UUIDField(pk=True)
     name = fields.CharField(max_length=255)
     original_name = fields.CharField(max_length=255)
     file_path = fields.CharField(max_length=500)
@@ -48,12 +48,15 @@ class Tree(models.Model):
     id = fields.UUIDField(pk=True)
     entries = ArrayField(element_type="varchar(40)")
 
+    name = fields.CharField(max_length=255, default="Root")
+    tags = fields.JSONField(default=dict)
+
 
 class TreeEntry(models.Model):
     id = fields.UUIDField(pk=True)
     path = fields.CharField(max_length=40)
     object_type = fields.CharField(max_length=10)
-    object_id = fields.IntField()
+    object_id = fields.UUIDField()
 
 
 class Commit(models.Model):

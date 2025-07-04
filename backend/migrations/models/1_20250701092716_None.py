@@ -4,7 +4,7 @@ from tortoise import BaseDBAsyncClient
 async def upgrade(db: BaseDBAsyncClient) -> str:
     return """
         CREATE TABLE IF NOT EXISTS "files" (
-    "id" SERIAL NOT NULL PRIMARY KEY,
+    "id" UUID NOT NULL  PRIMARY KEY,
     "name" VARCHAR(255) NOT NULL,
     "original_name" VARCHAR(255) NOT NULL,
     "file_path" VARCHAR(500) NOT NULL,
@@ -35,14 +35,18 @@ CREATE TABLE IF NOT EXISTS "treeentry" (
     "id" UUID NOT NULL  PRIMARY KEY,
     "path" VARCHAR(40) NOT NULL,
     "object_type" VARCHAR(10) NOT NULL,
-    "object_id" INT NOT NULL
+    "object_id"  UUID NOT NULL 
 );
 CREATE TABLE IF NOT EXISTS "aerich" (
     "id" SERIAL NOT NULL PRIMARY KEY,
     "version" VARCHAR(255) NOT NULL,
     "app" VARCHAR(100) NOT NULL,
     "content" JSONB NOT NULL
-);"""
+);
+
+ALTER TABLE "tree" ADD "name" VARCHAR(255) NOT NULL DEFAULT 'Root';
+ALTER TABLE "tree" ADD "tags" JSONB NOT NULL DEFAULT '{}'::jsonb;
+"""
 
 
 async def downgrade(db: BaseDBAsyncClient) -> str:

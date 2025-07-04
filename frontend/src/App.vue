@@ -20,7 +20,8 @@
         <div v-else-if="error" class="error">{{ error }}</div>
         <div v-else class="disclosure-wrap disclosure-wrap-feature_list">
           <div class="feature-list">
-            <FileCard 
+            <component 
+              :is="entry.object_type === 'file' ? FileCard : TreeCard"
               v-for="entry in files" 
               :key="entry.id"
               :file="entry.object"
@@ -52,6 +53,7 @@
     <!-- Upload Modal -->
     <SimpleUpload 
       :is-open="showUploadModal"
+      :commit-id="currentBranch && currentBranch.commit_id"
       @uploaded="handleFileUploaded"
       @close="showUploadModal = false"
     />
@@ -61,6 +63,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import FileCard from './components/FileCard.vue'
+import TreeCard from './components/TreeCard.vue'
 import FileEditor from './components/FileEditor.vue'
 import SimpleUpload from './components/SimpleUpload.vue'
 import BranchSelector from './components/BranchSelector.vue'

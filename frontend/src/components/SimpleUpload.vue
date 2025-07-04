@@ -44,6 +44,10 @@ const props = defineProps({
   isOpen: {
     type: Boolean,
     default: false
+  },
+  commitId: {
+    type: String,
+    required: true
   }
 })
 
@@ -89,13 +93,17 @@ async function handleUpload() {
     error.value = 'Оберіть файл.'
     return
   }
+  if (!props.commitId) {
+    error.value = 'Commit ID is required.'
+    return
+  }
   uploading.value = true
   const tagObj = {}
   tags.value.forEach(t => {
     if (t.key && t.value) tagObj[t.key] = t.value
   })
   try {
-    const uploaded = await apiService.uploadFile(file.value, tagObj)
+    const uploaded = await apiService.uploadFile(file.value, tagObj, props.commitId)
     success.value = true
     emit('uploaded', uploaded)
     // Close modal after successful upload

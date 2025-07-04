@@ -11,7 +11,7 @@ import hashlib
 from datetime import datetime, timezone
 import json
 import random
-from git_service import add_object, update_object, delete_object
+from git_service import update_object, delete_object
 
 
 class FileTypeService:
@@ -102,6 +102,17 @@ class FileTypeService:
             return False
 
 
+class CollectionsService:
+    @classmethod
+    async def create_collection(cls, name: str, tags: dict):
+        tree_obj = await Tree.create(
+            name=name,
+            tags=tags,
+            entries=[],
+        )
+        
+        return tree_obj
+
 class FileService:
     UPLOAD_DIR = "uploads"
     
@@ -138,9 +149,9 @@ class FileService:
         }
     
     @classmethod
-    async def create_file(cls, file_data: Dict[str, Any], tags: Dict[str, str] = None, expected_type: str = None) -> File_Pydantic:
+    async def create_file(cls, uploaded_file, tags: Dict[str, str] = None, expected_type: str = None) -> File_Pydantic:
         """Create a new file record with automatic type detection and versioning"""
-        file_info = await cls.save_uploaded_file(file_data["file"], tags)
+        file_info = await cls.save_uploaded_file(uploaded_file, tags)
         
         # Detect file type
         base_file_type = FileTypeService.detect_file_type(file_info["file_path"])
@@ -170,10 +181,8 @@ class FileService:
             tags=file_tags,
             sha1=file_info["sha1"]
         )
-
-        await add_object(file_obj, message=f"Add file {file_obj.name}")
         
-        return await File_Pydantic.from_tortoise_orm(file_obj)
+        return file_obj
     
     @classmethod
     async def get_file(cls, file_id: int) -> Optional[File_Pydantic]:

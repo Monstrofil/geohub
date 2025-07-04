@@ -1,15 +1,17 @@
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends, Path
+from fastapi import APIRouter, UploadFile, File, Form, Body, HTTPException, Depends, Path
 from fastapi.responses import FileResponse as FastAPIFileResponse
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, ForwardRef
 import os
 import datetime 
 import json
 import uuid
 import git_service
+import hashlib
+import random
 from pydantic import BaseModel, ConfigDict
 
 import models
-from services import FileService, FileTypeService
+from services import FileService, FileTypeService, CollectionsService
 from mapserver_service import MapServerService
 
 
@@ -23,7 +25,7 @@ mapserver_service = MapServerService()
 class FileResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    id: int
+    id: uuid.UUID
     name: str
     sha1: str | None
     original_name: str
@@ -42,13 +44,22 @@ class FileListResponse(BaseModel):
     limit: int
 
 
+class CategoryResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+
+    name: str
+    tags: Dict[str, str]
+
+
 class TreeEntryResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
 
     object_type: str
-    object: FileResponse
+    object: FileResponse | CategoryResponse
 
     path: str
 
@@ -98,47 +109,6 @@ class TreeResponse(BaseModel):
     entries: list[TreeEntryResponse]
 
 
-# File endpoints
-@router.post("/files/upload", response_model=FileResponse)
-async def upload_file(
-    file: UploadFile = File(...),
-    tags: Optional[str] = Form(None),
-    expected_type: Optional[str] = Form(None)
-):
-    """Upload a new file with optional tags and type validation"""
-    if not file.filename:
-        raise HTTPException(status_code=400, detail="No file provided")
-    
-    # Parse tags if provided
-    file_tags = {}
-    if tags:
-        try:
-            file_tags = json.loads(tags)
-        except json.JSONDecodeError:
-            raise HTTPException(status_code=400, detail="Invalid tags format")
-    
-    # Validate expected type if provided
-    if expected_type and expected_type not in ["raster", "vector", "raw"]:
-        raise HTTPException(status_code=400, detail="Invalid expected_type. Must be 'raster', 'vector', or 'raw'")
-    
-    # Create file
-    file_data = {"file": file}
-    file_obj = await FileService.create_file(file_data, file_tags, expected_type)
-    
-    return FileResponse(
-        id=file_obj.id,
-        name=file_obj.name,
-        sha1=file_obj.sha1,
-        original_name=file_obj.original_name,
-        file_size=file_obj.file_size,
-        mime_type=file_obj.mime_type,
-        base_file_type=file_obj.base_file_type,
-        tags=file_obj.tags,
-        created_at=file_obj.created_at.isoformat(),
-        updated_at=file_obj.updated_at.isoformat()
-    )
-
-
 @router.get("/{commit_id}/objects", response_model=ObjectsListResponse)
 async def list_tree(commit_id: str, skip: int = 0, limit: int = 100):
     commit = await models.Commit.get_or_none(id=commit_id)
@@ -146,69 +116,30 @@ async def list_tree(commit_id: str, skip: int = 0, limit: int = 100):
 
     entries = await models.TreeEntry.filter(id__in=tree.entries).offset(skip).limit(limit)
 
-    files = await models.File.filter(id__in=[
-        entry.object_id for entry in entries if entry.object_type == 'file'
-    ])
+    # Separate IDs by type
+    file_ids = [entry.object_id for entry in entries if entry.object_type == 'file']
+    tree_ids = [entry.object_id for entry in entries if entry.object_type == 'tree']
 
-    files_mapping = {
-        f.id: f for f in files
-    }
+    files = await models.File.filter(id__in=file_ids)
+    trees = await models.Tree.filter(id__in=tree_ids)
 
+    files_mapping = {f.id: f for f in files}
+    trees_mapping = {t.id: t for t in trees}
+
+    # Attach the correct object to each entry
     for entry in entries:
-        # TODO: this is not going to work when type > 1
-        entry.object = files_mapping.get(entry.object_id)
+        if entry.object_type == 'file':
+            object = files_mapping.get(entry.object_id)
+        elif entry.object_type == 'tree':
+            object = trees_mapping.get(entry.object_id)
+        
+        entry.object = object
 
     return ObjectsListResponse(
         objects=entries,
         total=len(entries),
         skip=skip,
         limit=limit
-    )
-
-@router.get("/files", response_model=FileListResponse)
-async def list_files(skip: int = 0, limit: int = 100, commit: str = None):
-    """List files for a specific commit (commit is required)"""
-    if not commit:
-        raise HTTPException(status_code=400, detail="commit parameter is required")
-    files = await FileService.list_files(skip=skip, limit=limit, commit=commit)
-    return FileListResponse(
-        files=[
-            FileResponse(
-                id=file.id,
-                name=file.name,
-                sha1=file.sha1,
-                original_name=file.original_name,
-                file_size=file.file_size,
-                mime_type=file.mime_type,
-                base_file_type=file.base_file_type,
-                tags=file.tags,
-                created_at=file.created_at.isoformat(),
-                updated_at=file.updated_at.isoformat()
-            ) for file in files
-        ],
-        total=len(files),
-        skip=skip,
-        limit=limit
-    )
-
-
-@router.get("/files/{file_id}", response_model=FileResponse)
-async def get_file(file_id: int):
-    """Get a specific file by ID"""
-    file_obj = await FileService.get_file(file_id)
-    if not file_obj:
-        raise HTTPException(status_code=404, detail="File not found")
-    
-    return FileResponse(
-        id=file_obj.id,
-        name=file_obj.name,
-        original_name=file_obj.original_name,
-        file_size=file_obj.file_size,
-        mime_type=file_obj.mime_type,
-        base_file_type=file_obj.base_file_type,
-        tags=file_obj.tags,
-        created_at=file_obj.created_at.isoformat(),
-        updated_at=file_obj.updated_at.isoformat()
     )
 
 
@@ -405,6 +336,50 @@ async def get_tree(tree_id: str):
                 object_id=entry.object_id
             ) for entry in entries
         ]
+    )
+
+@router.post("/{commit_id}/objects", response_model=TreeEntryResponse)
+async def add_object_in_tree(
+    commit_id: str = Path(..., description="Commit ID"),
+    file: UploadFile | None = None,
+    name: Optional[str] = Body(...),
+    tags: Optional[str] = Form(None)
+):
+    """Add a new file object to a tree (by commit)."""
+    ref = await models.Ref.get_or_none(name="main")
+
+    commit = await models.Commit.get_or_none(id=commit_id)
+    if not commit:
+        raise HTTPException(status_code=404, detail="Commit not found")
+
+    object_tags = {}
+    if tags:
+        try:
+            object_tags = json.loads(tags)
+        except json.JSONDecodeError:
+            raise HTTPException(status_code=400, detail="Invalid tags format")
+
+
+    if file is not None:
+        object, obj_type = await FileService.create_file(file, object_tags), "file"
+    else:
+        object, obj_type = await CollectionsService.create_collection(name, object_tags), "tree"
+
+    tree_entry_path = hashlib.sha1(str(random.getrandbits(256)).encode()).hexdigest()
+    async with git_service.stage_changes(head=commit) as index:
+        new_entry = await models.TreeEntry.create(
+            path=tree_entry_path,
+            object_type=obj_type,
+            object_id=object.id
+        )
+        await index.add_tree_entry(new_entry)
+        await index.commit(f"Add file {object.name}", ref)
+
+    return TreeEntryResponse(
+        id=new_entry.id,
+        object_type=obj_type,
+        object=object,
+        path=tree_entry_path
     )
 
 

@@ -17,23 +17,6 @@ async def create_commit(tree, parent_commit, message):
     return commit
 
 
-async def add_object(obj, message=None, object_type="file"):
-    ref = await Ref.get_or_none(name="main")
-    head = await ref.commit.get()
-    head_entries = list((await head.tree).entries)
-
-    tree_entry_path = hashlib.sha1(str(random.getrandbits(256)).encode()).hexdigest()
-    tree_entry = await TreeEntry.create(
-        path=tree_entry_path, object_type=object_type, object_id=obj.id
-    )
-    await tree_entry.save()
-
-    entries_sha1s = head_entries + [str(tree_entry.id)]
-    tree = await Tree.create(entries=entries_sha1s)
-    commit_message = message or f"Add {object_type} {obj.id}"
-    return await create_commit(tree, head, commit_message)
-
-
 async def update_object(orig_obj_id, new_obj, message=None, object_type="file"):
     ref = await Ref.get_or_none(name="main")
     head = await ref.commit.get()
@@ -101,6 +84,10 @@ class Index:
         self.entries: dict[str, TreeEntry] = entries
         self.updated = False
 
+    async def add_tree_entry(self, new_entry):
+        self.entries[str(new_entry.id)] = new_entry
+        self.updated = True
+
     async def update_tree_entry(self, old_entry, new_entry):
         self.entries[str(old_entry.id)] = new_entry
         self.updated = True
@@ -127,8 +114,11 @@ async def stage_changes(head: Commit):
     entries = {}
 
     tree_entry_ids = (await head.tree).entries
-    for entry in await TreeEntry.filter(id__in=tree_entry_ids):
-        entries[str(entry)] = entry
+    print("tree_entry_ids", tree_entry_ids)
+    async for entry in TreeEntry.filter(id__in=tree_entry_ids).all():
+        entries[str(entry.id)] = entry
+
+    assert len(tree_entry_ids) == len(entries), "Entries mismatch (broken db?)"
 
     print("entries", entries)
     index = Index(head, entries)
