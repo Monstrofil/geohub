@@ -110,6 +110,48 @@ class TreeResponse(BaseModel):
 
 
 
+@router.get("/files/{file_id}/map")
+async def get_file_map(file_id: uuid.UUID):
+    """Get a MapServer URL for a GeoTIFF file"""
+    file_obj = await FileService.get_file(file_id)
+    if not file_obj:
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    map_url = mapserver_service.get_map_url(file_obj.name)
+    if not map_url:
+        raise HTTPException(status_code=400, detail="File type not supported for mapping")
+    
+    return {"map_url": map_url}
+
+
+@router.get("/files/{file_id}/extent")
+async def get_file_extent(file_id: uuid.UUID):
+    """Get the extent (bounding box) of a GeoTIFF file"""
+    file_obj = await FileService.get_file(file_id)
+    if not file_obj:
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    extent = mapserver_service.get_file_extent(file_obj.name)
+    if not extent:
+        raise HTTPException(status_code=400, detail="File type not supported for extent calculation")
+    
+    return {"extent": extent}
+
+# MapServer endpoints
+@router.get("/files/{file_id}/preview")
+async def get_file_preview(file_id: uuid.UUID):
+    """Get a preview URL for a file (especially GeoTIFF)"""
+    file_obj = await FileService.get_file(file_id)
+    if not file_obj:
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    preview_url = mapserver_service.get_preview_url(file_obj.name)
+    if not preview_url:
+        raise HTTPException(status_code=400, detail="File type not supported for preview")
+    
+    return {"preview_url": preview_url}
+
+
 @router.get("/{commit_id}/objects", response_model=ObjectsListResponse)
 async def list_tree_root(commit_id: str):
     return await list_tree(commit_id, path=None)
@@ -189,116 +231,6 @@ async def download_file(file_id: int):
     )
 
 
-@router.delete("/files/{file_id}")
-async def delete_file(file_id: int):
-    """Delete a file"""
-    success = await FileService.delete_file(file_id)
-    if not success:
-        raise HTTPException(status_code=404, detail="File not found")
-    
-    return {"message": "File deleted successfully"}
-
-
-@router.post("/files/search", response_model=FileListResponse)
-async def search_files(request: FileSearchRequest):
-    """Search files by tags"""
-    files = await FileService.search_files_by_tags(
-        tags=request.tags,
-        base_type=request.base_type,
-        skip=request.skip,
-        limit=request.limit
-    )
-    
-    return FileListResponse(
-        files=[
-            FileResponse(
-                id=file.id,
-                name=file.name,
-                original_name=file.original_name,
-                file_size=file.file_size,
-                mime_type=file.mime_type,
-                base_file_type=file.base_file_type,
-                tags=file.tags,
-                created_at=file.created_at.isoformat(),
-                updated_at=file.updated_at.isoformat()
-            ) for file in files
-        ],
-        total=len(files),
-        skip=request.skip,
-        limit=request.limit
-    )
-
-
-@router.put("/files/{file_id}", response_model=FileResponse)
-async def update_file(file_id: int, request: FileUpdateRequest):
-    """Update file tags (and in the future, other fields)"""
-    file_obj = await models.File.get_or_none(id=file_id)
-    if not file_obj:
-        raise HTTPException(status_code=404, detail="File not found")
-
-    # Update tags
-    new_file_id = await FileService.update_file_tags(file_id, tags=request.tags)
-
-    file_obj = await models.File.get_or_none(id=new_file_id)
-    if not file_obj:
-        raise HTTPException(status_code=500, detail="Updated file not found")
-
-    # Return the updated file as a dict with ISO-formatted datetimes
-    return {
-        "id": file_obj.id,
-        "name": file_obj.name,
-        "sha1": file_obj.sha1,
-        "original_name": file_obj.original_name,
-        "file_size": file_obj.file_size,
-        "mime_type": file_obj.mime_type,
-        "base_file_type": file_obj.base_file_type,
-        "tags": file_obj.tags,
-        "created_at": file_obj.created_at.isoformat(),
-        "updated_at": file_obj.updated_at.isoformat(),
-    }
-
-
-# MapServer endpoints
-@router.get("/files/{file_id}/preview")
-async def get_file_preview(file_id: int):
-    """Get a preview URL for a file (especially GeoTIFF)"""
-    file_obj = await FileService.get_file(file_id)
-    if not file_obj:
-        raise HTTPException(status_code=404, detail="File not found")
-    
-    preview_url = mapserver_service.get_preview_url(file_obj.name)
-    if not preview_url:
-        raise HTTPException(status_code=400, detail="File type not supported for preview")
-    
-    return {"preview_url": preview_url}
-
-
-@router.get("/files/{file_id}/map")
-async def get_file_map(file_id: int):
-    """Get a MapServer URL for a GeoTIFF file"""
-    file_obj = await FileService.get_file(file_id)
-    if not file_obj:
-        raise HTTPException(status_code=404, detail="File not found")
-    
-    map_url = mapserver_service.get_map_url(file_obj.name)
-    if not map_url:
-        raise HTTPException(status_code=400, detail="File type not supported for mapping")
-    
-    return {"map_url": map_url}
-
-
-@router.get("/files/{file_id}/extent")
-async def get_file_extent(file_id: int):
-    """Get the extent (bounding box) of a GeoTIFF file"""
-    file_obj = await FileService.get_file(file_id)
-    if not file_obj:
-        raise HTTPException(status_code=404, detail="File not found")
-    
-    extent = mapserver_service.get_file_extent(file_obj.name)
-    if not extent:
-        raise HTTPException(status_code=400, detail="File type not supported for extent calculation")
-    
-    return {"extent": extent}
 
 
 @router.post("/mapserver/cleanup")
@@ -465,7 +397,7 @@ async def update_object_in_tree(
         await index.remove_tree_entry(path)
 
 
-        match path.split('/', 1):
+        match path.rsplit('/', 1):
             case folder, _:
                 await index.insert_tree_entry(new_entry, folder)
             case _:

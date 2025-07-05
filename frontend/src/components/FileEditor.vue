@@ -127,9 +127,9 @@
         <div class="editor-main">
           <!-- Interactive Map for GeoTIFF files -->
           <InteractiveMap 
-            v-if="isGeoTiff && file.value"
-            :fileId="file.value.id"
-            :filename="file.value.name"
+            v-if="isGeoTiff && file"
+            :fileId="file.id"
+            :filename="file.name"
             class="interactive-map-container"
           />
           
