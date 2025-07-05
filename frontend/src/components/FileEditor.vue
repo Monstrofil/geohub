@@ -133,6 +133,21 @@
             class="interactive-map-container"
           />
           
+          <!-- Collection view -->
+          <div v-else-if="isCollection && file" class="collection-view">
+            <div class="collection-header">
+              <div class="collection-icon" v-html="fileIcon"></div>
+              <div class="collection-info">
+                <h3>Колекція: {{ file.name }}</h3>
+                <p>Кількість елементів: {{ file.entries?.length || 0 }}</p>
+              </div>
+            </div>
+            <div class="collection-content">
+              <p>Це колекція файлів. Ви можете редагувати теги колекції в панелі зліва.</p>
+              <p class="collection-note">Для перегляду вмісту колекції використовуйте кнопку "Переглянути вміст" у списку файлів.</p>
+            </div>
+          </div>
+          
           <!-- Placeholder for other file types -->
           <div v-else class="editor-placeholder">
             <div class="placeholder-icon">
@@ -218,6 +233,8 @@ async function loadFile() {
     const entry = await apiService.getTreeEntry(props.commitId, treePathString.value)
     if (!entry || !entry.object) throw new Error('File not found')
     file.value = entry.object
+    // Store the object type for collection detection
+    file.value.object_type = entry.object_type
 
     // Set initial type based on file tags
     if (file.value && file.value.tags) {
@@ -251,6 +268,10 @@ const selectedFields = computed(() => {
 
 // File type detection and icon
 const fileType = computed(() => {
+  // Check if this is a collection first
+  if (file.value?.object_type === 'tree') {
+    return 'collection'
+  }
   return file.value?.base_file_type || 'raw'
 })
 
@@ -259,6 +280,7 @@ const fileTypeLabel = computed(() => {
     'raster': 'Геоприв\'язане растрове зображення',
     'vector': 'Геоприв\'язаний векторний файл', 
     'raw': 'Звичайний файл',
+    'collection': 'Колекція файлів',
   }
   return labels[fileType.value] || 'Невідомий тип'
 })
@@ -287,6 +309,17 @@ const fileIcon = computed(() => {
         <rect x="9" y="18" width="8" height="1.5" fill="#6c757d"/>
         <rect x="9" y="23" width="12" height="1.5" fill="#6c757d"/>
       </svg>`
+    case 'collection':
+      return `<svg width="32" height="32" viewBox="0 0 32 32">
+        <rect x="3" y="8" width="26" height="18" rx="3" fill="#ffe082" stroke="#ffb300" stroke-width="1.5"/>
+        <path d="M3 8l4-6h12l4 6" fill="#ffe082" stroke="#ffb300" stroke-width="1.5"/>
+        <rect x="8" y="14" width="4" height="2" fill="#ffb300"/>
+        <rect x="14" y="14" width="4" height="2" fill="#ffb300"/>
+        <rect x="20" y="14" width="4" height="2" fill="#ffb300"/>
+        <rect x="8" y="18" width="4" height="2" fill="#ffb300"/>
+        <rect x="14" y="18" width="4" height="2" fill="#ffb300"/>
+        <rect x="20" y="18" width="4" height="2" fill="#ffb300"/>
+      </svg>`
     default:
       return `<svg width="32" height="32" viewBox="0 0 32 32">
         <rect x="6" y="6" width="20" height="20" rx="5" fill="#f8f9fa" stroke="#dee2e6" stroke-width="1.5"/>
@@ -298,6 +331,11 @@ const fileIcon = computed(() => {
 // Check if file is a GeoTIFF (raster type)
 const isGeoTiff = computed(() => {
   return fileType.value === 'raster'
+})
+
+// Check if object is a collection
+const isCollection = computed(() => {
+  return fileType.value === 'collection'
 })
 
 // Tags editor functions
@@ -751,5 +789,64 @@ async function handleCommit() {
   border-radius: 8px;
   overflow: hidden;
   height: 600px;
+}
+
+/* Collection view styles */
+.collection-view {
+  padding: 2rem;
+  background: white;
+  border-radius: 8px;
+  margin: 1rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.collection-header {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid #eee;
+}
+
+.collection-icon {
+  flex-shrink: 0;
+}
+
+.collection-icon svg {
+  width: 48px;
+  height: 48px;
+}
+
+.collection-info h3 {
+  margin: 0 0 0.5rem 0;
+  color: #333;
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.collection-info p {
+  margin: 0;
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.collection-content {
+  color: #555;
+  line-height: 1.6;
+}
+
+.collection-content p {
+  margin: 0 0 1rem 0;
+}
+
+.collection-note {
+  font-size: 0.9rem;
+  color: #888;
+  font-style: italic;
+  background: #f8f9fa;
+  padding: 1rem;
+  border-radius: 6px;
+  border-left: 4px solid #ffb300;
 }
 </style> 

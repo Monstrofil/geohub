@@ -13,7 +13,12 @@
             <div class="label-inner">
               <div class="namepart">{{ currentType ? currentType.name : '' }}</div>
               <div v-if="!isCurrentTypeCompatible" class="incompatible-warning">
-                Несумісний з типом файлу
+                <span v-if="props.currentFile?.object_type === 'tree'">
+                  Несумісний з типом колекції
+                </span>
+                <span v-else>
+                  Несумісний з типом файлу
+                </span>
               </div>
             </div>
           </div>
@@ -34,7 +39,12 @@
         <input type="search" v-model="search" placeholder="Пошук" class="pure-input-1" />
       </div>
       <div v-if="filteredTypes.length === 0" class="no-compatible-types">
-        <p>Немає сумісних типів для файлу типу "{{ props.currentFile?.base_file_type || 'невідомий' }}"</p>
+        <p v-if="props.currentFile?.object_type === 'tree'">
+          Немає доступних типів для колекції
+        </p>
+        <p v-else>
+          Немає сумісних типів для файлу типу "{{ props.currentFile?.base_file_type || 'невідомий' }}"
+        </p>
       </div>
       <div v-else class="type-modal-list">
         <button v-for="(type, idx) in filteredTypes" :key="type.name" class="type-modal-item" @click="selectType(idx)">
@@ -147,7 +157,14 @@ watch(openMenu, (val) => {
 })
 
 const filteredTypes = computed(() => {
-  // First filter by file type compatibility
+  // For collections, show all types since they don't have base_file_type restrictions
+  if (props.currentFile?.object_type === 'tree') {
+    let allTypes = types.value
+    if (!search.value) return allTypes
+    return allTypes.filter(t => t.name.toLowerCase().includes(search.value.toLowerCase()))
+  }
+  
+  // For files, filter by file type compatibility
   let compatibleTypes = types.value
   
   if (props.currentFile?.base_file_type) {
@@ -164,6 +181,9 @@ const filteredTypes = computed(() => {
 
 // Add a computed property to check if current type is still compatible
 const isCurrentTypeCompatible = computed(() => {
+  // Collections are always compatible with all types
+  if (props.currentFile?.object_type === 'tree') return true
+  
   if (!currentType.value || !props.currentFile?.base_file_type) return true
   return currentType.value.base_file_type && currentType.value.base_file_type.includes(props.currentFile.base_file_type)
 })
