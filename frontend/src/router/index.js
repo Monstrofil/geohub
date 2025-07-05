@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import Explorer from '../components/Explorer.vue'
 import FileEditor from '../components/FileEditor.vue'
 import FileList from '../components/FileList.vue'
+import FileViewer from '../components/FileViewer.vue'
 
 const routes = [
   {
@@ -19,6 +20,12 @@ const routes = [
           path: ':treePath*/view',
           name: 'FileList',
           component: FileList,
+          props: true
+      },
+      {
+          path: ':treePath*/view',
+          name: 'FileViewer',
+          component: FileViewer,
           props: true
       },
     ],

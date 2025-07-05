@@ -1,21 +1,24 @@
 <template>
   <div class="tree-card-container">
-    <div class="tree-card" :class="{ 'selected': selected }">
-      <div class="tree-icon" v-html="icon" title="Edit category"></div>
-      <router-link :to="{name: 'FileEditor', params: { treePath: fullPath }}">
-          <div class="tree-name"title="Edit category">Name {{ name }}</div>
-      </router-link>
-      <div class="tree-name tree-path">{{ path }}</div>
-
-      
-      <router-link :to="{name: 'FileList', params: { treePath: fullPath }}">
-          <button class="view-contents-btn" title="View files in this category">
-          <svg width="20" height="20" viewBox="0 0 20 20">
-              <path d="M5 10h10M12 7l3 3-3 3" stroke="#ffb300" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-          </button>
-      </router-link>
-    </div>
+    <router-link :to="{name: 'FileList', params: { treePath: fullPath }}">
+      <div class="tree-card" :class="{ 'selected': selected }">
+        <div class="tree-icon" v-html="icon"></div>
+        <div class="tree-name">Name {{ name }}</div>
+        <div class="tree-name tree-path">{{ path }}</div>
+      </div>
+    </router-link>
+    <router-link :to="{name: 'FileEditor', params: { treePath: fullPath }}">
+      <button 
+        class="edit-btn" 
+        title="Edit collection"
+      >
+        <svg width="16" height="16" viewBox="0 0 16 16">
+          <path d="M11 1L15 5L5 15H1V11L11 1Z" stroke="#007bff" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M8 4L12 8" stroke="#007bff" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+    </router-link>
+    
     <button 
       class="remove-btn" 
       @click.stop="handleRemove"
@@ -111,19 +114,34 @@ const handleRemove = async () => {
   word-break: break-all;
   margin-bottom: 0.5rem;
 }
-.view-contents-btn {
+.edit-btn {
   position: absolute;
-  bottom: 10px;
-  right: 10px;
-  background: none;
-  border: none;
+  top: 5px;
+  right: 30px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid #007bff;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
-  padding: 0.2rem;
-  border-radius: 4px;
-  transition: background 0.15s;
+  opacity: 0;
+  transition: opacity 0.2s, background-color 0.2s;
+  z-index: 10;
 }
-.view-contents-btn:hover {
-  background: #fff3cd;
+
+.tree-card-container:hover .edit-btn {
+  opacity: 1;
+}
+
+.edit-btn:hover {
+  background: #007bff;
+}
+
+.edit-btn:hover svg path {
+  stroke: white;
 }
 
 .remove-btn {

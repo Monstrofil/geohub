@@ -1,10 +1,21 @@
 <template>
   <div class="file-card-container">
-    <router-link :to="path + '/edit'">
+    <router-link :to="{name: 'FileViewer', params: { treePath: fullPath }}">
       <div class="file-card" :class="{ 'selected': selected }">
         <div class="file-icon" v-html="icon"></div>
         <div class="file-name">{{ name }}</div>
       </div>
+    </router-link>
+    <router-link :to="{name: 'FileEditor', params: { treePath: fullPath }}">
+      <button 
+        class="edit-btn" 
+        title="Edit file"
+      >
+        <svg width="16" height="16" viewBox="0 0 16 16">
+          <path d="M11 1L15 5L5 15H1V11L11 1Z" stroke="#007bff" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M8 4L12 8" stroke="#007bff" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
     </router-link>
     <button 
       class="remove-btn" 
@@ -36,6 +47,8 @@ const emit = defineEmits(['click', 'file-selected', 'removed'])
 const fileType = computed(() => {
   return props.file.base_file_type || 'raw'
 })
+
+
 
 const fullPath = computed(() => {
   if (props.treePath) {
@@ -127,6 +140,36 @@ const handleRemove = async () => {
   color: #333;
   text-align: center;
   word-break: break-all;
+}
+
+.edit-btn {
+  position: absolute;
+  top: 5px;
+  right: 30px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid #007bff;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s, background-color 0.2s;
+  z-index: 10;
+}
+
+.file-card-container:hover .edit-btn {
+  opacity: 1;
+}
+
+.edit-btn:hover {
+  background: #007bff;
+}
+
+.edit-btn:hover svg path {
+  stroke: white;
 }
 
 .remove-btn {
