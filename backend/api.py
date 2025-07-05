@@ -11,7 +11,7 @@ import random
 from pydantic import BaseModel, ConfigDict
 
 import models
-from services import FileService, FileTypeService, CollectionsService
+from services import FileService, CollectionsService
 from mapserver_service import MapServerService
 
 

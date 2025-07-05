@@ -3,7 +3,7 @@
 
     <!-- Header with back button -->
     <div class="editor-header">
-      <button class="back-btn" @click="$emit('back')">
+      <button class="back-btn" @click="backButton()">
         <svg width="16" height="16" viewBox="0 0 16 16">
           <path d="M10 2L4 8L10 14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
@@ -15,7 +15,7 @@
           <h2 class="file-name">{{ file.value?.name }}</h2>
           <div class="file-meta">
             <span class="file-type">{{ fileTypeLabel }}</span>
-            <span class="file-id">ID: {{ file.value?.id }}</span>
+            <span class="file-id">ID: {{ file.id }}</span>
           </div>
         </div>
       </div>
@@ -155,11 +155,12 @@
 import { ref, computed, onMounted } from 'vue'
 import ObjectTypeSelector from './ObjectTypeSelector.vue'
 import TagList from './TagList.vue'
-import GeoTiffPreview from './GeoTiffPreview.vue'
 import InteractiveMap from './InteractiveMap.vue'
 import { matchTagsToPreset } from '../utils/tagMatcher.js'
 import { loadFieldDefinitions, resolveFields } from '../utils/fieldResolver.js'
 import apiService from '../services/api.js'
+import { watch } from 'vue'
+import { useRouter } from 'vue-router'
 
 const props = defineProps({
   changeTracker: {
@@ -192,6 +193,9 @@ const allPresets = ref([])
 const allFieldDefinitions = ref({})
 const sidebarCollapsed = ref(false)
 
+
+const router = useRouter()
+
 // Convert treePath array to string for API calls
 const treePathString = computed(() => {
   if (Array.isArray(props.treePath)) {
@@ -202,6 +206,10 @@ const treePathString = computed(() => {
 
 // Dynamically import all presets
 const presetModules = import.meta.glob('../data/presets/*/*.json', { eager: true })
+
+function backButton() {
+  router.go(-1); 
+}
 
 async function loadFile() {
   loading.value = true
@@ -231,7 +239,6 @@ onMounted(async () => {
 })
 
 // Reload file when treePath or commitId changes
-import { watch } from 'vue'
 watch(() => [props.treePath, props.commitId], loadFile)
 
 // Resolve field keys to full field definitions
