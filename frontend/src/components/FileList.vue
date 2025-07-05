@@ -31,6 +31,7 @@
           @click="selectFile(entry.object)"
           @file-selected="handleFileSelected"
           @removed="handleObjectRemoved"
+          @cloned="handleObjectCloned"
         />
       </div>
     </div>
@@ -132,7 +133,7 @@ const props = defineProps({
   currentBranchName: { type: String, required: false }
 })
 
-const emit = defineEmits(['refresh', 'select-file', 'file-selected', 'files-loaded', 'file-uploaded', 'branch-created', 'object-removed'])
+const emit = defineEmits(['refresh', 'select-file', 'file-selected', 'files-loaded', 'file-uploaded', 'branch-created', 'object-removed', 'object-cloned'])
 
 const files = ref([])
 const loading = ref(false)
@@ -199,6 +200,13 @@ function handleObjectRemoved(path) {
   }
   // Emit the removed event to parent components
   emit('object-removed', path)
+}
+
+function handleObjectCloned(cloneData) {
+  // Emit the cloned event to parent components
+  emit('object-cloned', cloneData)
+  // Optionally refresh the file list to show the new clone
+  // loadFiles()
 }
 
 async function handleEdit() {

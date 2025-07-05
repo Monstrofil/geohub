@@ -145,6 +145,47 @@
             <div class="collection-content">
               <p>Це колекція файлів. Ви можете редагувати теги колекції в панелі зліва.</p>
               <p class="collection-note">Для перегляду вмісту колекції використовуйте кнопку "Переглянути вміст" у списку файлів.</p>
+              
+              <!-- Add existing files to collection -->
+              <div class="add-files-section">
+                <h4>Додати існуючі файли до колекції</h4>
+                <p>Введіть шлях до існуючого файлу, щоб додати його до цієї колекції:</p>
+                
+                <div class="add-file-form">
+                  <input 
+                    v-model="filePathToAdd" 
+                    type="text" 
+                    placeholder="Наприклад: files/document.pdf"
+                    class="file-path-input"
+                    @keyup.enter="addExistingFile"
+                  />
+                  <button 
+                    @click="addExistingFile" 
+                    class="add-file-btn"
+                    :disabled="!filePathToAdd.trim() || isAddingFile"
+                  >
+                    <i v-if="isAddingFile" class="fas fa-spinner fa-spin"></i>
+                    <i v-else class="fas fa-plus"></i>
+                    {{ isAddingFile ? 'Додавання...' : 'Додати файл' }}
+                  </button>
+                </div>
+                
+                <div v-if="addFileStatus" class="add-file-status">
+                  <div v-if="addFileStatus.state === 'success'" class="add-file-success">
+                    <svg width="16" height="16" viewBox="0 0 16 16">
+                      <path d="M3 8l3 3 7-7" stroke="#28a745" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    <span>{{ addFileStatus.message }}</span>
+                  </div>
+                  <div v-else-if="addFileStatus.state === 'error'" class="add-file-error">
+                    <svg width="16" height="16" viewBox="0 0 16 16">
+                      <path d="M8 2L2 8l6 6 6-6-6-6z" fill="#dc3545"/>
+                      <path d="M8 6v4M8 12h0" stroke="#fff" stroke-width="1" fill="none"/>
+                    </svg>
+                    <span>{{ addFileStatus.error }}</span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
           
@@ -200,6 +241,11 @@ const uploadStatus = ref(null)
 const file = ref(null)
 const loading = ref(false)
 const error = ref(null)
+
+// Add existing file to collection state
+const filePathToAdd = ref('')
+const isAddingFile = ref(false)
+const addFileStatus = ref(null)
 
 // Tags editor state
 const selectedType = ref(null)
@@ -448,6 +494,49 @@ async function handleCommit() {
   } else {
     console.error('Commit failed:', result.error)
     // You might want to show an error message to the user
+  }
+}
+
+async function addExistingFile() {
+  if (!filePathToAdd.value.trim()) return
+  
+  isAddingFile.value = true
+  addFileStatus.value = null
+  
+  try {
+    // Clone the file from the specified path to the current collection
+    const targetPath = treePathString.value + '/' + filePathToAdd.value.split('/').pop()
+    await apiService.cloneObjectInTree(props.commitId, filePathToAdd.value.trim(), targetPath)
+    
+    addFileStatus.value = {
+      state: 'success',
+      message: `Файл успішно додано до колекції "${file.value.name}"`
+    }
+    
+    // Clear the input
+    filePathToAdd.value = ''
+    
+    // Reload the file to update the entries count
+    await loadFile()
+    
+    // Clear success message after 3 seconds
+    setTimeout(() => {
+      addFileStatus.value = null
+    }, 3000)
+    
+  } catch (error) {
+    console.error('Failed to add file to collection:', error)
+    addFileStatus.value = {
+      state: 'error',
+      error: error.message || 'Помилка додавання файлу до колекції'
+    }
+    
+    // Clear error message after 5 seconds
+    setTimeout(() => {
+      addFileStatus.value = null
+    }, 5000)
+  } finally {
+    isAddingFile.value = false
   }
 }
 </script>
@@ -848,5 +937,97 @@ async function handleCommit() {
   padding: 1rem;
   border-radius: 6px;
   border-left: 4px solid #ffb300;
+}
+
+/* Add files section styles */
+.add-files-section {
+  margin-top: 2rem;
+  padding-top: 2rem;
+  border-top: 1px solid #eee;
+}
+
+.add-files-section h4 {
+  margin: 0 0 0.75rem 0;
+  color: #333;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.add-files-section p {
+  margin: 0 0 1rem 0;
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.add-file-form {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.file-path-input {
+  flex: 1;
+  padding: 0.75rem;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  transition: border-color 0.15s;
+}
+
+.file-path-input:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+}
+
+.add-file-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: #007bff;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background-color 0.15s;
+  white-space: nowrap;
+}
+
+.add-file-btn:hover:not(:disabled) {
+  background: #0056b3;
+}
+
+.add-file-btn:disabled {
+  background: #6c757d;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.add-file-status {
+  padding: 0.75rem;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.add-file-success {
+  background: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
+
+.add-file-error {
+  background: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+}
+
+.add-file-success svg,
+.add-file-error svg {
+  flex-shrink: 0;
 }
 </style> 

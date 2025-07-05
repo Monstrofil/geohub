@@ -160,6 +160,18 @@ class ApiService {
       method: 'DELETE',
     })
   }
+
+  // Clone an object from one path to another (keeping the same object reference)
+  async cloneObjectInTree(commitId, sourcePath, targetPath) {
+    if (!commitId || !sourcePath || !targetPath) throw new Error('commitId, sourcePath, and targetPath are required')
+    return await this.request(`/${commitId}/clone`, {
+      method: 'POST',
+      body: JSON.stringify({ 
+        source_path: sourcePath,
+        target_path: targetPath
+      }),
+    })
+  }
 }
 
 export default new ApiService() 

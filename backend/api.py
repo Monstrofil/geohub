@@ -489,4 +489,82 @@ async def remove_object_in_tree(
         commit_message = f"Remove object"
         await index.commit(commit_message, ref)
 
-    return {"message": f"Successfully removed object from path '{path}'"} 
+    return {"message": f"Successfully removed object from path '{path}'"}
+
+
+class CloneObjectRequest(BaseModel):
+    source_path: str
+    target_path: str
+
+
+@router.post("/{commit_id}/clone", response_model=TreeEntryResponse)
+async def clone_object_in_tree(
+    commit_id: str = Path(..., description="Commit ID"),
+    request: CloneObjectRequest = Body(..., description="Clone request with source and target paths")
+):
+    """Clone a file or collection object from one path to another (keeping the same object reference)."""
+    ref = await models.Ref.get_or_none(name="main")
+
+    # Find the commit
+    commit = await models.Commit.get_or_none(id=commit_id)
+    if not commit:
+        raise HTTPException(status_code=404, detail="Commit not found")
+
+    # Resolve the source entry
+    source_entry = await git_service.resolve_entry(await commit.tree, request.source_path)
+    if not source_entry:
+        raise HTTPException(status_code=404, detail="Source object not found")
+
+    # Check if target path already exists
+    target_entry = await git_service.resolve_entry(await commit.tree, request.target_path)
+    if target_entry:
+        raise HTTPException(status_code=409, detail="Target path already exists")
+
+    # Get object details for commit message
+    object_name = "unknown"
+    object_type = source_entry.object_type
+    
+    if source_entry.object_type == 'file':
+        file_obj = await models.File.get_or_none(id=source_entry.object_id)
+        if file_obj:
+            object_name = file_obj.name
+    elif source_entry.object_type == 'tree':
+        tree_obj = await models.Tree.get_or_none(id=source_entry.object_id)
+        if tree_obj:
+            object_name = tree_obj.name
+
+    async with git_service.stage_changes(head=commit) as index:
+        # Create a new tree entry pointing to the same object
+        new_entry = await models.TreeEntry.create(
+            path=request.target_path,
+            object_type=source_entry.object_type,
+            object_id=source_entry.object_id
+        )
+        
+        # Insert the new entry at the target path
+        match request.target_path.rsplit('/', 1):
+            case folder, _:
+                await index.insert_tree_entry(new_entry, folder)
+            case _:
+                await index.insert_tree_entry(new_entry, None)
+        
+        # Create commit message
+        commit_message = f"Clone {object_type} {object_name} from {request.source_path} to {request.target_path}"
+        await index.commit(commit_message, ref)
+
+    # Fetch the cloned object to return
+    if object_type == 'file':
+        cloned_object = await models.File.get_or_none(id=source_entry.object_id)
+        if not cloned_object:
+            raise HTTPException(status_code=500, detail="Cloned file not found")
+    else:
+        cloned_object = await models.Tree.get_or_none(id=source_entry.object_id)
+        if not cloned_object:
+            raise HTTPException(status_code=500, detail="Cloned collection not found")
+
+    return TreeEntryResponse(
+        id=new_entry.id,
+        object_type=object_type,
+        object=cloned_object,
+        path=request.target_path
+    ) 
