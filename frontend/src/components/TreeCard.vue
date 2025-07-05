@@ -1,12 +1,19 @@
 <template>
   <div class="tree-card" :class="{ 'selected': selected }">
-    <div class="tree-icon" v-html="icon" @click="editTree" title="Edit category"></div>
-    <div class="tree-name" @click="editTree" title="Edit category">{{ name }}</div>
-    <button class="view-contents-btn" @click.stop="viewContents" title="View files in this category">
-      <svg width="20" height="20" viewBox="0 0 20 20">
-        <path d="M5 10h10M12 7l3 3-3 3" stroke="#ffb300" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-    </button>
+    <div class="tree-icon" v-html="icon" title="Edit category"></div>
+    <router-link :to="{name: 'FileEditor', params: { treePath: fullPath }}">
+        <div class="tree-name"title="Edit category">Name {{ name }}</div>
+    </router-link>
+    <div class="tree-name tree-path">{{ path }}</div>
+
+    
+    <router-link :to="{name: 'FileList', params: { treePath: fullPath }}">
+        <button class="view-contents-btn" title="View files in this category">
+        <svg width="20" height="20" viewBox="0 0 20 20">
+            <path d="M5 10h10M12 7l3 3-3 3" stroke="#ffb300" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        </button>
+    </router-link>
   </div>
 </template>
 
@@ -16,10 +23,19 @@ import { computed } from 'vue'
 const props = defineProps({
   name: { type: String, required: true },
   selected: { type: Boolean, default: false },
-  tree: { type: Object, required: true }
+  path: { type: String, required: true },
+  treePath: { type: [String, Array], required: false }
 })
 
-const emit = defineEmits(['edit', 'view-contents'])
+const emit = defineEmits(['edit'])
+
+const fullPath = computed(() => {
+  if (props.treePath) {
+    const currentPath = Array.isArray(props.treePath) ? props.treePath.join('/') : props.treePath
+    return currentPath + '/' + props.path
+  }
+  return props.path
+})
 
 const icon = computed(() => {
   // Simple folder icon
@@ -29,13 +45,6 @@ const icon = computed(() => {
   </svg>`
 })
 
-function editTree() {
-  emit('edit', props.tree)
-}
-
-function viewContents() {
-  emit('view-contents', props.tree)
-}
 </script>
 
 <style scoped>

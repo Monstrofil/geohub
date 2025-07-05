@@ -1,5 +1,6 @@
 <template>
   <div class="file-editor">
+
     <!-- Header with back button -->
     <div class="editor-header">
       <button class="back-btn" @click="$emit('back')">
@@ -8,25 +9,27 @@
         </svg>
         Назад до списку
       </button>
-      <div class="file-info">
+      <div class="file-info" v-if="file">
         <div class="file-icon" v-html="fileIcon"></div>
         <div class="file-details">
-          <h2 class="file-name">{{ file.name }}</h2>
+          <h2 class="file-name">{{ file.value?.name }}</h2>
           <div class="file-meta">
             <span class="file-type">{{ fileTypeLabel }}</span>
-            <span class="file-id">ID: {{ file.id }}</span>
+            <span class="file-id">ID: {{ file.value?.id }}</span>
           </div>
         </div>
       </div>
+      <div v-else-if="loading" class="file-details">Завантаження...</div>
+      <div v-else-if="error" class="file-details">Помилка: {{ error }}</div>
     </div>
 
     <!-- Main content area with editor and tags -->
-    <div class="editor-content">
+    <div class="editor-content" v-if="file">
       <!-- Left panel: Tags editor -->
       <div class="left-panel" :class="{ 'collapsed': sidebarCollapsed }">
         <ObjectTypeSelector 
           v-model:selectedType="selectedType" 
-          :currentFile="file"
+          :currentFile="file.value"
           @menu-open="menuOpen = $event"
           @type-changed="handleTypeChange"
         />
@@ -124,9 +127,9 @@
         <div class="editor-main">
           <!-- Interactive Map for GeoTIFF files -->
           <InteractiveMap 
-            v-if="isGeoTiff"
-            :fileId="file.id"
-            :filename="file.name"
+            v-if="isGeoTiff && file.value"
+            :fileId="file.value.id"
+            :filename="file.value.name"
             class="interactive-map-container"
           />
           
@@ -139,7 +142,7 @@
               </svg>
             </div>
             <h3>Редактор файлу</h3>
-            <p>Тут буде розміщено інлайн редактор для файлу {{ file.name }}</p>
+            <p>Тут буде розміщено інлайн редактор для файлу {{ file.value?.name }}</p>
             <p class="placeholder-note">Функціональність редактора буде додана пізніше</p>
           </div>
         </div>
@@ -159,10 +162,6 @@ import { loadFieldDefinitions, resolveFields } from '../utils/fieldResolver.js'
 import apiService from '../services/api.js'
 
 const props = defineProps({
-  file: {
-    type: Object,
-    required: true
-  },
   changeTracker: {
     type: Object,
     required: true
@@ -171,8 +170,8 @@ const props = defineProps({
     type: [String, Number],
     required: true
   },
-  treeEntryId: {
-    type: [String, Number],
+  treePath: {
+    type: [String, Number, Array],
     required: true
   }
 })
@@ -182,6 +181,9 @@ const emit = defineEmits(['back', 'file-uploaded', 'tags-updated', 'file-updated
 const fileInput = ref(null)
 const isDragOver = ref(false)
 const uploadStatus = ref(null)
+const file = ref(null)
+const loading = ref(false)
+const error = ref(null)
 
 // Tags editor state
 const selectedType = ref(null)
@@ -190,36 +192,59 @@ const allPresets = ref([])
 const allFieldDefinitions = ref({})
 const sidebarCollapsed = ref(false)
 
+// Convert treePath array to string for API calls
+const treePathString = computed(() => {
+  if (Array.isArray(props.treePath)) {
+    return props.treePath.join('/')
+  }
+  return props.treePath || ''
+})
+
 // Dynamically import all presets
 const presetModules = import.meta.glob('../data/presets/*/*.json', { eager: true })
 
-onMounted(async () => {
-  // Load all preset JSONs
-  allPresets.value = Object.values(presetModules)
-  
-  // Load all field definitions
-  allFieldDefinitions.value = await loadFieldDefinitions()
-  
-  // Set initial type based on file tags
-  if (props.file && props.file.tags) {
-    const matchedPreset = matchTagsToPreset(props.file.tags, allPresets.value)
-    selectedType.value = matchedPreset
+async function loadFile() {
+  loading.value = true
+  error.value = null
+  try {
+    const entry = await apiService.getTreeEntry(props.commitId, treePathString.value)
+    if (!entry || !entry.object) throw new Error('File not found')
+    file.value = entry.object
+
+    // Set initial type based on file tags
+    if (file.value && file.value.tags) {
+      const matchedPreset = matchTagsToPreset(file.value.tags, allPresets.value)
+      selectedType.value = matchedPreset
+    }
+  } catch (e) {
+    error.value = e.message || 'Failed to load file'
+    file.value = null
+  } finally {
+    loading.value = false
   }
+}
+
+onMounted(async () => {
+  allPresets.value = Object.values(presetModules)
+  allFieldDefinitions.value = await loadFieldDefinitions()
+  await loadFile()
 })
+
+// Reload file when treePath or commitId changes
+import { watch } from 'vue'
+watch(() => [props.treePath, props.commitId], loadFile)
 
 // Resolve field keys to full field definitions
 const selectedFields = computed(() => {
   if (!selectedType.value || !selectedType.value.fields) {
     return []
   }
-  
   return resolveFields(selectedType.value.fields, allFieldDefinitions.value)
 })
 
 // File type detection and icon
 const fileType = computed(() => {
-  // Use base_file_type from API instead of guessing
-  return props.file.base_file_type || 'raw'
+  return file.value?.base_file_type || 'raw'
 })
 
 const fileTypeLabel = computed(() => {
@@ -270,41 +295,32 @@ const isGeoTiff = computed(() => {
 
 // Tags editor functions
 function handleTypeChange(newType) {
-  if (props.file && newType) {
+  if (file.value && newType) {
     // Create new tags based on the selected type
     const newTags = { ...newType.tags }
-    
     // Preserve the name tag if it exists
-    if (props.file.tags && props.file.tags.name) {
-      newTags.name = props.file.tags.name
+    if (file.value.tags && file.value.tags.name) {
+      newTags.name = file.value.tags.name
     }
-    
     // Add change to tracker
     props.changeTracker.addChange({
       type: 'tags',
-      fileId: props.file.id,
+      fileId: file.value.id,
       data: newTags
     })
-    
     // Update the local file object to reflect changes immediately
-    if (props.file) {
-      props.file.tags = { ...newTags }
-    }
+    file.value.tags = { ...newTags }
   }
 }
 
 function handleTagsUpdated(newTags) {
-  // Add change to tracker
+  if (!file.value) return
   props.changeTracker.addChange({
     type: 'tags',
-    fileId: props.file.id,
+    fileId: file.value.id,
     data: newTags
   })
-  
-  // Update the local file object to reflect changes immediately
-  if (props.file) {
-    props.file.tags = { ...newTags }
-  }
+  file.value.tags = { ...newTags }
 }
 
 // File upload handlers
@@ -335,39 +351,29 @@ function handleFileSelect(event) {
   }
 }
 
-async function processFile(file) {
+async function processFile(uploadFileObj) {
   uploadStatus.value = { state: 'uploading', progress: 0 }
-  
   try {
     // Prepare tags for the new file
     const tags = {
-      name: file.name,
+      name: uploadFileObj.name,
     }
-    
     // Upload file via API
-    const uploadedFile = await apiService.uploadFile(file, tags)
-    
+    const uploadedFile = await apiService.uploadFile(uploadFileObj, tags, props.commitId, '', uploadFileObj.name)
     uploadStatus.value = { state: 'success' }
-    
-    // Emit the uploaded file data
     emit('file-uploaded', uploadedFile)
-    
-    // Reset after 3 seconds
     setTimeout(() => {
       uploadStatus.value = null
       if (fileInput.value) {
         fileInput.value.value = ''
       }
     }, 3000)
-    
   } catch (error) {
     console.error('Upload failed:', error)
     uploadStatus.value = { 
       state: 'error', 
       error: error.message || 'Помилка завантаження файлу'
     }
-    
-    // Reset after 5 seconds
     setTimeout(() => {
       uploadStatus.value = null
       if (fileInput.value) {
@@ -384,19 +390,16 @@ function triggerFileSelect() {
 async function handleCommit() {
   const result = await props.changeTracker.commitChanges(async (change) => {
     if (change.type === 'tags') {
-      const updatedEntry = await apiService.updateObjectInTree(props.commitId, props.treeEntryId, change.data)
+      const updatedEntry = await apiService.updateObjectInTree(props.commitId, treePathString.value, change.data)
       // Update the local file object with the response
-      if (updatedEntry && updatedEntry.object && props.file) {
-        Object.assign(props.file, updatedEntry.object)
+      if (updatedEntry && updatedEntry.object && file.value) {
+        Object.assign(file.value, updatedEntry.object)
       }
     }
   })
-  
   if (result.success) {
-    // Emit the final tags update with fromCommit flag
-    emit('tags-updated', props.file.tags, true)
-    // Emit file updated event to notify parent
-    emit('file-updated', props.file)
+    emit('tags-updated', file.value?.tags, true)
+    emit('file-updated', file.value)
   } else {
     console.error('Commit failed:', result.error)
     // You might want to show an error message to the user

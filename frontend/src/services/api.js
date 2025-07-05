@@ -36,12 +36,22 @@ class ApiService {
     }
   }
 
-  // File operations
-  async uploadFile(file, tags = {}, commitId) {
+  /**
+   * Upload a file to a specific commit
+   * @param {File} file - The file to upload
+   * @param {Object} tags - Tags to associate with the file
+   * @param {string} commitId - The commit ID to upload to
+   * @param {string} path - The path where the file should be placed (optional)
+   * @param {string} name - The name for the file (optional, defaults to file.name)
+   * @returns {Promise<Object>} The uploaded file response
+   */
+  async uploadFile(file, tags = {}, commitId, path = '', name = '') {
     if (!commitId) throw new Error('commitId is required for upload')
     const formData = new FormData()
     formData.append('file', file)
     formData.append('tags', JSON.stringify(tags))
+    formData.append('path', path)
+    formData.append('name', name || file.name)
 
     const response = await fetch(`${this.baseUrl}/${commitId}/objects`, {
       method: 'POST',
@@ -56,10 +66,45 @@ class ApiService {
     return await response.json()
   }
 
+  /**
+   * Create a collection in a specific commit
+   * @param {string} name - The name of the collection
+   * @param {string} commitId - The commit ID to create the collection in
+   * @param {string} path - The path where the collection should be placed (optional)
+   * @param {Object} tags - Tags to associate with the collection (optional)
+   * @returns {Promise<Object>} The created collection response
+   */
+  async createCollection(name, commitId, path = '', tags = {}) {
+    if (!commitId) throw new Error('commitId is required for collection creation')
+    if (!name) throw new Error('name is required for collection creation')
+    
+    const formData = new FormData()
+    formData.append('name', name)
+    formData.append('path', path)
+    formData.append('tags', JSON.stringify(tags))
+
+    const response = await fetch(`${this.baseUrl}/${commitId}/objects`, {
+      method: 'POST',
+      body: formData,
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.detail || `Collection creation failed! status: ${response.status}`)
+    }
+
+    return await response.json()
+  }
+
   // Get objects (tree entries) for a commit
-  async getObjects(commitId, skip = 0, limit = 100) {
+  async getObjects(commitId, path, skip = 0, limit = 100) {
     if (!commitId) throw new Error('commitId is required')
-    const response = await this.request(`/${commitId}/objects?skip=${skip}&limit=${limit}`)
+      if (!!path) {
+        var response = await this.request(`/${commitId}/${path}/objects`)
+      }
+      else {
+        var response = await this.request(`/${commitId}/objects`)
+      }
     // Return the objects array as files for compatibility
     return { files: response.objects, total: response.total, skip: response.skip, limit: response.limit }
   }
@@ -84,10 +129,18 @@ class ApiService {
   // Update a file object in a tree (by tree entry)
   async updateObjectInTree(commitId, treeEntryId, tags) {
     if (!commitId || !treeEntryId) throw new Error('commitId and treeEntryId are required')
-    return await this.request(`/${commitId}/objects/${treeEntryId}`, {
+    return await this.request(`/${commitId}/${treeEntryId}`, {
       method: 'PUT',
       body: JSON.stringify({ tags }),
     })
+  }
+
+  // Get a single tree entry (file) by commitId and treeEntryId
+  async getTreeEntry(commitId, treeEntryId) {
+    if (!commitId || !treeEntryId) throw new Error('commitId and treeEntryId are required')
+    const response = await this.request(`/${commitId}/${treeEntryId}`)
+
+    return response;
   }
 }
 

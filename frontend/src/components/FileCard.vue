@@ -1,8 +1,10 @@
 <template>
-  <div class="file-card" :class="{ 'selected': selected }" @click="selectFile">
-    <div class="file-icon" v-html="icon"></div>
-    <div class="file-name">{{ name }}</div>
-  </div>
+  <router-link :to="path + '/edit'">
+    <div class="file-card" :class="{ 'selected': selected }">
+      <div class="file-icon" v-html="icon"></div>
+      <div class="file-name">{{ name }}</div>
+    </div>
+  </router-link>
 </template>
 
 <script setup>
@@ -11,6 +13,7 @@ import { computed } from 'vue'
 const props = defineProps({
   name: { type: String, required: true },
   selected: { type: Boolean, default: false },
+  path: { type: String, required: true },
   file: { type: Object, required: true }
 })
 
@@ -52,10 +55,6 @@ const icon = computed(() => {
   }
 })
 
-function selectFile() {
-  emit('click')
-  emit('file-selected', props.file)
-}
 </script>
 
 <style scoped>
