@@ -517,8 +517,8 @@ async def clone_object_in_tree(
 
     # Check if target path already exists
     target_entry = await git_service.resolve_entry(await commit.tree, request.target_path)
-    if target_entry:
-        raise HTTPException(status_code=409, detail="Target path already exists")
+    if not target_entry:
+        raise HTTPException(status_code=409, detail="Target collection does not exist")
 
     # Get object details for commit message
     object_name = "unknown"
@@ -535,18 +535,14 @@ async def clone_object_in_tree(
 
     async with git_service.stage_changes(head=commit) as index:
         # Create a new tree entry pointing to the same object
+        tree_entry_path = hashlib.sha1(str(random.getrandbits(256)).encode()).hexdigest()
         new_entry = await models.TreeEntry.create(
-            path=request.target_path,
+            path=tree_entry_path,
             object_type=source_entry.object_type,
             object_id=source_entry.object_id
         )
-        
-        # Insert the new entry at the target path
-        match request.target_path.rsplit('/', 1):
-            case folder, _:
-                await index.insert_tree_entry(new_entry, folder)
-            case _:
-                await index.insert_tree_entry(new_entry, None)
+
+        await index.insert_tree_entry(new_entry, request.target_path)
         
         # Create commit message
         commit_message = f"Clone {object_type} {object_name} from {request.source_path} to {request.target_path}"

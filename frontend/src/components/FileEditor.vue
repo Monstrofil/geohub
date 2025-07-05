@@ -149,26 +149,12 @@
               <!-- Add existing files to collection -->
               <div class="add-files-section">
                 <h4>Додати існуючі файли до колекції</h4>
-                <p>Введіть шлях до існуючого файлу, щоб додати його до цієї колекції:</p>
+                <p>Виберіть файли з дерева файлів для додавання до цієї колекції:</p>
                 
-                <div class="add-file-form">
-                  <input 
-                    v-model="filePathToAdd" 
-                    type="text" 
-                    placeholder="Наприклад: files/document.pdf"
-                    class="file-path-input"
-                    @keyup.enter="addExistingFile"
-                  />
-                  <button 
-                    @click="addExistingFile" 
-                    class="add-file-btn"
-                    :disabled="!filePathToAdd.trim() || isAddingFile"
-                  >
-                    <i v-if="isAddingFile" class="fas fa-spinner fa-spin"></i>
-                    <i v-else class="fas fa-plus"></i>
-                    {{ isAddingFile ? 'Додавання...' : 'Додати файл' }}
-                  </button>
-                </div>
+                <button @click="showFileChooser = true" class="open-chooser-btn">
+                  <i class="fas fa-folder-open"></i>
+                  Відкрити вибір файлів
+                </button>
                 
                 <div v-if="addFileStatus" class="add-file-status">
                   <div v-if="addFileStatus.state === 'success'" class="add-file-success">
@@ -184,6 +170,19 @@
                     </svg>
                     <span>{{ addFileStatus.error }}</span>
                   </div>
+                </div>
+              </div>
+              
+              <!-- File Chooser Modal -->
+              <div v-if="showFileChooser" class="file-chooser-modal" @click="closeFileChooser">
+                <div class="file-chooser-container" @click.stop>
+                  <FileChooser 
+                    :commit-id="props.commitId"
+                    :current-path="fileChooserPath"
+                    @close="closeFileChooser"
+                    @files-added="handleFilesAdded"
+                    @update:current-path="fileChooserPath = $event"
+                  />
                 </div>
               </div>
             </div>
@@ -212,6 +211,7 @@ import { ref, computed, onMounted } from 'vue'
 import ObjectTypeSelector from './ObjectTypeSelector.vue'
 import TagList from './TagList.vue'
 import InteractiveMap from './InteractiveMap.vue'
+import FileChooser from './FileChooser.vue'
 import { matchTagsToPreset } from '../utils/tagMatcher.js'
 import { loadFieldDefinitions, resolveFields } from '../utils/fieldResolver.js'
 import apiService from '../services/api.js'
@@ -243,7 +243,8 @@ const loading = ref(false)
 const error = ref(null)
 
 // Add existing file to collection state
-const filePathToAdd = ref('')
+const showFileChooser = ref(false)
+const fileChooserPath = ref('')
 const isAddingFile = ref(false)
 const addFileStatus = ref(null)
 
@@ -497,24 +498,27 @@ async function handleCommit() {
   }
 }
 
-async function addExistingFile() {
-  if (!filePathToAdd.value.trim()) return
-  
+function closeFileChooser() {
+  showFileChooser.value = false
+  fileChooserPath.value = ''
+}
+
+async function handleFilesAdded(selectedFiles) {
   isAddingFile.value = true
   addFileStatus.value = null
   
   try {
-    // Clone the file from the specified path to the current collection
-    const targetPath = treePathString.value + '/' + filePathToAdd.value.split('/').pop()
-    await apiService.cloneObjectInTree(props.commitId, filePathToAdd.value.trim(), targetPath)
+    // Clone each selected file to the current collection
+    for (const selectedFile of selectedFiles) {
+      const sourcePath = selectedFile.fullPath
+      
+      await apiService.cloneObjectInTree(props.commitId, sourcePath, treePathString.value)
+    }
     
     addFileStatus.value = {
       state: 'success',
-      message: `Файл успішно додано до колекції "${file.value.name}"`
+      message: `${selectedFiles.length} файл(ів) успішно додано до колекції "${file.value.name}"`
     }
-    
-    // Clear the input
-    filePathToAdd.value = ''
     
     // Reload the file to update the entries count
     await loadFile()
@@ -525,10 +529,10 @@ async function addExistingFile() {
     }, 3000)
     
   } catch (error) {
-    console.error('Failed to add file to collection:', error)
+    console.error('Failed to add files to collection:', error)
     addFileStatus.value = {
       state: 'error',
-      error: error.message || 'Помилка додавання файлу до колекції'
+      error: error.message || 'Помилка додавання файлів до колекції'
     }
     
     // Clear error message after 5 seconds
@@ -959,28 +963,7 @@ async function addExistingFile() {
   font-size: 0.9rem;
 }
 
-.add-file-form {
-  display: flex;
-  gap: 0.75rem;
-  margin-bottom: 1rem;
-}
-
-.file-path-input {
-  flex: 1;
-  padding: 0.75rem;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  font-size: 0.9rem;
-  transition: border-color 0.15s;
-}
-
-.file-path-input:focus {
-  outline: none;
-  border-color: #007bff;
-  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
-}
-
-.add-file-btn {
+.open-chooser-btn {
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -993,16 +976,29 @@ async function addExistingFile() {
   cursor: pointer;
   transition: background-color 0.15s;
   white-space: nowrap;
+  margin-bottom: 1rem;
 }
 
-.add-file-btn:hover:not(:disabled) {
+.open-chooser-btn:hover {
   background: #0056b3;
 }
 
-.add-file-btn:disabled {
-  background: #6c757d;
-  cursor: not-allowed;
-  opacity: 0.6;
+.file-chooser-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.file-chooser-container {
+  max-width: 90vw;
+  max-height: 90vh;
 }
 
 .add-file-status {

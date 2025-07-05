@@ -116,6 +116,13 @@ class ApiService {
     })
   }
 
+  async searchFilesByName(name, skip = 0, limit = 100) {
+    return await this.request('/files/search-by-name', {
+      method: 'POST',
+      body: JSON.stringify({ name, skip, limit }),
+    })
+  }
+
   // Branch/Ref operations
   async getRefs() {
     return await this.request('/refs')
