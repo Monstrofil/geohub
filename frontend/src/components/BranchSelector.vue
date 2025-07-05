@@ -2,7 +2,7 @@
   <div class="section section-branch-selector">
     <label for="branch-select">Гілка:</label>
     <select id="branch-select" v-model="selectedBranch" @change="emitBranchChange">
-      <option v-for="ref in refs" :key="ref.name" :value="ref">
+      <option v-for="ref in props.refs" :key="ref.name" :value="ref">
         {{ ref.name }}
       </option>
     </select>
@@ -11,46 +11,28 @@
 </template>
 
 <script setup>
-import { ref, watch, onMounted } from 'vue'
-import apiService from '../services/api.js'
+import { ref, watch, onMounted, computed } from 'vue'
 
 const props = defineProps({
-  modelValue: String
+  modelValue: Object, // Changed to Object to pass the full branch object
+  refs: Array
 })
 const emit = defineEmits(['update:modelValue', 'onBranchChange'])
 
-// Expose loadRefs method for parent components
-defineExpose({
-  loadRefs
+const selectedBranch = computed({
+  get: () => props.modelValue,
+  set: (value) => emit('update:modelValue', value)
 })
 
-const refs = ref([])
-const selectedBranch = ref(null)
-
-onMounted(async () => {
-  await loadRefs()
+onMounted(() => {
+  // No need to load refs here anymore, parent will provide them
 })
 
-watch(() => props.modelValue, (val) => {
-  if (val && val !== selectedBranch.value) {
-    selectedBranch.value = val
-  }
-})
+// No need for this watch anymore since we're using computed
 
-async function loadRefs() {
-  try {
-    const response = await apiService.getRefs()
-    refs.value = response
-    selectedBranch.value = refs.value[0]
-  } catch (err) {
-    console.error('Failed to load refs:', err)
-  }
-
-  emitBranchChange(selectedBranch.value)
-}
+// Removed loadRefs function - no longer needed
 
 function emitBranchChange() {
-  emit('update:modelValue', selectedBranch.value)
   emit('onBranchChange', selectedBranch.value)
 }
 </script>

@@ -5,7 +5,7 @@ import FileList from '../components/FileList.vue'
 
 const routes = [
   {
-    path: '/explorer',
+    path: '/explorer/:branch',
     name: 'Explorer',
     component: Explorer,
     children: [
