@@ -252,6 +252,32 @@ async def list_refs():
     ]
 
 
+class CreateBranchRequest(BaseModel):
+    branch_name: str
+    base_ref_name: str
+
+@router.post("/refs", response_model=RefResponse)
+async def create_branch(request: CreateBranchRequest):
+    """Create a new branch based on the specified base ref"""
+    # Get the base ref
+    base_ref = await models.Ref.get_or_none(name=request.base_ref_name)
+    if not base_ref:
+        raise HTTPException(status_code=404, detail=f"Base ref '{request.base_ref_name}' not found")
+    
+    # Check if branch already exists
+    existing_ref = await models.Ref.get_or_none(name=request.branch_name)
+    if existing_ref:
+        raise HTTPException(status_code=409, detail="Branch already exists")
+    
+    # Create new ref pointing to the same commit as base ref
+    new_ref = await models.Ref.create(
+        name=request.branch_name,
+        commit_id=base_ref.commit_id
+    )
+    
+    return RefResponse(name=new_ref.name, commit_id=new_ref.commit_id)
+
+
 @router.get("/commits", response_model=List[CommitResponse])
 async def list_commits():
     commits = await models.Commit.all().prefetch_related("tree", "parent")

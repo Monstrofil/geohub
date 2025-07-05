@@ -121,6 +121,16 @@ class ApiService {
     return await this.request('/refs')
   }
 
+  async createBranch(branchName, baseRefName) {
+    return await this.request('/refs', {
+      method: 'POST',
+      body: JSON.stringify({ 
+        branch_name: branchName,
+        base_ref_name: baseRefName
+      })
+    })
+  }
+
   // Health check
   async healthCheck() {
     return await fetch('http://localhost:8000/health').then(res => res.json())

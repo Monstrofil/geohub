@@ -1,12 +1,14 @@
 <template>
   <div class="pure-g app-grid">
     <!-- Branch Selector -->
-    <BranchSelector v-model="currentBranch" @onBranchChange="handleBranchChange" />
+    <BranchSelector ref="branchSelectorRef" v-model="currentBranch" @onBranchChange="handleBranchChange" />
     <!-- File List View -->
     <div class="pure-u-1">
       <RouterView 
             :commit-id="currentBranch && currentBranch.commit_id"
+            :current-branch-name="currentBranch && currentBranch.name"
             :change-tracker="changeTracker"
+            @branch-created="handleBranchCreated"
         />
     </div>
   </div>
@@ -18,6 +20,8 @@ import { useRoute, useRouter } from 'vue-router'
 import BranchSelector from './BranchSelector.vue'
 import { useChangeTracker } from '../composables/useChangeTracker.js'
 import { loadFieldDefinitions } from '../utils/fieldResolver.js'
+
+const branchSelectorRef = ref(null)
 
 const allFieldDefinitions = ref({})
 
@@ -34,6 +38,16 @@ onMounted(async () => {
 
 function handleBranchChange(branch) {
   currentBranch.value = branch
+}
+
+async function handleBranchCreated(newBranch) {
+  // Refresh the branch selector to show the new branch
+  if (branchSelectorRef.value) {
+    await branchSelectorRef.value.loadRefs()
+  }
+  console.log('New branch created:', newBranch)
+  // You might want to automatically switch to the new branch
+  // currentBranch.value = newBranch
 }
 
 </script>

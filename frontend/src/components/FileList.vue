@@ -6,6 +6,9 @@
         <button @click="handleRefresh" class="action-btn refresh-btn" :disabled="loading">
           <i class="fas fa-sync-alt"></i> Refresh
         </button>
+        <button @click="handleEdit" class="action-btn edit-btn" :disabled="!props.commitId">
+          <i class="fas fa-edit"></i> Edit
+        </button>
         <button @click="showUploadModal = true" class="action-btn upload-btn">
           <i class="fas fa-upload"></i> Upload
         </button>
@@ -21,7 +24,7 @@
           :key="entry.id"
           :path="entry.path"
           :file="entry.object"
-          :name="entry.object?.original_name || ''"
+          :name="entry.object?.tags.name || entry.object?.original_name || ''"
           :tree-path="treePathString"
           :selected="selectedEntry && selectedEntry.object && selectedEntry.object.id === entry.object?.id"
           @click="selectFile(entry.object)"
@@ -123,10 +126,11 @@ import apiService from '../services/api.js'
 const props = defineProps({
   commitId: { type: [String, Number], required: true },
   treePath: {type: [String, Array], required: false},
-  selectedEntry: { type: Object, default: null }
+  selectedEntry: { type: Object, default: null },
+  currentBranchName: { type: String, required: false }
 })
 
-const emit = defineEmits(['refresh', 'select-file', 'file-selected', 'files-loaded', 'file-uploaded'])
+const emit = defineEmits(['refresh', 'select-file', 'file-selected', 'files-loaded', 'file-uploaded', 'branch-created'])
 
 const files = ref([])
 const loading = ref(false)
@@ -183,6 +187,31 @@ function selectFile(file) {
 function handleFileSelected(file) {
   const entry = files.value.find(e => e.object && e.object.id === file.id)
   emit('file-selected', entry?.object || file)
+}
+
+async function handleEdit() {
+  if (!props.commitId) {
+    error.value = 'Commit ID is required for editing'
+    return
+  }
+  
+  if (!props.currentBranchName) {
+    error.value = 'Current branch name is required for editing'
+    return
+  }
+  
+  try {
+    // Generate a UUID for the new branch
+    const uuid = crypto.randomUUID()
+    const branchName = `refs/changes/${uuid}`
+    const newBranch = await apiService.createBranch(branchName, props.currentBranchName)
+    emit('branch-created', newBranch)
+    // You might want to navigate to the new branch or show a success message
+    console.log('Created new branch:', newBranch)
+  } catch (err) {
+    console.error('Failed to create edit branch:', err)
+    error.value = 'Помилка створення гілки для редагування: ' + err.message
+  }
 }
 
 // Upload modal functions
@@ -350,6 +379,15 @@ watch(() => props.treePath, loadFiles)
 .refresh-btn:hover:not(:disabled) {
   border-color: #2196f3;
   color: #2196f3;
+}
+
+.edit-btn {
+  color: #666;
+}
+
+.edit-btn:hover:not(:disabled) {
+  border-color: #ff9800;
+  color: #ff9800;
 }
 
 .upload-btn {

@@ -19,6 +19,11 @@ const props = defineProps({
 })
 const emit = defineEmits(['update:modelValue', 'onBranchChange'])
 
+// Expose loadRefs method for parent components
+defineExpose({
+  loadRefs
+})
+
 const refs = ref([])
 const selectedBranch = ref(null)
 
@@ -45,7 +50,6 @@ async function loadRefs() {
 }
 
 function emitBranchChange() {
-  const refObj = refs.value.find(r => r.name === selectedBranch.value)
   emit('update:modelValue', selectedBranch.value)
   emit('onBranchChange', selectedBranch.value)
 }
