@@ -10,3 +10,5 @@ pydantic
 aiohttp
 GDAL==3.6.2
 geopandas
+pytest
+pytest-asyncio

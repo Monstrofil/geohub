@@ -37,6 +37,14 @@ async def dump_tree_structure(root_tree: Tree, indent: str = "", max_depth: int 
             file_obj = await File.get_or_none(id=entry.object_id)
             file_name = file_obj.name if file_obj else f"<file {entry.object_id}>"
             print(f"{indent}   {prefix} 📄 {entry.path} -> {file_name}")
+            
+            # Dump file tags information
+            if file_obj and file_obj.tags:
+                print(f"{indent}      🏷️  Tags: {file_obj.tags}")
+            elif file_obj:
+                print(f"{indent}      🏷️  Tags: (empty)")
+            else:
+                print(f"{indent}      🏷️  Tags: (file not found)")
         elif entry.object_type == "tree":
             # Recursively dump subtree
             subtree = await Tree.get_or_none(id=entry.object_id)

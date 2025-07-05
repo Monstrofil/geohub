@@ -2,6 +2,7 @@ from models import File, Tree, TreeEntry, Commit, Ref
 import hashlib
 import random
 import logging
+import debug_utils
 from contextlib import contextmanager, asynccontextmanager
 import copy
 
@@ -70,15 +71,6 @@ async def delete_object(obj, message=None, object_type="file"):
     return await create_commit(tree, head, commit_message)
 
 
-def create_tree_entry(object_type: str, object_id: int, path: str):
-    entry = TreeEntry.create(
-        path=path,
-        object_type=object_type,
-        object_id=object_id
-    )
-    return entry
-
-
 async def resolve_tree(root: Tree, path: str) -> list[tuple[Tree, TreeEntry]]:
     if not path:
         return [(root, None)]
@@ -119,21 +111,51 @@ async def resolve_tree(root: Tree, path: str) -> list[tuple[Tree, TreeEntry]]:
     return leafs
 
 
+
+async def resolve_entry(root: Tree, path: str) -> list[tuple[Tree, TreeEntry]]:
+    if not path:
+        raise FileNotFoundError(path)
+
+    tokens = path.split('/')
+    
+    leaf = root
+    
+    entry = None
+    for i, path_token in enumerate(tokens):
+        entries_query = TreeEntry.filter(id__in=leaf.entries)
+        entries_list = list(await entries_query.filter())
+        logging.debug('all entries: %s', entries_list)
+
+        entry = await entries_query.get_or_none(path=path_token)
+        if entry is None:
+            raise FileNotFoundError("Path %s does not exist" % path_token)
+        assert entry is not None
+
+        if entry.object_type == "file":
+            # If we found a file, check if there are more tokens
+            # If so, we're trying to access a file as if it were a directory
+            if i < len(tokens) - 1:
+                raise NotADirectoryError("Path %s is not a directory" % path_token)
+            # If we found a file and it's the last token, we're done
+            break
+
+        # Navigate to the next tree
+        leaf = await Tree.get_or_none(id=entry.object_id)
+        if leaf is None:
+            raise FileNotFoundError("Tree %s does not exist" % entry.object_id)
+
+    if entry is None:
+        raise FileNotFoundError(path)
+    return entry
+
+
+
 class Index:
-    def __init__(self, tree, entries):
+    def __init__(self, tree):
         self.tree = tree
-        self.entries: dict[str, TreeEntry] = entries
         self.updated = False
 
-    async def add_tree_entry(self, new_entry):
-        self.entries[str(new_entry.id)] = new_entry
-        self.updated = True
-
-    async def update_tree_entry(self, old_entry, new_entry):
-        self.entries[str(old_entry.id)] = new_entry
-        self.updated = True
-
-    async def remove_tree_entry(self, tree: Tree, path: str) -> Tree:
+    async def remove_tree_entry(self, path: str) -> Tree:
         """
         Remove a tree entry from the specified path.
         
@@ -148,9 +170,10 @@ class Index:
             FileNotFoundError: If the path does not exist
             OSError: If trying to remove a non-empty collection
         """
-        tree_path = await resolve_tree(tree, path)
+        tree_path = await resolve_tree(self.tree, path)
         logging.debug("Resolved tree path for removal: %s", repr(tree_path))
         
+        # TODO: rewrite this hallucination from AI
         # Find the target entry to remove (last non-None entry in path)
         target_entry = None
         for i in range(len(tree_path) - 1, -1, -1):
@@ -207,11 +230,14 @@ class Index:
             new_trees.append(new_leaf)
         
         # Return the root tree (last one created)
+        self.tree = new_trees[-1]
+
+        await debug_utils.debug_tree(await self.tree, "Tree after remove")
         return new_trees[-1]
 
 
-    async def insert_tree_entry(self, tree: Tree, new_entry: TreeEntry, path: str) -> Tree:
-        tree_path = await resolve_tree(tree, path)
+    async def insert_tree_entry(self, new_entry: TreeEntry, path: str) -> Tree:
+        tree_path = await resolve_tree(self.tree, path)
         logging.debug("Resolved tree path: %s (type: %s)", repr(tree_path), type(tree_path))
 
         # Process the tree path in reverse order so we can properly link trees
@@ -246,15 +272,18 @@ class Index:
             new_trees.append(new_leaf)
         
         # Return the root tree (last one created)
+        self.tree = new_trees[-1]
+        await debug_utils.debug_tree(await self.tree, "Tree after insert")
         return new_trees[-1]
 
 
     async def commit(self, message, ref): 
-        tree_ids = [str(entry.id) for entry in self.entries.values()]
-        new_tree = await Tree.create(entries=tree_ids)
+        import debug_utils
+
+        await debug_utils.debug_tree(await (await ref.commit).tree, "Tree before commit")
 
         new_commit = await Commit.create(
-            tree_id=new_tree.id,
+            tree_id=self.tree.id,
             parent_id=ref.commit_id,
             message=message
         )
@@ -262,23 +291,16 @@ class Index:
         ref.commit = new_commit
         logging.debug("new commit head: %s", new_commit.id)
         await ref.save()
+
+        await debug_utils.debug_tree(await new_commit.tree, "Tree after commit")
+
         return new_commit
 
 
 @asynccontextmanager
 async def stage_changes(head: Commit):
     """Context manager for staging changes to a commit's tree."""
-    entries = {}
-
-    tree_entry_ids = (await head.tree).entries
-    logging.debug("tree_entry_ids: %s", tree_entry_ids)
-    async for entry in TreeEntry.filter(id__in=tree_entry_ids).all():
-        entries[str(entry.id)] = entry
-
-    assert len(tree_entry_ids) == len(entries), "Entries mismatch (broken db?)"
-
-    logging.debug("entries: %s", entries)
-    index = Index(head, entries)
+    index = Index(await head.tree)
     try:
         yield index
     finally:

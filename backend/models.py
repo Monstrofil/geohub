@@ -51,12 +51,18 @@ class Tree(models.Model):
     name = fields.CharField(max_length=255, default="Root")
     tags = fields.JSONField(default=dict)
 
+    def __repr__(self):
+        return f"Tree(id={self.id}, name='{self.name}', entries_count={len(self.entries)})"
+
 
 class TreeEntry(models.Model):
     id = fields.UUIDField(pk=True)
     path = fields.CharField(max_length=40)
     object_type = fields.CharField(max_length=10)
     object_id = fields.UUIDField()
+
+    def __repr__(self):
+        return f"TreeEntry(id={self.id}, path='{self.path}', object_type='{self.object_type}', object_id={self.object_id})"
 
 
 class Commit(models.Model):

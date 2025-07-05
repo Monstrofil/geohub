@@ -109,12 +109,25 @@ class TreeResponse(BaseModel):
     entries: list[TreeEntryResponse]
 
 
-@router.get("/{commit_id}/objects", response_model=ObjectsListResponse)
-async def list_tree(commit_id: str, skip: int = 0, limit: int = 100):
-    commit = await models.Commit.get_or_none(id=commit_id)
-    tree = await commit.tree
 
-    entries = await models.TreeEntry.filter(id__in=tree.entries).offset(skip).limit(limit)
+@router.get("/{commit_id}/objects", response_model=ObjectsListResponse)
+async def list_tree_root(commit_id: str):
+    return await list_tree(commit_id, path=None)
+
+
+@router.get("/{commit_id}/{path:path}/objects", response_model=ObjectsListResponse)
+async def list_tree_by_path(commit_id: str, path: str):
+    return await list_tree(commit_id, path)
+
+
+async def list_tree(commit_id: str, path: str | None = None):
+    commit = await models.Commit.get_or_none(id=commit_id)
+
+    resolved_path = await git_service.resolve_tree(await commit.tree, path or '')
+    tree = resolved_path[-1][0]
+
+    entries_query = models.TreeEntry.filter(id__in=tree.entries)
+    entries = await entries_query.all()
 
     # Separate IDs by type
     file_ids = [entry.object_id for entry in entries if entry.object_type == 'file']
@@ -138,9 +151,25 @@ async def list_tree(commit_id: str, skip: int = 0, limit: int = 100):
     return ObjectsListResponse(
         objects=entries,
         total=len(entries),
-        skip=skip,
-        limit=limit
+        skip=0,
+        limit=0
     )
+
+
+@router.get("/{commit_id}/{path:path}", response_model=TreeEntryResponse)
+async def get_tree_object(commit_id: str, path: str):
+    commit = await models.Commit.get_or_none(id=commit_id)
+
+    entry = await git_service.resolve_entry(await commit.tree, path or '')
+
+    if entry.object_type == 'file':
+        object = await models.File.filter(id=entry.object_id).get()
+    else:
+        object = await models.Tree.filter(id=entry.object_id).get()
+        
+    entry.object = object
+
+    return entry
 
 
 @router.get("/files/{file_id}/download")
@@ -342,6 +371,7 @@ async def get_tree(tree_id: str):
 async def add_object_in_tree(
     commit_id: str = Path(..., description="Commit ID"),
     file: UploadFile | None = None,
+    path: Optional[str] = Body(...),
     name: Optional[str] = Body(...),
     tags: Optional[str] = Form(None)
 ):
@@ -372,7 +402,7 @@ async def add_object_in_tree(
             object_type=obj_type,
             object_id=object.id
         )
-        await index.add_tree_entry(new_entry)
+        await index.insert_tree_entry(new_entry, path)
         await index.commit(f"Add file {object.name}", ref)
 
     return TreeEntryResponse(
@@ -383,10 +413,10 @@ async def add_object_in_tree(
     )
 
 
-@router.put("/{commit_id}/objects/{tree_entry_id}", response_model=TreeEntryResponse)
+@router.put("/{commit_id}/{path:path}", response_model=TreeEntryResponse)
 async def update_object_in_tree(
     commit_id: str = Path(..., description="Commit ID"),
-    tree_entry_id: str = Path(..., description="TreeEntry (object) ID"),
+    path: str = Path(..., description="TreeEntry (object) path"),
     request: FileUpdateRequest = None
 ):
     """Update a file object in a tree (by tree entry). Only file objects are supported for now."""
@@ -398,7 +428,7 @@ async def update_object_in_tree(
         raise HTTPException(status_code=404, detail="Commit not found")
 
 
-    entry = await models.TreeEntry.get_or_none(id=tree_entry_id)
+    entry = await git_service.resolve_entry(await commit.tree, path)
     if not entry:
         raise HTTPException(status_code=404, detail="Tree entry not found")
 
@@ -409,19 +439,38 @@ async def update_object_in_tree(
     orig_file_obj = await models.File.get_or_none(id=entry.object_id)
     if not orig_file_obj:
         raise HTTPException(status_code=404, detail="File not found")
+    
+    print('Requested tags: ', request.tags)
         
     # Copy file record, assign new tags
-    new_file_obj = orig_file_obj
-    new_file_obj.id = None
-    new_file_obj.tags = request.tags
+    new_file_obj = await models.File.create(   
+        name=orig_file_obj.name,
+        original_name=orig_file_obj.original_name,
+        file_path=orig_file_obj.file_path,
+        file_size=orig_file_obj.file_size,
+        mime_type=orig_file_obj.mime_type,
+        base_file_type=orig_file_obj.base_file_type,
+        tags = request.tags,
+    )
+    # todo: do I need this?
     new_file_obj.sha1 = models.calculate_file_obj_hash(new_file_obj)
     await new_file_obj.save()
 
     async with git_service.stage_changes(head=commit) as index:
-        new_entry = await git_service.create_tree_entry(
-            entry.object_type, new_file_obj.id, entry.path)
-        await index.update_tree_entry(entry, new_entry)
+        new_entry = await models.TreeEntry.create(
+            path=entry.path,
+            object_type='file',
+            object_id=new_file_obj.id
+        )
+        await index.remove_tree_entry(path)
 
+
+        match path.split('/', 1):
+            case folder, _:
+                await index.insert_tree_entry(new_entry, folder)
+            case _:
+                await index.insert_tree_entry(new_entry, None)
+        
         await index.commit("Update file %s", ref)
 
     file_obj = await models.File.get_or_none(id=new_file_obj.id)
