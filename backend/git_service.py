@@ -133,6 +133,83 @@ class Index:
         self.entries[str(old_entry.id)] = new_entry
         self.updated = True
 
+    async def remove_tree_entry(self, tree: Tree, path: str) -> Tree:
+        """
+        Remove a tree entry from the specified path.
+        
+        Args:
+            tree: The root tree to modify
+            path: The path to the entry to remove
+            
+        Returns:
+            A new tree with the entry removed
+            
+        Raises:
+            FileNotFoundError: If the path does not exist
+            OSError: If trying to remove a non-empty collection
+        """
+        tree_path = await resolve_tree(tree, path)
+        logging.debug("Resolved tree path for removal: %s", repr(tree_path))
+        
+        # Find the target entry to remove (last non-None entry in path)
+        target_entry = None
+        for i in range(len(tree_path) - 1, -1, -1):
+            if tree_path[i][1] is not None:
+                target_entry = tree_path[i][1]
+                break
+        
+        if target_entry is None:
+            raise FileNotFoundError(f"No entry found at path: {path}")
+        
+        logging.debug("Target entry to remove: %s (type: %s)", repr(target_entry), target_entry.object_type)
+        
+        # Rule 2: If target is a tree and has entries, raise OSError
+        if target_entry.object_type == "tree":
+            target_tree = await Tree.get(id=target_entry.object_id)
+            if target_tree.entries:
+                raise OSError(f"collection not empty")
+        
+        # Rule 1: Only remove the last item, rest stay
+        # Process the tree path in reverse order to rebuild the tree structure
+        new_trees = []
+        
+        for i, (leaf, tree_entry) in enumerate(reversed(tree_path)):
+            logging.debug("Processing leaf %d: leaf=%s, tree_entry=%s", i, repr(leaf), repr(tree_entry))
+            
+            # Create a copy of the current leaf
+            new_leaf = await Tree.create(
+                entries=list(leaf.entries),
+                name=leaf.name,
+                tags=dict(leaf.tags)
+            )
+            
+            if tree_entry:
+                if tree_entry.id == target_entry.id:
+                    # This is the target entry to remove
+                    new_leaf.entries.remove(str(tree_entry.id))
+                    logging.debug("Removed target entry %s from new_leaf", str(tree_entry.id))
+                else:
+                    # This is an intermediate entry - update it to point to the new child tree
+                    if tree_entry.object_type == "tree" and new_trees:
+                        # Remove old entry and create new one pointing to updated child
+                        new_leaf.entries.remove(str(tree_entry.id))
+                        child_tree_id = new_trees[-1].id
+                        new_tree_entry = await TreeEntry.create(
+                            path=tree_entry.path,
+                            object_type=tree_entry.object_type,
+                            object_id=child_tree_id
+                        )
+                        new_leaf.entries.append(str(new_tree_entry.id))
+                        logging.debug("Updated intermediate entry %s to point to new child tree", str(tree_entry.id))
+                    # For file entries or when no new_trees, keep the entry as is
+            
+            await new_leaf.save()
+            new_trees.append(new_leaf)
+        
+        # Return the root tree (last one created)
+        return new_trees[-1]
+
+
     async def insert_tree_entry(self, tree: Tree, new_entry: TreeEntry, path: str) -> Tree:
         tree_path = await resolve_tree(tree, path)
         logging.debug("Resolved tree path: %s (type: %s)", repr(tree_path), type(tree_path))
