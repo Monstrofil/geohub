@@ -1,33 +1,46 @@
 <template>
-  <div class="tree-card" :class="{ 'selected': selected }">
-    <div class="tree-icon" v-html="icon" title="Edit category"></div>
-    <router-link :to="{name: 'FileEditor', params: { treePath: fullPath }}">
-        <div class="tree-name"title="Edit category">Name {{ name }}</div>
-    </router-link>
-    <div class="tree-name tree-path">{{ path }}</div>
+  <div class="tree-card-container">
+    <div class="tree-card" :class="{ 'selected': selected }">
+      <div class="tree-icon" v-html="icon" title="Edit category"></div>
+      <router-link :to="{name: 'FileEditor', params: { treePath: fullPath }}">
+          <div class="tree-name"title="Edit category">Name {{ name }}</div>
+      </router-link>
+      <div class="tree-name tree-path">{{ path }}</div>
 
-    
-    <router-link :to="{name: 'FileList', params: { treePath: fullPath }}">
-        <button class="view-contents-btn" title="View files in this category">
-        <svg width="20" height="20" viewBox="0 0 20 20">
-            <path d="M5 10h10M12 7l3 3-3 3" stroke="#ffb300" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-        </button>
-    </router-link>
+      
+      <router-link :to="{name: 'FileList', params: { treePath: fullPath }}">
+          <button class="view-contents-btn" title="View files in this category">
+          <svg width="20" height="20" viewBox="0 0 20 20">
+              <path d="M5 10h10M12 7l3 3-3 3" stroke="#ffb300" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          </button>
+      </router-link>
+    </div>
+    <button 
+      class="remove-btn" 
+      @click.stop="handleRemove"
+      title="Remove collection"
+    >
+      <svg width="16" height="16" viewBox="0 0 16 16">
+        <path d="M2 2l12 12M14 2l-12 12" stroke="#dc3545" stroke-width="2" fill="none" stroke-linecap="round"/>
+      </svg>
+    </button>
   </div>
 </template>
 
 <script setup>
 import { computed } from 'vue'
+import apiService from '../services/api.js'
 
 const props = defineProps({
   name: { type: String, required: true },
   selected: { type: Boolean, default: false },
   path: { type: String, required: true },
-  treePath: { type: [String, Array], required: false }
+  treePath: { type: [String, Array], required: false },
+  commitId: { type: String, required: true }
 })
 
-const emit = defineEmits(['edit'])
+const emit = defineEmits(['edit', 'removed'])
 
 const fullPath = computed(() => {
   if (props.treePath) {
@@ -45,9 +58,25 @@ const icon = computed(() => {
   </svg>`
 })
 
+const handleRemove = async () => {
+  if (confirm(`Are you sure you want to remove collection "${props.name}"?`)) {
+    try {
+      await apiService.removeObjectInTree(props.commitId, fullPath.value)
+      emit('removed', props.path)
+    } catch (error) {
+      console.error('Failed to remove collection:', error)
+      alert(`Failed to remove collection: ${error.message}`)
+    }
+  }
+}
 </script>
 
 <style scoped>
+.tree-card-container {
+  position: relative;
+  display: inline-block;
+}
+
 .tree-card {
   display: flex;
   flex-direction: column;
@@ -95,5 +124,35 @@ const icon = computed(() => {
 }
 .view-contents-btn:hover {
   background: #fff3cd;
+}
+
+.remove-btn {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid #dc3545;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s, background-color 0.2s;
+  z-index: 10;
+}
+
+.tree-card-container:hover .remove-btn {
+  opacity: 1;
+}
+
+.remove-btn:hover {
+  background: #dc3545;
+}
+
+.remove-btn:hover svg path {
+  stroke: white;
 }
 </style> 

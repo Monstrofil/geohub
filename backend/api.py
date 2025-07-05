@@ -460,4 +460,33 @@ async def update_object_in_tree(
         object_type=object_type,
         object=updated_object,
         path=entry.path
-    ) 
+    )
+
+
+@router.delete("/{commit_id}/{path:path}")
+async def remove_object_in_tree(
+    commit_id: str = Path(..., description="Commit ID"),
+    path: str = Path(..., description="TreeEntry (object) path")
+):
+    """Remove a file or collection object from a tree (by tree entry)."""
+    ref = await models.Ref.get_or_none(name="main")
+
+    # Find the commit
+    commit = await models.Commit.get_or_none(id=commit_id)
+    if not commit:
+        raise HTTPException(status_code=404, detail="Commit not found")
+
+    # Resolve the entry to get object information for the commit message
+    entry = await git_service.resolve_entry(await commit.tree, path)
+    if not entry:
+        raise HTTPException(status_code=404, detail="Tree entry not found")
+
+    async with git_service.stage_changes(head=commit) as index:
+        # Remove the tree entry
+        await index.remove_tree_entry(path)
+        
+        # Create commit message
+        commit_message = f"Remove object"
+        await index.commit(commit_message, ref)
+
+    return {"message": f"Successfully removed object from path '{path}'"} 

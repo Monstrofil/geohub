@@ -152,6 +152,14 @@ class ApiService {
 
     return response;
   }
+
+  // Remove an object from a tree (by tree entry)
+  async removeObjectInTree(commitId, path) {
+    if (!commitId || !path) throw new Error('commitId and path are required')
+    return await this.request(`/${commitId}/${path}`, {
+      method: 'DELETE',
+    })
+  }
 }
 
 export default new ApiService() 

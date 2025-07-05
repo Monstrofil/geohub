@@ -26,9 +26,11 @@
           :file="entry.object"
           :name="entry.object?.tags.name || entry.object?.original_name || ''"
           :tree-path="treePathString"
+          :commit-id="props.commitId"
           :selected="selectedEntry && selectedEntry.object && selectedEntry.object.id === entry.object?.id"
           @click="selectFile(entry.object)"
           @file-selected="handleFileSelected"
+          @removed="handleObjectRemoved"
         />
       </div>
     </div>
@@ -130,7 +132,7 @@ const props = defineProps({
   currentBranchName: { type: String, required: false }
 })
 
-const emit = defineEmits(['refresh', 'select-file', 'file-selected', 'files-loaded', 'file-uploaded', 'branch-created'])
+const emit = defineEmits(['refresh', 'select-file', 'file-selected', 'files-loaded', 'file-uploaded', 'branch-created', 'object-removed'])
 
 const files = ref([])
 const loading = ref(false)
@@ -187,6 +189,16 @@ function selectFile(file) {
 function handleFileSelected(file) {
   const entry = files.value.find(e => e.object && e.object.id === file.id)
   emit('file-selected', entry?.object || file)
+}
+
+function handleObjectRemoved(path) {
+  // Remove the object from the local files array
+  const index = files.value.findIndex(entry => entry.path === path)
+  if (index !== -1) {
+    files.value.splice(index, 1)
+  }
+  // Emit the removed event to parent components
+  emit('object-removed', path)
 }
 
 async function handleEdit() {
