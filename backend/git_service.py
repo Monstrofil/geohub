@@ -91,7 +91,7 @@ class Index:
         self.tree = tree
         self.updated = False
 
-    async def remove_tree_entry(self, path: str) -> Tree:
+    async def remove_tree_entry(self, path: str, force: bool = False) -> Tree:
         """
         Remove a tree entry from the specified path.
         
@@ -125,7 +125,7 @@ class Index:
         # Rule 2: If target is a tree and has entries, raise OSError
         if target_entry.object_type == "tree":
             target_tree = await Tree.get(id=target_entry.object_id)
-            if target_tree.entries:
+            if not force and target_tree.entries:
                 raise OSError(f"collection not empty")
         
         # Rule 1: Only remove the last item, rest stay

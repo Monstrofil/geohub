@@ -258,7 +258,7 @@ const fileTypeLabel = computed(() => {
   const labels = {
     'raster': 'Геоприв\'язане растрове зображення',
     'vector': 'Геоприв\'язаний векторний файл', 
-    'raw': 'Звичайний файл'
+    'raw': 'Звичайний файл',
   }
   return labels[fileType.value] || 'Невідомий тип'
 })

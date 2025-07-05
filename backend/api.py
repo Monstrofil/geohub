@@ -73,7 +73,7 @@ class ObjectsListResponse(BaseModel):
     limit: int
 
 
-class FileUpdateRequest(BaseModel):
+class ObjectUpdateRequest(BaseModel):
     tags: Dict[str, str]
 
 
@@ -375,9 +375,9 @@ async def add_object_in_tree(
 async def update_object_in_tree(
     commit_id: str = Path(..., description="Commit ID"),
     path: str = Path(..., description="TreeEntry (object) path"),
-    request: FileUpdateRequest = None
+    request: ObjectUpdateRequest = None
 ):
-    """Update a file object in a tree (by tree entry). Only file objects are supported for now."""
+    """Update a file or collection object in a tree (by tree entry)."""
     ref = await models.Ref.get_or_none(name="main")
 
     # Find the commit
@@ -385,43 +385,56 @@ async def update_object_in_tree(
     if not commit:
         raise HTTPException(status_code=404, detail="Commit not found")
 
-
     entry = await git_service.resolve_entry(await commit.tree, path)
     if not entry:
         raise HTTPException(status_code=404, detail="Tree entry not found")
 
-    # TODO: add support for other object types
-    if entry.object_type != 'file':
-        raise HTTPException(status_code=400, detail="Only file objects can be updated at this time")
-    
-    orig_file_obj = await models.File.get_or_none(id=entry.object_id)
-    if not orig_file_obj:
-        raise HTTPException(status_code=404, detail="File not found")
-    
     print('Requested tags: ', request.tags)
+
+    if entry.object_type == 'file':
+        orig_file_obj = await models.File.get_or_none(id=entry.object_id)
+        if not orig_file_obj:
+            raise HTTPException(status_code=404, detail="File not found")
         
-    # Copy file record, assign new tags
-    new_file_obj = await models.File.create(   
-        name=orig_file_obj.name,
-        original_name=orig_file_obj.original_name,
-        file_path=orig_file_obj.file_path,
-        file_size=orig_file_obj.file_size,
-        mime_type=orig_file_obj.mime_type,
-        base_file_type=orig_file_obj.base_file_type,
-        tags = request.tags,
-    )
-    # todo: do I need this?
-    new_file_obj.sha1 = models.calculate_file_obj_hash(new_file_obj)
-    await new_file_obj.save()
+        new_file_obj = await models.File.create(   
+            name=orig_file_obj.name,
+            original_name=orig_file_obj.original_name,
+            file_path=orig_file_obj.file_path,
+            file_size=orig_file_obj.file_size,
+            mime_type=orig_file_obj.mime_type,
+            base_file_type=orig_file_obj.base_file_type,
+            tags=request.tags,
+        )
+        new_file_obj.sha1 = models.calculate_file_obj_hash(new_file_obj)
+        await new_file_obj.save()
+
+        new_object = new_file_obj
+        object_type = 'file'
+
+    elif entry.object_type == 'tree':
+        orig_tree_obj = await models.Tree.get_or_none(id=entry.object_id)
+        if not orig_tree_obj:
+            raise HTTPException(status_code=404, detail="Collection not found")
+        
+        new_tree_obj = await models.Tree.create(
+            entries=list(orig_tree_obj.entries),
+            name=orig_tree_obj.name,
+            tags=request.tags,
+        )
+
+        new_object = new_tree_obj
+        object_type = 'tree'
+
+    else:
+        raise HTTPException(status_code=400, detail=f"Unsupported object type: {entry.object_type}")
 
     async with git_service.stage_changes(head=commit) as index:
         new_entry = await models.TreeEntry.create(
             path=entry.path,
-            object_type='file',
-            object_id=new_file_obj.id
+            object_type=object_type,
+            object_id=new_object.id
         )
-        await index.remove_tree_entry(path)
-
+        await index.remove_tree_entry(path, force=True)
 
         match path.rsplit('/', 1):
             case folder, _:
@@ -429,15 +442,22 @@ async def update_object_in_tree(
             case _:
                 await index.insert_tree_entry(new_entry, None)
         
-        await index.commit("Update file %s", ref)
+        commit_message = f"Update {'file' if object_type == 'file' else 'collection'} {new_object.name}"
+        await index.commit(commit_message, ref)
 
-    file_obj = await models.File.get_or_none(id=new_file_obj.id)
-    if not file_obj:
-        raise HTTPException(status_code=500, detail="Updated file not found")
+    # Fetch the updated object to return
+    if object_type == 'file':
+        updated_object = await models.File.get_or_none(id=new_object.id)
+        if not updated_object:
+            raise HTTPException(status_code=500, detail="Updated file not found")
+    else:
+        updated_object = await models.Tree.get_or_none(id=new_object.id)
+        if not updated_object:
+            raise HTTPException(status_code=500, detail="Updated collection not found")
 
     return TreeEntryResponse(
         id=entry.id,
-        object_type=entry.object_type,
-        object=file_obj,
+        object_type=object_type,
+        object=updated_object,
         path=entry.path
     ) 
