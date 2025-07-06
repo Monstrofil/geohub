@@ -39,12 +39,7 @@ function emitBranchChange() {
 
 <style scoped>
 .section-branch-selector {
-  padding: 1rem;
-  background: #e9f5ff;
-  border-bottom: 1px solid #b3d8fd;
-  display: flex;
-  align-items: center;
-  gap: 1rem;
+  display: none; /* Hide the branch selector section */
 }
 .current-branch {
   font-weight: bold;
