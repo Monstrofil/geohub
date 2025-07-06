@@ -1,10 +1,16 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import LandingPage from '../components/LandingPage.vue'
 import Explorer from '../components/Explorer.vue'
 import FileEditor from '../components/FileEditor.vue'
 import FileList from '../components/FileList.vue'
 import FileViewer from '../components/FileViewer.vue'
 
 const routes = [
+  {
+    path: '/',
+    name: 'LandingPage',
+    component: LandingPage
+  },
   {
     path: '/explorer/:branch',
     name: 'Explorer',
