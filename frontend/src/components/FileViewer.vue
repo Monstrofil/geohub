@@ -5,11 +5,12 @@
         <div class="file-info">
           <div class="file-icon" v-html="fileIcon"></div>
           <div class="file-details">
-            <h1 class="file-name">{{ file?.tags?.name || file?.original_name || 'Untitled File' }}</h1>
+            <h1 class="file-name">{{ getDisplayName() }}</h1>
             <div class="file-meta">
-              <span class="file-type">{{ file?.base_file_type || 'Unknown' }}</span>
+              <span class="file-type">{{ fileTypeLabel }}</span>
               <span class="file-size" v-if="file?.file_size">{{ formatFileSize(file.file_size) }}</span>
               <span class="file-date" v-if="file?.created_at">{{ formatDate(file.created_at) }}</span>
+              <span class="file-id" v-if="file?.id">ID: {{ file.id }}</span>
             </div>
           </div>
         </div>
@@ -47,41 +48,139 @@
       </div>
       
       <div v-else class="file-content">
-        <!-- File type specific viewers -->
-        <div v-if="file.base_file_type === 'raster'" class="raster-viewer">
-          <h3>Raster File Viewer</h3>
-          <p>This is a raster file ({{ file.mime_type }}).</p>
-          <div class="preview-placeholder">
-            <i class="fas fa-image"></i>
-            <p>Raster preview would be displayed here</p>
+        <div class="content-layout">
+          <!-- Left panel: Main content -->
+          <div class="content-main">
+            <!-- Collection viewer -->
+            <div v-if="file.object_type === 'tree'" class="collection-viewer">
+              <div class="collection-info">
+                <h3>Collection: {{ file.name || 'Untitled Collection' }}</h3>
+                <p class="collection-description">
+                  This is a collection containing {{ file.entries?.length || 0 }} items.
+                </p>
+                <div class="collection-stats">
+                  <div class="stat-item">
+                    <span class="stat-label">Items:</span>
+                    <span class="stat-value">{{ file.entries?.length || 0 }}</span>
+                  </div>
+                  <div class="stat-item">
+                    <span class="stat-label">Created:</span>
+                    <span class="stat-value">{{ formatDate(file.created_at) }}</span>
+                  </div>
+                </div>
+              </div>
+              
+              <div class="collection-content">
+                <p>This is a collection of files. You can view the contents below.</p>
+                
+                <!-- Collection files list -->
+                <CollectionFilesList 
+                  :ref-name="props.refName"
+                  :collection-path="props.treePath"
+                  @files-updated="handleCollectionFilesUpdated"
+                  ref="collectionFilesList"
+                />
+              </div>
+            </div>
+            
+            <!-- File viewer -->
+            <div v-else class="file-viewer">
+              <!-- Interactive Map for GeoTIFF files -->
+              <InteractiveMap 
+                v-if="isGeoTiff && file"
+                :fileId="file.id"
+                :filename="file.name"
+                class="interactive-map-container"
+              />
+              
+              <!-- Vector file content -->
+              <div v-else-if="file.base_file_type === 'vector'" class="vector-content">
+                <h3>Vector File</h3>
+                <p>This is a vector file ({{ file.mime_type }}).</p>
+                <div class="preview-placeholder">
+                  <i class="fas fa-draw-polygon"></i>
+                  <p>Vector preview would be displayed here</p>
+                </div>
+              </div>
+              
+              <!-- Generic file content -->
+              <div v-else class="generic-content">
+                <h3>File Content</h3>
+                <p>File type: {{ file.mime_type }}</p>
+                <div class="preview-placeholder">
+                  <i class="fas fa-file"></i>
+                  <p>File preview would be displayed here</p>
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
-        
-        <div v-else-if="file.base_file_type === 'vector'" class="vector-viewer">
-          <h3>Vector File Viewer</h3>
-          <p>This is a vector file ({{ file.mime_type }}).</p>
-          <div class="preview-placeholder">
-            <i class="fas fa-draw-polygon"></i>
-            <p>Vector preview would be displayed here</p>
-          </div>
-        </div>
-        
-        <div v-else class="generic-viewer">
-          <h3>File Viewer</h3>
-          <p>File type: {{ file.mime_type }}</p>
-          <div class="preview-placeholder">
-            <i class="fas fa-file"></i>
-            <p>File preview would be displayed here</p>
-          </div>
-        </div>
 
-        <!-- File tags -->
-        <div v-if="file.tags && Object.keys(file.tags).length > 0" class="file-tags">
-          <h3>File Properties</h3>
-          <div class="tags-grid">
-            <div v-for="(value, key) in file.tags" :key="key" class="tag-item">
-              <span class="tag-key">{{ key }}:</span>
-              <span class="tag-value">{{ value }}</span>
+          <!-- Right panel: Object Information -->
+          <div class="content-sidebar">
+            <!-- Unified Object Type and Properties section -->
+            <div v-if="selectedType || (file.tags && Object.keys(file.tags).length > 0)" class="unified-properties-section">
+              <h3>Object Information</h3>
+              
+              <!-- Object type display -->
+              <div v-if="selectedType" class="object-type-display">
+                <div class="preset-icon-container">
+                  <span v-html="selectedType.icon" class="preset-icon"></span>
+                </div>
+                <div class="object-type-info">
+                  <div class="object-type-name">{{ selectedType.name }}</div>
+                  <div class="object-type-description">
+                    Matched based on file tags and properties
+                  </div>
+                </div>
+              </div>
+
+              <!-- Object properties using field definitions -->
+              <div v-if="file.tags && Object.keys(file.tags).length > 0" class="properties-section">
+                <h4>Properties</h4>
+                <div v-if="selectedFields.length > 0" class="properties-grid">
+                  <div v-for="field in selectedFields" :key="field.key" class="property-item">
+                    <span class="property-label">{{ field.label || field.key }}:</span>
+                    <span class="property-value">{{ file.tags[field.key] || 'Not set' }}</span>
+                  </div>
+                </div>
+                <div v-else class="tags-grid">
+                  <div v-for="(value, key) in file.tags" :key="key" class="tag-item">
+                    <span class="tag-key">{{ key }}:</span>
+                    <span class="tag-value">{{ value }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- File Information section -->
+            <div class="file-info-section">
+              <h3>File Information</h3>
+              <div class="info-grid">
+                <div class="info-item">
+                  <span class="info-label">Name:</span>
+                  <span class="info-value">{{ file.original_name || file.name }}</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">Type:</span>
+                  <span class="info-value">{{ fileTypeLabel }}</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">MIME Type:</span>
+                  <span class="info-value">{{ file.mime_type || 'Unknown' }}</span>
+                </div>
+                <div class="info-item" v-if="file.file_size">
+                  <span class="info-label">Size:</span>
+                  <span class="info-value">{{ formatFileSize(file.file_size) }}</span>
+                </div>
+                <div class="info-item" v-if="file.created_at">
+                  <span class="info-label">Created:</span>
+                  <span class="info-value">{{ formatDate(file.created_at) }}</span>
+                </div>
+                <div class="info-item" v-if="file.updated_at">
+                  <span class="info-label">Modified:</span>
+                  <span class="info-value">{{ formatDate(file.updated_at) }}</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -93,6 +192,10 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import InteractiveMap from './InteractiveMap.vue'
+import CollectionFilesList from './CollectionFilesList.vue'
+import { matchTagsToPreset } from '../utils/tagMatcher.js'
+import { loadFieldDefinitions, resolveFields } from '../utils/fieldResolver.js'
 import apiService from '../services/api.js'
 
 const route = useRoute()
@@ -102,6 +205,11 @@ const router = useRouter()
 const file = ref(null)
 const loading = ref(false)
 const error = ref(null)
+
+// Field definitions and presets (reused from FileEditor)
+const allPresets = ref([])
+const allFieldDefinitions = ref({})
+const selectedType = ref(null)
 
 const props = defineProps({
   refName: {
@@ -117,36 +225,52 @@ const props = defineProps({
 
 // Computed
 const fileIcon = computed(() => {
-  if (!file.value) return ''
-  
-  const fileType = file.value.base_file_type || 'raw'
-  switch (fileType) {
+  switch (fileType.value) {
     case 'raster':
       return `<svg width="40" height="40" viewBox="0 0 40 40">
-        <rect x="4" y="8" width="32" height="24" rx="4" fill="#e0e7ef" stroke="#7faaff" stroke-width="2"/>
+        <rect x="2" y="6" width="36" height="28" rx="4" fill="#e0e7ef" stroke="#7faaff" stroke-width="2"/>
         <circle cx="14" cy="24" r="4" fill="#7faaff"/>
         <rect x="20" y="16" width="12" height="8" fill="#b3d1ff"/>
         <path d="M6 6l4 4M10 6l4 4M14 6l4 4" stroke="#7faaff" stroke-width="1" fill="none"/>
       </svg>`
     case 'vector':
       return `<svg width="40" height="40" viewBox="0 0 40 40">
-        <rect x="4" y="8" width="32" height="24" rx="4" fill="#e0f7e7" stroke="#2ecc71" stroke-width="2"/>
+        <rect x="2" y="6" width="36" height="28" rx="4" fill="#e0f7e7" stroke="#2ecc71" stroke-width="2"/>
         <circle cx="12" cy="28" r="3" fill="#2ecc71"/>
         <circle cx="28" cy="14" r="3" fill="#2ecc71"/>
         <line x1="12" y1="28" x2="28" y2="14" stroke="#27ae60" stroke-width="2"/>
         <path d="M6 6l4 4M10 6l4 4M14 6l4 4" stroke="#2ecc71" stroke-width="1" fill="none"/>
       </svg>`
-    default:
+    case 'raw':
       return `<svg width="40" height="40" viewBox="0 0 40 40">
-        <rect x="6" y="8" width="28" height="24" rx="4" fill="#f7f7e7" stroke="#6c757d" stroke-width="2"/>
+        <rect x="4" y="6" width="32" height="28" rx="4" fill="#f7f7e7" stroke="#6c757d" stroke-width="2"/>
         <rect x="12" y="16" width="16" height="2" fill="#6c757d"/>
         <rect x="12" y="22" width="10" height="2" fill="#6c757d"/>
         <rect x="12" y="28" width="14" height="2" fill="#6c757d"/>
+      </svg>`
+    case 'collection':
+      return `<svg width="40" height="40" viewBox="0 0 40 40">
+        <rect x="3" y="8" width="34" height="24" rx="4" fill="#ffe082" stroke="#ffb300" stroke-width="2"/>
+        <path d="M3 8l4-6h12l4 6" fill="#ffe082" stroke="#ffb300" stroke-width="2"/>
+        <rect x="8" y="14" width="4" height="2" fill="#ffb300"/>
+        <rect x="14" y="14" width="4" height="2" fill="#ffb300"/>
+        <rect x="20" y="14" width="4" height="2" fill="#ffb300"/>
+        <rect x="8" y="18" width="4" height="2" fill="#ffb300"/>
+        <rect x="14" y="18" width="4" height="2" fill="#ffb300"/>
+        <rect x="20" y="18" width="4" height="2" fill="#ffb300"/>
+      </svg>`
+    default:
+      return `<svg width="40" height="40" viewBox="0 0 40 40">
+        <rect x="6" y="6" width="28" height="28" rx="6" fill="#f8f9fa" stroke="#dee2e6" stroke-width="2"/>
+        <path d="M12 12h16M12 16h12M12 20h8" stroke="#6c757d" stroke-width="2" fill="none"/>
       </svg>`
   }
 })
 
 // Methods
+// Dynamically import all presets (reused from FileEditor)
+const presetModules = import.meta.glob('../data/presets/*/*.json', { eager: true })
+
 async function loadFile() {
   if (!props.treePath) {
     error.value = 'No file path provided'
@@ -157,30 +281,24 @@ async function loadFile() {
   error.value = null
   
   try {
-    // This is a dummy implementation - in real app you'd fetch the file data
-    // const response = await apiService.getTreeEntry(props.refName, props.treePath)
-    // file.value = response.object
+    const response = await apiService.getTreeEntry(props.refName, props.treePath)
+    if (!response || !response.object) {
+      throw new Error('File not found')
+    }
     
-    // For now, create a dummy file object
-    file.value = {
-      id: 'dummy-id',
-      name: 'dummy-file',
-      original_name: 'Sample File',
-      file_size: 1024 * 1024, // 1MB
-      mime_type: 'application/octet-stream',
-      base_file_type: 'raw',
-      tags: {
-        name: 'Sample File',
-        description: 'This is a sample file for demonstration purposes',
-        author: 'Demo User',
-        version: '1.0'
-      },
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
+    file.value = response.object
+    // Store the object type for UI rendering
+    file.value.object_type = response.object_type
+
+    // Set initial type based on file tags (reused from FileEditor)
+    if (file.value && file.value.tags) {
+      const matchedPreset = matchTagsToPreset(file.value.tags, allPresets.value)
+      selectedType.value = matchedPreset
     }
   } catch (err) {
     console.error('Failed to load file:', err)
     error.value = err.message || 'Failed to load file'
+    file.value = null
   } finally {
     loading.value = false
   }
@@ -202,9 +320,65 @@ function goBack() {
   router.back()
 }
 
+function getDisplayName() {
+  if (!file.value) return 'Untitled'
+  
+  if (file.value.object_type === 'tree') {
+    return file.value.tags?.name || file.value.name || 'Untitled Collection'
+  } else {
+    return file.value.tags?.name || file.value.original_name || file.value.name || 'Untitled File'
+  }
+}
+
+
+
+// File type detection and labels (reused from FileEditor)
+const fileType = computed(() => {
+  // Check if this is a collection first
+  if (file.value?.object_type === 'tree') {
+    return 'collection'
+  }
+  return file.value?.base_file_type || 'raw'
+})
+
+const fileTypeLabel = computed(() => {
+  const labels = {
+    'raster': 'Georeferenced Raster Image',
+    'vector': 'Georeferenced Vector File', 
+    'raw': 'Regular File',
+    'collection': 'File Collection',
+  }
+  return labels[fileType.value] || 'Unknown Type'
+})
+
+// Check if file is a GeoTIFF (raster type)
+const isGeoTiff = computed(() => {
+  return fileType.value === 'raster'
+})
+
+// Handle collection files updates
+function handleCollectionFilesUpdated(files) {
+  // Update the collection entries count if needed
+  if (file.value && file.value.object_type === 'tree') {
+    file.value.entries = files
+  }
+}
+
+// Resolve field keys to full field definitions (reused from FileEditor)
+const selectedFields = computed(() => {
+  if (!selectedType.value || !selectedType.value.fields) {
+    return []
+  }
+  return resolveFields(selectedType.value.fields, allFieldDefinitions.value)
+})
+
 // Lifecycle
-onMounted(() => {
-  loadFile()
+onMounted(async () => {
+  // Load all field definitions and presets (reused from FileEditor)
+  allPresets.value = Object.values(presetModules).map(module => module.default || module)
+  console.log('Loaded presets:', allPresets.value)
+  allFieldDefinitions.value = await loadFieldDefinitions()
+  await loadFile()
 })
 
 // Watch for prop changes
@@ -215,25 +389,24 @@ watch(() => [props.refName, props.treePath], () => {
 
 <style scoped>
 .file-viewer {
-  height: 100vh;
   display: flex;
   flex-direction: column;
   background: #f8f9fa;
+  overflow: hidden;
 }
 
 .viewer-header {
   background: white;
-  border-bottom: 1px solid #e9ecef;
+  border-bottom: 1px solid #eee;
   padding: 1rem;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
 }
 
 .header-content {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  max-width: 1200px;
-  margin: 0 auto;
+  width: 100%;
 }
 
 .file-info {
@@ -309,8 +482,23 @@ watch(() => [props.refName, props.treePath], () => {
 
 .viewer-content {
   flex: 1;
-  padding: 2rem;
+  padding: 1rem;
   overflow-y: auto;
+}
+
+.content-layout {
+  display: flex;
+  gap: 2rem;
+}
+
+.content-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.content-sidebar {
+  width: 350px;
+  flex-shrink: 0;
 }
 
 .loading, .error, .not-found {
@@ -363,8 +551,7 @@ watch(() => [props.refName, props.treePath], () => {
 }
 
 .file-content {
-  max-width: 1000px;
-  margin: 0 auto;
+  width: 100%;
 }
 
 .raster-viewer, .vector-viewer, .generic-viewer {
@@ -424,5 +611,254 @@ watch(() => [props.refName, props.treePath], () => {
 .tag-value {
   color: #333;
   word-break: break-word;
+}
+
+/* Collection viewer styles */
+.collection-viewer {
+  width: 100%;
+}
+
+.collection-info {
+  background: white;
+  border-radius: 8px;
+  padding: 2rem;
+  margin-bottom: 2rem;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.collection-description {
+  color: #666;
+  margin-bottom: 1.5rem;
+}
+
+.collection-stats {
+  display: flex;
+  gap: 2rem;
+  margin-bottom: 1.5rem;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.stat-label {
+  font-size: 0.9rem;
+  color: #666;
+  margin-bottom: 0.25rem;
+}
+
+.stat-value {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #333;
+}
+
+.collection-actions {
+  text-align: center;
+}
+
+.view-collection-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  background: #007bff;
+  color: white;
+  text-decoration: none;
+  border-radius: 6px;
+  font-weight: 500;
+  transition: background-color 0.15s;
+}
+
+.view-collection-btn:hover {
+  background: #0056b3;
+}
+
+/* File viewer styles */
+.file-viewer {
+  width: 100%;
+}
+
+/* File info section in sidebar */
+.file-info-section {
+  background: white;
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin-top: 1.5rem;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.file-info-section h3 {
+  margin: 0 0 1rem 0;
+  font-size: 1.2rem;
+  color: #333;
+}
+
+.info-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.info-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 0.75rem;
+  background: #f8f9fa;
+  border-radius: 6px;
+  border: 1px solid #e9ecef;
+}
+
+.info-label {
+  font-size: 0.9rem;
+  color: #495057;
+  font-weight: 500;
+  min-width: 80px;
+}
+
+.info-value {
+  font-size: 0.9rem;
+  color: #212529;
+  text-align: right;
+  word-break: break-word;
+  max-width: 200px;
+}
+
+/* Content sections */
+.raster-content,
+.vector-content,
+.generic-content {
+  background: white;
+  border-radius: 8px;
+  padding: 2rem;
+  margin-bottom: 2rem;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* Unified properties section */
+.unified-properties-section {
+  background: white;
+  border-radius: 8px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  top: 1rem;
+}
+
+.unified-properties-section h3 {
+  margin: 0 0 1rem 0;
+  font-size: 1.2rem;
+  color: #333;
+}
+
+.object-type-display {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
+}
+
+.preset-icon-container {
+  flex-shrink: 0;
+}
+
+.preset-icon {
+  display: block;
+  width: 32px;
+  height: 32px;
+}
+
+.object-type-info {
+  flex: 1;
+}
+
+.object-type-name {
+  font-weight: 600;
+  font-size: 1.1rem;
+  color: #212529;
+  margin-bottom: 0.25rem;
+}
+
+.object-type-description {
+  font-size: 0.9rem;
+  color: #6c757d;
+}
+
+.properties-section {
+  margin-top: 1.5rem;
+}
+
+.properties-section h4 {
+  margin: 0 0 1rem 0;
+  font-size: 1rem;
+  color: #333;
+  font-weight: 600;
+}
+
+.properties-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.property-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 0.75rem;
+  background: #f8f9fa;
+  border-radius: 6px;
+  border: 1px solid #e9ecef;
+}
+
+.property-label {
+  font-weight: 500;
+  color: #333;
+  font-size: 0.9rem;
+}
+
+.property-value {
+  color: #666;
+  word-break: break-word;
+  font-size: 1rem;
+}
+
+/* Fallback for raw tags */
+.object-tags {
+  background: white;
+  border-radius: 8px;
+  padding: 2rem;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* Interactive map container */
+.interactive-map-container {
+  background: white;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 2rem;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  min-height: 400px;
+  height: 80vh;
+}
+
+/* Collection content */
+.collection-content {
+  background: white;
+  border-radius: 8px;
+  padding: 2rem;
+  margin-bottom: 2rem;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.collection-content p {
+  color: #666;
+  margin-bottom: 1.5rem;
 }
 </style> 

@@ -36,6 +36,7 @@ export function resolveFields(fieldKeys, allFieldDefinitions) {
       // Auto-create a simple text field for undefined fields
       return {
         name: key,
+        key: key,
         type: 'str',
         label: formatFieldLabel(key)
       }
@@ -44,6 +45,7 @@ export function resolveFields(fieldKeys, allFieldDefinitions) {
     // Map field definition format to our component format
     return {
       name: fieldDef.key,
+      key: fieldDef.key,
       type: mapFieldType(fieldDef.type),
       label: fieldDef.label,
       values: fieldDef.strings?.options ? Object.keys(fieldDef.strings.options) : undefined,

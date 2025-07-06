@@ -143,19 +143,19 @@ class ApiService {
     return await fetch('http://localhost:8000/health').then(res => res.json())
   }
 
-  // Update a file object in a tree (by tree entry)
-  async updateObjectInTree(refName, treeEntryId, tags) {
-    if (!refName || !treeEntryId) throw new Error('refName and treeEntryId are required')
-    return await this.request(`/${refName}/${treeEntryId}`, {
+  // Update a file object in a tree (by path)
+  async updateObjectInTree(refName, path, tags) {
+    if (!refName || !path) throw new Error('refName and path are required')
+    return await this.request(`/${refName}/${path}`, {
       method: 'PUT',
       body: JSON.stringify({ tags }),
     })
   }
 
-  // Get a single tree entry (file) by refName and treeEntryId
-  async getTreeEntry(refName, treeEntryId) {
-    if (!refName || !treeEntryId) throw new Error('refName and treeEntryId are required')
-    const response = await this.request(`/${refName}/${treeEntryId}`)
+  // Get a single tree entry (file) by refName and path
+  async getTreeEntry(refName, path) {
+    if (!refName || !path) throw new Error('refName and path are required')
+    const response = await this.request(`/${refName}/${path}`)
 
     return response;
   }
