@@ -50,7 +50,8 @@ function handleBranchChange(branch) {
       params: { 
         ...route.params,
         branch: branch.name,
-      }
+      },
+      query: route.query
     })
   }
 }

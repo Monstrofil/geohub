@@ -14,7 +14,7 @@
           </div>
         </div>
         <div class="header-actions">
-          <router-link :to="{name: 'FileEditor', params: { treePath: $route.params.treePath }}" class="edit-btn">
+          <router-link :to="{name: 'FileEditor', query: { treePath: $route.query.treePath }}" class="edit-btn">
             <i class="fas fa-edit"></i>
             Edit
           </router-link>
@@ -91,7 +91,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import apiService from '../services/api.js'
 
@@ -148,7 +148,7 @@ const fileIcon = computed(() => {
 
 // Methods
 async function loadFile() {
-  if (!route.params.treePath) {
+  if (!props.treePath) {
     error.value = 'No file path provided'
     return
   }
@@ -158,7 +158,7 @@ async function loadFile() {
   
   try {
     // This is a dummy implementation - in real app you'd fetch the file data
-    // const response = await apiService.getTreeEntry(route.params.refName, route.params.treePath)
+    // const response = await apiService.getTreeEntry(props.refName, props.treePath)
     // file.value = response.object
     
     // For now, create a dummy file object
@@ -204,6 +204,11 @@ function goBack() {
 
 // Lifecycle
 onMounted(() => {
+  loadFile()
+})
+
+// Watch for prop changes
+watch(() => [props.refName, props.treePath], () => {
   loadFile()
 })
 </script>

@@ -1,13 +1,13 @@
 <template>
   <div class="tree-card-container">
-    <router-link :to="{name: 'FileList', params: { treePath: fullPath }}">
+    <router-link :to="{name: 'FileList', query: { treePath: fullPath }}">
       <div class="tree-card" :class="{ 'selected': selected }">
         <div class="tree-icon" v-html="icon"></div>
         <div class="tree-name">Name {{ name }}</div>
         <div class="tree-name tree-path">{{ path }}</div>
       </div>
     </router-link>
-    <router-link :to="{name: 'FileEditor', params: { treePath: fullPath }}">
+    <router-link :to="{name: 'FileEditor', query: { treePath: fullPath }}">
       <button 
         class="edit-btn" 
         title="Edit collection"

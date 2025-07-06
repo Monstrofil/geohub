@@ -11,22 +11,31 @@ const routes = [
     component: Explorer,
     children: [
       {
-          path: ':treePath(.*)/edit',
+          path: 'edit',
           name: 'FileEditor',
           component: FileEditor,
-          props: true
+          props: route => ({ 
+            refName: route.params.branch,
+            treePath: route.query.treePath 
+          })
       },
       {
-          path: ':treePath*/view',
+          path: 'list',
           name: 'FileList',
           component: FileList,
-          props: true
+          props: route => ({ 
+            refName: route.params.branch,
+            treePath: route.query.treePath 
+          })
       },
       {
-          path: ':treePath*/view',
+          path: 'view',
           name: 'FileViewer',
           component: FileViewer,
-          props: true
+          props: route => ({ 
+            refName: route.params.branch,
+            treePath: route.query.treePath 
+          })
       },
     ],
     props: true

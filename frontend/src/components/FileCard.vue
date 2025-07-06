@@ -1,12 +1,12 @@
 <template>
   <div class="file-card-container">
-    <router-link :to="{name: 'FileViewer', params: { treePath: fullPath }}">
+    <router-link :to="{name: 'FileViewer', query: { treePath: fullPath }}">
       <div class="file-card" :class="{ 'selected': selected }">
         <div class="file-icon" v-html="icon"></div>
         <div class="file-name">{{ name }}</div>
       </div>
     </router-link>
-    <router-link :to="{name: 'FileEditor', params: { treePath: fullPath }}">
+    <router-link :to="{name: 'FileEditor', query: { treePath: fullPath }}">
       <button 
         class="edit-btn" 
         title="Edit file"
