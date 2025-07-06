@@ -144,7 +144,14 @@
             </div>
             <div class="collection-content">
               <p>Це колекція файлів. Ви можете редагувати теги колекції в панелі зліва.</p>
-              <p class="collection-note">Для перегляду вмісту колекції використовуйте кнопку "Переглянути вміст" у списку файлів.</p>
+              
+              <!-- Collection files list -->
+              <CollectionFilesList 
+                :commit-id="props.commitId"
+                :collection-path="treePathString"
+                @files-updated="handleCollectionFilesUpdated"
+                ref="collectionFilesList"
+              />
               
               <!-- Add existing files to collection -->
               <div class="add-files-section">
@@ -212,6 +219,7 @@ import ObjectTypeSelector from './ObjectTypeSelector.vue'
 import TagList from './TagList.vue'
 import InteractiveMap from './InteractiveMap.vue'
 import FileChooser from './FileChooser.vue'
+import CollectionFilesList from './CollectionFilesList.vue'
 import { matchTagsToPreset } from '../utils/tagMatcher.js'
 import { loadFieldDefinitions, resolveFields } from '../utils/fieldResolver.js'
 import apiService from '../services/api.js'
@@ -247,6 +255,9 @@ const showFileChooser = ref(false)
 const fileChooserPath = ref('')
 const isAddingFile = ref(false)
 const addFileStatus = ref(null)
+
+// Collection files list ref
+const collectionFilesList = ref(null)
 
 // Tags editor state
 const selectedType = ref(null)
@@ -288,6 +299,8 @@ async function loadFile() {
       const matchedPreset = matchTagsToPreset(file.value.tags, allPresets.value)
       selectedType.value = matchedPreset
     }
+    
+    // Collection files will be loaded by the CollectionFilesList component
   } catch (e) {
     error.value = e.message || 'Failed to load file'
     file.value = null
@@ -295,6 +308,8 @@ async function loadFile() {
     loading.value = false
   }
 }
+
+
 
 onMounted(async () => {
   allPresets.value = Object.values(presetModules)
@@ -523,6 +538,11 @@ async function handleFilesAdded(selectedFiles) {
     // Reload the file to update the entries count
     await loadFile()
     
+    // Reload collection files to show the newly added files
+    if (collectionFilesList.value) {
+      await collectionFilesList.value.reload()
+    }
+    
     // Clear success message after 3 seconds
     setTimeout(() => {
       addFileStatus.value = null
@@ -541,6 +561,14 @@ async function handleFilesAdded(selectedFiles) {
     }, 5000)
   } finally {
     isAddingFile.value = false
+  }
+}
+
+// Handle collection files updates
+function handleCollectionFilesUpdated(files) {
+  // Update the collection entries count if needed
+  if (file.value && isCollection.value) {
+    file.value.entries = files
   }
 }
 </script>
@@ -1026,4 +1054,6 @@ async function handleFilesAdded(selectedFiles) {
 .add-file-error svg {
   flex-shrink: 0;
 }
+
+
 </style> 
