@@ -14,6 +14,28 @@
         </button>
       </div>
     </h3>
+    
+    <!-- Breadcrumb navigation -->
+    <div class="breadcrumb">
+      <button 
+        @click="navigateToRoot" 
+        class="breadcrumb-item"
+        :class="{ active: treePathString === '' }"
+      >
+        Корінь
+      </button>
+      <template v-for="(segment, index) in pathSegments" :key="index">
+        <span class="breadcrumb-separator">/</span>
+        <button 
+          @click="navigateToPath(index)"
+          class="breadcrumb-item"
+          :class="{ active: index === pathSegments.length - 1 }"
+        >
+          {{ segment }}
+        </button>
+      </template>
+    </div>
+    
     <div v-if="loading" class="loading">Завантаження файлів...</div>
     <div v-else-if="error" class="error">{{ error }}</div>
     <div v-else class="disclosure-wrap disclosure-wrap-feature_list">
@@ -122,6 +144,7 @@
 
 <script setup>
 import { ref, watch, onMounted, defineProps, defineEmits, computed } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import FileCard from './FileCard.vue'
 import TreeCard from './TreeCard.vue'
 import apiService from '../services/api.js'
@@ -134,6 +157,9 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['refresh', 'select-file', 'file-selected', 'files-loaded', 'file-uploaded', 'branch-created', 'object-removed', 'object-cloned'])
+
+const router = useRouter()
+const route = useRoute()
 
 const files = ref([])
 const loading = ref(false)
@@ -158,6 +184,11 @@ const treePathString = computed(() => {
   return props.treePath || ''
 })
 
+// Breadcrumb path segments
+const pathSegments = computed(() => {
+  return treePathString.value ? treePathString.value.split('/').filter(Boolean) : []
+})
+
 async function loadFiles() {
   loading.value = true
   error.value = null
@@ -180,6 +211,23 @@ async function loadFiles() {
 function handleRefresh() {
   loadFiles()
   emit('refresh')
+}
+
+function navigateToRoot() {
+  router.push({
+    name: 'FileList',
+    params: { branch: props.refName },
+    query: { treePath: '' }
+  })
+}
+
+function navigateToPath(index) {
+  const newPath = pathSegments.value.slice(0, index + 1).join('/')
+  router.push({
+    name: 'FileList',
+    params: { branch: props.refName },
+    query: { treePath: newPath }
+  })
 }
 
 function selectFile(file) {
@@ -682,5 +730,42 @@ watch(() => props.treePath, loadFiles)
   font-weight: 500;
   color: #333;
   transition: all 0.15s;
+}
+
+/* Breadcrumb styles */
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  padding: 0.75rem 0;
+  background: #f8f9fa;
+  border-bottom: 1px solid #e9ecef;
+  overflow-x: auto;
+  margin-bottom: 1rem;
+}
+
+.breadcrumb-item {
+  background: none;
+  border: none;
+  color: #007bff;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.breadcrumb-item:hover {
+  background: #e3f2fd;
+}
+
+.breadcrumb-item.active {
+  color: #333;
+  font-weight: 500;
+}
+
+.breadcrumb-separator {
+  color: #666;
+  margin: 0 0.25rem;
 }
 </style> 
