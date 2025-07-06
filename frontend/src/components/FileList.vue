@@ -38,6 +38,24 @@
     
     <div v-if="loading" class="loading">Завантаження файлів...</div>
     <div v-else-if="error" class="error">{{ error }}</div>
+    <div v-else-if="files.length === 0" class="empty-state">
+      <div class="empty-icon">📁</div>
+      <h3>Папка порожня</h3>
+      <p v-if="treePathString === ''">
+        У кореневій папці поки немає файлів або папок. 
+        <br>Створіть нову колекцію або завантажте файл, щоб почати роботу.
+      </p>
+      <p v-else>
+        У папці "{{ pathSegments[pathSegments.length - 1] }}" поки немає файлів.
+        <br>Перейдіть до батьківської папки або створіть новий вміст.
+      </p>
+      <div class="empty-actions">
+        <button @click="showUploadModal = true" class="btn btn-primary">
+          <i class="fas fa-plus"></i>
+          Додати файл
+        </button>
+      </div>
+    </div>
     <div v-else class="disclosure-wrap disclosure-wrap-feature_list">
       <div class="feature-list">
         <component 
@@ -767,5 +785,78 @@ watch(() => props.treePath, loadFiles)
 .breadcrumb-separator {
   color: #666;
   margin: 0 0.25rem;
+}
+
+/* Empty state styles */
+.empty-state {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: #666;
+  background: #f8f9fa;
+  border-radius: 8px;
+  margin: 1rem 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.empty-icon {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+  opacity: 0.5;
+}
+
+.empty-state h3 {
+  margin: 0 0 1rem 0;
+  color: #333;
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.empty-state p {
+  margin: 0 0 2rem 0;
+  font-size: 1rem;
+  line-height: 1.5;
+  color: #666;
+}
+
+.empty-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-decoration: none;
+}
+
+.btn-primary {
+  background: #007bff;
+  color: white;
+}
+
+.btn-primary:hover {
+  background: #0056b3;
+}
+
+.btn-secondary {
+  background: #6c757d;
+  color: white;
+}
+
+.btn-secondary:hover {
+  background: #5a6268;
 }
 </style> 
