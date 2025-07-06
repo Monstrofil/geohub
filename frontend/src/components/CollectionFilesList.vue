@@ -81,7 +81,7 @@ import { useRouter } from 'vue-router'
 import apiService from '../services/api.js'
 
 const props = defineProps({
-  commitId: {
+  refName: {
     type: [String, Number],
     required: true
   },
@@ -103,7 +103,7 @@ async function loadCollectionFiles() {
   loading.value = true
   error.value = null
   try {
-    const response = await apiService.getObjects(props.commitId, props.collectionPath)
+    const response = await apiService.getObjects(props.refName, props.collectionPath)
     collectionFiles.value = response.files || []
     emit('files-updated', collectionFiles.value)
   } catch (e) {
@@ -197,7 +197,7 @@ async function deleteFile(entry) {
   
   try {
     const filePath = props.collectionPath + '/' + entry.path
-    await apiService.removeObjectInTree(props.commitId, filePath)
+          await apiService.removeObjectInTree(props.refName, filePath)
     
     // Reload collection files to update the list
     await loadCollectionFiles()
@@ -220,7 +220,7 @@ onMounted(() => {
 })
 
 // Watch for changes in props
-watch(() => [props.commitId, props.collectionPath], loadCollectionFiles)
+watch(() => [props.refName, props.collectionPath], loadCollectionFiles)
 </script>
 
 <style scoped>

@@ -21,6 +21,15 @@ router = APIRouter(tags=["files"])
 mapserver_service = MapServerService()
 
 
+# Helper function to resolve ref name to commit
+async def get_commit_from_ref(ref_name: str) -> models.Commit:
+    """Resolve a ref name to a commit, raising HTTPException if not found"""
+    ref = await models.Ref.get_or_none(name=ref_name)
+    if not ref:
+        raise HTTPException(status_code=404, detail=f"Ref '{ref_name}' not found")
+    return await ref.commit
+
+
 # Pydantic models for request/response
 class FileResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -152,18 +161,18 @@ async def get_file_preview(file_id: uuid.UUID):
     return {"preview_url": preview_url}
 
 
-@router.get("/{commit_id}/objects", response_model=ObjectsListResponse)
-async def list_tree_root(commit_id: str):
-    return await list_tree(commit_id, path=None)
+@router.get("/{ref_name}/objects", response_model=ObjectsListResponse)
+async def list_tree_root(ref_name: str):
+    return await list_tree(ref_name, path=None)
 
 
-@router.get("/{commit_id}/{path:path}/objects", response_model=ObjectsListResponse)
-async def list_tree_by_path(commit_id: str, path: str):
-    return await list_tree(commit_id, path)
+@router.get("/{ref_name}/{path:path}/objects", response_model=ObjectsListResponse)
+async def list_tree_by_path(ref_name: str, path: str):
+    return await list_tree(ref_name, path)
 
 
-async def list_tree(commit_id: str, path: str | None = None):
-    commit = await models.Commit.get_or_none(id=commit_id)
+async def list_tree(ref_name: str, path: str | None = None):
+    commit = await get_commit_from_ref(ref_name)
 
     resolved_path = await git_service.resolve_tree(await commit.tree, path or '')
     tree = resolved_path[-1][0]
@@ -198,9 +207,9 @@ async def list_tree(commit_id: str, path: str | None = None):
     )
 
 
-@router.get("/{commit_id}/{path:path}", response_model=TreeEntryResponse)
-async def get_tree_object(commit_id: str, path: str):
-    commit = await models.Commit.get_or_none(id=commit_id)
+@router.get("/{ref_name}/{path:path}", response_model=TreeEntryResponse)
+async def get_tree_object(ref_name: str, path: str):
+    commit = await get_commit_from_ref(ref_name)
 
     entry = await git_service.resolve_entry(await commit.tree, path or '')
 
@@ -325,20 +334,18 @@ async def get_tree(tree_id: str):
         ]
     )
 
-@router.post("/{commit_id}/objects", response_model=TreeEntryResponse)
+@router.post("/{ref_name}/objects", response_model=TreeEntryResponse)
 async def add_object_in_tree(
-    commit_id: str = Path(..., description="Commit ID"),
+    ref_name: str = Path(..., description="Ref name"),
     file: UploadFile | None = None,
     path: Optional[str] = Body(...),
     name: Optional[str] = Body(...),
     tags: Optional[str] = Form(None)
 ):
-    """Add a new file object to a tree (by commit)."""
+    """Add a new file object to a tree (by ref)."""
     ref = await models.Ref.get_or_none(name="main")
 
-    commit = await models.Commit.get_or_none(id=commit_id)
-    if not commit:
-        raise HTTPException(status_code=404, detail="Commit not found")
+    commit = await get_commit_from_ref(ref_name)
 
     object_tags = {}
     if tags:
@@ -371,9 +378,9 @@ async def add_object_in_tree(
     )
 
 
-@router.put("/{commit_id}/{path:path}", response_model=TreeEntryResponse)
+@router.put("/{ref_name}/{path:path}", response_model=TreeEntryResponse)
 async def update_object_in_tree(
-    commit_id: str = Path(..., description="Commit ID"),
+    ref_name: str = Path(..., description="Ref name"),
     path: str = Path(..., description="TreeEntry (object) path"),
     request: ObjectUpdateRequest = None
 ):
@@ -381,9 +388,7 @@ async def update_object_in_tree(
     ref = await models.Ref.get_or_none(name="main")
 
     # Find the commit
-    commit = await models.Commit.get_or_none(id=commit_id)
-    if not commit:
-        raise HTTPException(status_code=404, detail="Commit not found")
+    commit = await get_commit_from_ref(ref_name)
 
     entry = await git_service.resolve_entry(await commit.tree, path)
     if not entry:
@@ -463,18 +468,16 @@ async def update_object_in_tree(
     )
 
 
-@router.delete("/{commit_id}/{path:path}")
+@router.delete("/{ref_name}/{path:path}")
 async def remove_object_in_tree(
-    commit_id: str = Path(..., description="Commit ID"),
+    ref_name: str = Path(..., description="Ref name"),
     path: str = Path(..., description="TreeEntry (object) path")
 ):
     """Remove a file or collection object from a tree (by tree entry)."""
     ref = await models.Ref.get_or_none(name="main")
 
     # Find the commit
-    commit = await models.Commit.get_or_none(id=commit_id)
-    if not commit:
-        raise HTTPException(status_code=404, detail="Commit not found")
+    commit = await get_commit_from_ref(ref_name)
 
     # Resolve the entry to get object information for the commit message
     entry = await git_service.resolve_entry(await commit.tree, path)
@@ -497,18 +500,16 @@ class CloneObjectRequest(BaseModel):
     target_path: str
 
 
-@router.post("/{commit_id}/clone", response_model=TreeEntryResponse)
+@router.post("/{ref_name}/clone", response_model=TreeEntryResponse)
 async def clone_object_in_tree(
-    commit_id: str = Path(..., description="Commit ID"),
+    ref_name: str = Path(..., description="Ref name"),
     request: CloneObjectRequest = Body(..., description="Clone request with source and target paths")
 ):
     """Clone a file or collection object from one path to another (keeping the same object reference)."""
     ref = await models.Ref.get_or_none(name="main")
 
     # Find the commit
-    commit = await models.Commit.get_or_none(id=commit_id)
-    if not commit:
-        raise HTTPException(status_code=404, detail="Commit not found")
+    commit = await get_commit_from_ref(ref_name)
 
     # Resolve the source entry
     source_entry = await git_service.resolve_entry(await commit.tree, request.source_path)

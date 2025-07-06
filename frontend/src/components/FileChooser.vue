@@ -107,7 +107,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import apiService from '../services/api.js'
 
 const props = defineProps({
-  commitId: { type: String, required: true },
+  refName: { type: String, required: true },
   currentPath: { type: String, default: '' }
 })
 
@@ -129,7 +129,7 @@ async function loadFiles() {
   loading.value = true
   error.value = null
   try {
-    const response = await apiService.getObjects(props.commitId, props.currentPath, 0, 100)
+    const response = await apiService.getObjects(props.refName, props.currentPath, 0, 100)
     files.value = response.files || []
   } catch (err) {
     console.error('Failed to load files:', err)

@@ -40,7 +40,7 @@ const props = defineProps({
   selected: { type: Boolean, default: false },
   path: { type: String, required: true },
   treePath: { type: [String, Array], required: false },
-  commitId: { type: String, required: true }
+  refName: { type: String, required: true }
 })
 
 const emit = defineEmits(['edit', 'removed'])
@@ -64,7 +64,7 @@ const icon = computed(() => {
 const handleRemove = async () => {
   if (confirm(`Are you sure you want to remove collection "${props.name}"?`)) {
     try {
-      await apiService.removeObjectInTree(props.commitId, fullPath.value)
+              await apiService.removeObjectInTree(props.refName, fullPath.value)
       emit('removed', props.path)
     } catch (error) {
       console.error('Failed to remove collection:', error)

@@ -104,8 +104,8 @@ const loading = ref(false)
 const error = ref(null)
 
 const props = defineProps({
-  commitId: {
-    type: [String, Number],
+  refName: {
+    type: String,
     required: true
   },
   treePath: {
@@ -158,7 +158,7 @@ async function loadFile() {
   
   try {
     // This is a dummy implementation - in real app you'd fetch the file data
-    // const response = await apiService.getTreeEntry(route.params.commitId, route.params.treePath)
+    // const response = await apiService.getTreeEntry(route.params.refName, route.params.treePath)
     // file.value = response.object
     
     // For now, create a dummy file object

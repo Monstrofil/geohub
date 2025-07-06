@@ -5,7 +5,7 @@
     <!-- File List View -->
     <div class="pure-u-1">
       <RouterView 
-            :commit-id="currentBranch && currentBranch.commit_id"
+            :ref-name="currentBranch && currentBranch.name"
             :current-branch-name="currentBranch && currentBranch.name"
             :change-tracker="changeTracker"
             @branch-created="handleBranchCreated"

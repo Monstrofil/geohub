@@ -6,7 +6,7 @@
         <button @click="handleRefresh" class="action-btn refresh-btn" :disabled="loading">
           <i class="fas fa-sync-alt"></i> Refresh
         </button>
-        <button @click="handleEdit" class="action-btn edit-btn" :disabled="!props.commitId">
+        <button @click="handleEdit" class="action-btn edit-btn" :disabled="!props.refName">
           <i class="fas fa-edit"></i> Edit
         </button>
         <button @click="showUploadModal = true" class="action-btn upload-btn">
@@ -26,7 +26,7 @@
           :file="entry.object"
           :name="entry.object?.tags.name || entry.object?.original_name || ''"
           :tree-path="treePathString"
-          :commit-id="props.commitId"
+          :ref-name="props.refName"
           :selected="selectedEntry && selectedEntry.object && selectedEntry.object.id === entry.object?.id"
           @click="selectFile(entry.object)"
           @file-selected="handleFileSelected"
@@ -127,7 +127,7 @@ import TreeCard from './TreeCard.vue'
 import apiService from '../services/api.js'
 
 const props = defineProps({
-  commitId: { type: [String, Number], required: true },
+  refName: { type: String, required: true },
   treePath: {type: [String, Array], required: false},
   selectedEntry: { type: Object, default: null },
   currentBranchName: { type: String, required: false }
@@ -162,11 +162,11 @@ async function loadFiles() {
   loading.value = true
   error.value = null
   try {
-    if (!props.commitId) {
+    if (!props.refName) {
       files.value = []
       return
     }
-    const response = await apiService.getObjects(props.commitId, treePathString.value, 0, 100)
+    const response = await apiService.getObjects(props.refName, treePathString.value, 0, 100)
     files.value = response.files || []
     emit('files-loaded', files.value)
   } catch (err) {
@@ -210,8 +210,8 @@ function handleObjectCloned(cloneData) {
 }
 
 async function handleEdit() {
-  if (!props.commitId) {
-    error.value = 'Commit ID is required for editing'
+  if (!props.refName) {
+    error.value = 'Ref name is required for editing'
     return
   }
   
@@ -271,8 +271,8 @@ function removeTag(idx) {
 async function handleUpload() {
   uploadError.value = ''
   uploadSuccess.value = false
-  if (!props.commitId) {
-    uploadError.value = 'Commit ID is required.'
+  if (!props.refName) {
+    uploadError.value = 'Ref name is required.'
     return
   }
 
@@ -287,7 +287,7 @@ async function handleUpload() {
       if (t.key && t.value) tagObj[t.key] = t.value
     })
     try {
-      const uploaded = await apiService.uploadFile(file.value, tagObj, props.commitId, treePathString.value, name.value)
+      const uploaded = await apiService.uploadFile(file.value, tagObj, props.refName, treePathString.value, name.value)
       uploadSuccess.value = true
       emit('file-uploaded', uploaded)
       // Reload files and close modal after successful upload
@@ -311,7 +311,7 @@ async function handleUpload() {
       if (t.key && t.value) tagObj[t.key] = t.value
     })
     try {
-      const collection = await apiService.createCollection(name.value, props.commitId, treePathString.value, tagObj)
+      const collection = await apiService.createCollection(name.value, props.refName, treePathString.value, tagObj)
       uploadSuccess.value = true
       emit('file-uploaded', collection)
       // Reload files and close modal after successful upload
@@ -329,9 +329,9 @@ async function handleUpload() {
 
 const isFormValid = computed(() => {
   if (objectType.value === 'file') {
-    return file.value && props.commitId
+    return file.value && props.refName
   } else if (objectType.value === 'collection') {
-    return name.value && props.commitId
+    return name.value && props.refName
   }
   return false
 })
@@ -346,7 +346,7 @@ const uploadSuccessMessage = computed(() => {
 })
 
 onMounted(loadFiles)
-watch(() => props.commitId, loadFiles)
+watch(() => props.refName, loadFiles)
 watch(() => props.treePath, loadFiles)
 </script>
 

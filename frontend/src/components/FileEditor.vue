@@ -147,7 +147,7 @@
               
               <!-- Collection files list -->
               <CollectionFilesList 
-                :commit-id="props.commitId"
+                :ref-name="props.refName"
                 :collection-path="treePathString"
                 @files-updated="handleCollectionFilesUpdated"
                 ref="collectionFilesList"
@@ -184,7 +184,7 @@
               <div v-if="showFileChooser" class="file-chooser-modal" @click="closeFileChooser">
                 <div class="file-chooser-container" @click.stop>
                   <FileChooser 
-                    :commit-id="props.commitId"
+                    :ref-name="props.refName"
                     :current-path="fileChooserPath"
                     @close="closeFileChooser"
                     @files-added="handleFilesAdded"
@@ -231,8 +231,8 @@ const props = defineProps({
     type: Object,
     required: true
   },
-  commitId: {
-    type: [String, Number],
+  refName: {
+    type: String,
     required: true
   },
   treePath: {
@@ -288,7 +288,7 @@ async function loadFile() {
   loading.value = true
   error.value = null
   try {
-    const entry = await apiService.getTreeEntry(props.commitId, treePathString.value)
+    const entry = await apiService.getTreeEntry(props.refName, treePathString.value)
     if (!entry || !entry.object) throw new Error('File not found')
     file.value = entry.object
     // Store the object type for collection detection
@@ -317,8 +317,8 @@ onMounted(async () => {
   await loadFile()
 })
 
-// Reload file when treePath or commitId changes
-watch(() => [props.treePath, props.commitId], loadFile)
+// Reload file when treePath or refName changes
+watch(() => [props.treePath, props.refName], loadFile)
 
 // Resolve field keys to full field definitions
 const selectedFields = computed(() => {
@@ -466,7 +466,7 @@ async function processFile(uploadFileObj) {
       name: uploadFileObj.name,
     }
     // Upload file via API
-    const uploadedFile = await apiService.uploadFile(uploadFileObj, tags, props.commitId, '', uploadFileObj.name)
+            const uploadedFile = await apiService.uploadFile(uploadFileObj, tags, props.refName, '', uploadFileObj.name)
     uploadStatus.value = { state: 'success' }
     emit('file-uploaded', uploadedFile)
     setTimeout(() => {
@@ -497,7 +497,7 @@ function triggerFileSelect() {
 async function handleCommit() {
   const result = await props.changeTracker.commitChanges(async (change) => {
     if (change.type === 'tags') {
-      const updatedEntry = await apiService.updateObjectInTree(props.commitId, treePathString.value, change.data)
+              const updatedEntry = await apiService.updateObjectInTree(props.refName, treePathString.value, change.data)
       // Update the local file object with the response
       if (updatedEntry && updatedEntry.object && file.value) {
         Object.assign(file.value, updatedEntry.object)
@@ -527,7 +527,7 @@ async function handleFilesAdded(selectedFiles) {
     for (const selectedFile of selectedFiles) {
       const sourcePath = selectedFile.fullPath
       
-      await apiService.cloneObjectInTree(props.commitId, sourcePath, treePathString.value)
+              await apiService.cloneObjectInTree(props.refName, sourcePath, treePathString.value)
     }
     
     addFileStatus.value = {
