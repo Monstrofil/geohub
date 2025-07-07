@@ -3,11 +3,20 @@
     <h3>
       <span>Файли ({{ files.length }})</span>
       <div class="file-actions">
-        <button @click="handleRefresh" class="action-btn refresh-btn" :disabled="loading">
-          <i class="fas fa-sync-alt"></i> Refresh
+        <button @click="handleRefresh" class="action-btn refresh-btn" :disabled="loading" title="Оновити список файлів">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path d="M3.5 10A6.5 6.5 0 0110 3.5c1.61 0 3.09.59 4.23 1.57M16.5 10A6.5 6.5 0 0110 16.5c-1.61 0-3.09-.59-4.23-1.57" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M14.5 2.5v3.5h-3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M5.5 17.5v-3.5h3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          Оновити
         </button>
-        <button @click="showUploadModal = true" class="action-btn upload-btn">
-          <i class="fas fa-upload"></i> Upload
+        <button @click="showUploadModal = true" class="action-btn upload-btn" title="Завантажити новий файл або створити колекцію">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path d="M10 15V5M10 5L6 9M10 5l4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <rect x="4" y="15" width="12" height="2" rx="1" fill="currentColor"/>
+          </svg>
+          Завантажити
         </button>
       </div>
     </h3>
@@ -47,8 +56,11 @@
         <br>Перейдіть до батьківської папки або створіть новий вміст.
       </p>
       <div class="empty-actions">
-        <button @click="showUploadModal = true" class="btn btn-primary">
-          <i class="fas fa-plus"></i>
+        <button @click="showUploadModal = true" class="action-btn upload-btn" title="Додати файл або колекцію">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path d="M10 15V5M10 5L6 9M10 5l4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <rect x="4" y="15" width="12" height="2" rx="1" fill="currentColor"/>
+          </svg>
           Додати файл
         </button>
       </div>
@@ -229,34 +241,49 @@ watch(() => props.treePath, loadFiles)
 .action-btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 0.5rem;
-  padding: 0.5rem 1rem;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  background: white;
+  padding: 0.6rem 1.2rem;
+  border: none;
+  border-radius: 50px;
+  background: #f4f6fb;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
   cursor: pointer;
-  font-size: 0.9rem;
-  transition: all 0.15s;
+  font-size: 1rem;
+  font-weight: 500;
+  transition: background 0.15s, color 0.15s, box-shadow 0.15s, transform 0.1s;
+  outline: none;
+  position: relative;
 }
-
-.action-btn:hover:not(:disabled) {
-  background: #f8f9fa;
-  border-color: #007bff;
-  color: #007bff;
+.action-btn:active {
+  transform: scale(0.97);
 }
-
 .action-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
-
 .refresh-btn {
-  color: #666;
+  background: #e0f7fa;
+  color: #0097a7;
 }
-
 .refresh-btn:hover:not(:disabled) {
-  border-color: #2196f3;
-  color: #2196f3;
+  background: #b2ebf2;
+  color: #006064;
+  box-shadow: 0 4px 16px rgba(0,151,167,0.08);
+}
+.upload-btn {
+  background: #e3f0ff;
+  color: #1976d2;
+}
+.upload-btn:hover:not(:disabled) {
+  background: #bbdefb;
+  color: #0d47a1;
+  box-shadow: 0 4px 16px rgba(25,118,210,0.08);
+}
+.action-btn svg {
+  display: inline-block;
+  vertical-align: middle;
+  margin-right: 0.2em;
 }
 
 .feature-list {
