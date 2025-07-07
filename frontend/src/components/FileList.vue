@@ -6,9 +6,6 @@
         <button @click="handleRefresh" class="action-btn refresh-btn" :disabled="loading">
           <i class="fas fa-sync-alt"></i> Refresh
         </button>
-        <button @click="handleEdit" class="action-btn edit-btn" :disabled="!props.refName">
-          <i class="fas fa-edit"></i> Edit
-        </button>
         <button @click="showUploadModal = true" class="action-btn upload-btn">
           <i class="fas fa-upload"></i> Upload
         </button>
@@ -195,31 +192,6 @@ function handleObjectCloned(cloneData) {
   // loadFiles()
 }
 
-async function handleEdit() {
-  if (!props.refName) {
-    error.value = 'Ref name is required for editing'
-    return
-  }
-  
-  if (!props.currentBranchName) {
-    error.value = 'Current branch name is required for editing'
-    return
-  }
-  
-  try {
-    // Generate a UUID for the new branch
-    const uuid = crypto.randomUUID()
-    const branchName = `refs/changes/${uuid}`
-    const newBranch = await apiService.createBranch(branchName, props.currentBranchName)
-    emit('branch-created', newBranch)
-    // You might want to navigate to the new branch or show a success message
-    console.log('Created new branch:', newBranch)
-  } catch (err) {
-    console.error('Failed to create edit branch:', err)
-    error.value = 'Помилка створення гілки для редагування: ' + err.message
-  }
-}
-
 // Upload modal functions
 function closeModal() {
   showUploadModal.value = false
@@ -285,24 +257,6 @@ watch(() => props.treePath, loadFiles)
 .refresh-btn:hover:not(:disabled) {
   border-color: #2196f3;
   color: #2196f3;
-}
-
-.edit-btn {
-  color: #666;
-}
-
-.edit-btn:hover:not(:disabled) {
-  border-color: #ff9800;
-  color: #ff9800;
-}
-
-.upload-btn {
-  color: #666;
-}
-
-.upload-btn:hover:not(:disabled) {
-  border-color: #4caf50;
-  color: #4caf50;
 }
 
 .feature-list {
