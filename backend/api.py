@@ -59,7 +59,7 @@ class CategoryResponse(BaseModel):
     id: uuid.UUID
 
     name: str
-    tags: Dict[str, str]
+    tags: Dict[object, object]
 
 
 class TreeEntryResponse(BaseModel):
@@ -334,11 +334,11 @@ async def get_tree(tree_id: str):
         ]
     )
 
-@router.post("/{ref_name}/objects", response_model=TreeEntryResponse)
+@router.post("/{ref_name}/{path:path}/objects", response_model=TreeEntryResponse)
 async def add_object_in_tree(
     ref_name: str = Path(..., description="Ref name"),
     file: UploadFile | None = None,
-    path: Optional[str] = Body(...),
+    path: Optional[str] = Path(...),
     name: Optional[str] = Body(...),
     tags: Optional[str] = Form(None)
 ):

@@ -80,10 +80,16 @@ class ApiService {
     
     const formData = new FormData()
     formData.append('name', name)
-    formData.append('path', path)
     formData.append('tags', JSON.stringify(tags))
 
-    const response = await fetch(`${this.baseUrl}/${refName}/objects`, {
+    if (!!path) {
+      var url = `${this.baseUrl}/${refName}/${path}/objects`
+    }
+    else {
+      var url = `${this.baseUrl}/${refName}/objects`
+    }
+
+    const response = await fetch(url, {
       method: 'POST',
       body: formData,
     })
