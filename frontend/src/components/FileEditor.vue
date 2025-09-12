@@ -261,6 +261,7 @@ const collectionFilesList = ref(null)
 
 // Tags editor state
 const selectedType = ref(null)
+const previousType = ref(null)
 const menuOpen = ref(false)
 const allPresets = ref([])
 const allFieldDefinitions = ref({})
@@ -288,16 +289,32 @@ async function loadFile() {
   loading.value = true
   error.value = null
   try {
-    const entry = await apiService.getTreeEntry(props.refName, treePathString.value)
-    if (!entry || !entry.object) throw new Error('File not found')
-    file.value = entry.object
+    // Find the tree item by path - similar to FileViewer
+    const pathParts = treePathString.value.split('/')
+    const fileName = pathParts[pathParts.length - 1]
+    
+    const collectionContents = await apiService.getRootContents(0, 1000)
+    const allItems = [...(collectionContents.files || []), ...(collectionContents.collections || [])]
+    const entry = allItems.find(item => 
+      item.name === fileName || 
+      item.original_name === fileName || 
+      item.path?.endsWith(fileName)
+    )
+    
+    if (!entry) {
+      throw new Error('File not found')
+    }
+    
+    file.value = entry
     // Store the object type for collection detection
-    file.value.object_type = entry.object_type
+    file.value.object_type = entry.object_type || (entry.type === 'collection' ? 'tree' : 'file')
 
     // Set initial type based on file tags
     if (file.value && file.value.tags) {
       const matchedPreset = matchTagsToPreset(file.value.tags, allPresets.value)
       selectedType.value = matchedPreset
+      // Initialize previousType to avoid removing tags on first type change
+      previousType.value = matchedPreset
     }
     
     // Collection files will be loaded by the CollectionFilesList component
@@ -403,12 +420,29 @@ const isCollection = computed(() => {
 // Tags editor functions
 function handleTypeChange(newType) {
   if (file.value && newType) {
-    // Create new tags based on the selected type
-    const newTags = { ...newType.tags }
-    // Preserve the name tag if it exists
-    if (file.value.tags && file.value.tags.name) {
-      newTags.name = file.value.tags.name
+    // Start with existing tags to preserve user-added tags
+    const newTags = { ...file.value.tags }
+    
+    // Remove tags that were specific to the previous type (if any)
+    if (previousType.value && previousType.value.tags) {
+      Object.keys(previousType.value.tags).forEach(key => {
+        // Only remove the tag if the new type doesn't also define it
+        if (!newType.tags || !(key in newType.tags)) {
+          delete newTags[key]
+        }
+      })
     }
+    
+    // Add/update tags that are specified by the new type
+    if (newType.tags) {
+      Object.entries(newType.tags).forEach(([key, value]) => {
+        newTags[key] = value
+      })
+    }
+    
+    // Update the previous type reference for next time
+    previousType.value = selectedType.value
+    
     // Add change to tracker
     props.changeTracker.addChange({
       type: 'tags',
@@ -497,7 +531,7 @@ function triggerFileSelect() {
 async function handleCommit() {
   const result = await props.changeTracker.commitChanges(async (change) => {
     if (change.type === 'tags') {
-              const updatedEntry = await apiService.updateObjectInTree(props.refName, treePathString.value, change.data)
+              const updatedEntry = await apiService.updateTreeItem(file.value.id, { tags: change.data })
       // Update the local file object with the response
       if (updatedEntry && updatedEntry.object && file.value) {
         Object.assign(file.value, updatedEntry.object)
@@ -527,7 +561,16 @@ async function handleFilesAdded(selectedFiles) {
     for (const selectedFile of selectedFiles) {
       const sourcePath = selectedFile.fullPath
       
-              await apiService.cloneObjectInTree(props.refName, sourcePath, treePathString.value)
+              // Clone operation: create a new tree item with the same tags but different name
+              if (file.value?.type === 'collection') {
+                await apiService.createTreeItem(
+                  file.value.name + '_copy',
+                  'collection',
+                  { ...file.value.tags }
+                )
+              } else {
+                throw new Error('File cloning not supported - use file upload instead')
+              }
     }
     
     addFileStatus.value = {

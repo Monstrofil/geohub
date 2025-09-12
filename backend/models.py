@@ -1,6 +1,5 @@
 from tortoise import fields, models
 from tortoise.contrib.pydantic import pydantic_model_creator
-from tortoise.contrib.postgres.fields import ArrayField
 
 import hashlib
 from pathlib import Path
@@ -9,30 +8,85 @@ from typing import Dict, Any
 import json
 
 
-class File(models.Model):
+class LTreeField(fields.Field):
+    SQL_TYPE = "LTREE"
+    field_type = str
+
+
+class TreeItem(models.Model):
     id = fields.UUIDField(pk=True)
     name = fields.CharField(max_length=255)
-    original_name = fields.CharField(max_length=255)
-    file_path = fields.CharField(max_length=500)
-    file_size = fields.BigIntField()
-    mime_type = fields.CharField(max_length=100)
-    base_file_type = fields.CharField(max_length=20, default="raw")  # raster, vector, raw
-    tags = fields.JSONField(default=dict)
-    sha1 = fields.CharField(max_length=40, unique=True, null=True)
+    type = fields.CharField(max_length=20)  # "file" or "collection"
+    tags = fields.JSONField(default=dict)  # All attributes go here now
     created_at = fields.DatetimeField(auto_now_add=True)
     updated_at = fields.DatetimeField(auto_now=True)
+    
+    # Hierarchical path using LTREE
+    path = LTreeField(default="root")
 
     class Meta:
-        table = "files"
+        table = "tree_items"
 
     def __str__(self):
-        return f"File(id={self.id}, name='{self.name}', type='{self.base_file_type}')"
+        return f"TreeItem(id={self.id}, name='{self.name}', type='{self.type}', path='{self.path}')"
     
+    @property
+    def is_file(self) -> bool:
+        """Check if this tree item is a file"""
+        return self.type == "file"
+    
+    @property
+    def is_collection(self) -> bool:
+        """Check if this tree item is a collection"""
+        return self.type == "collection"
+    
+    # File-specific properties (access tags)
+    @property
+    def original_name(self) -> str:
+        """Get original filename from tags"""
+        return self.tags.get("original_name", self.name)
+    
+    @property
+    def file_path(self) -> str:
+        """Get file path from tags"""
+        return self.tags.get("file_path", "")
+    
+    @property
+    def file_size(self) -> int:
+        """Get file size from tags"""
+        return self.tags.get("file_size", 0)
+    
+    @property
+    def mime_type(self) -> str:
+        """Get MIME type from tags"""
+        return self.tags.get("mime_type", "")
+    
+    @property
+    def base_file_type(self) -> str:
+        """Get base file type from tags"""
+        return self.tags.get("base_file_type", "raw")
+    
+    @property
+    def sha1(self) -> str:
+        """Get SHA1 hash from tags"""
+        return self.tags.get("sha1", "")
 
-def calculate_file_obj_hash(file_obj: File):
-    content = Path(file_obj.file_path).read_bytes()
-    tags = file_obj.tags
 
+def calculate_tree_item_hash(tree_item: TreeItem):
+    """Calculate hash for a file tree item"""
+    if not tree_item.is_file:
+        return None
+        
+    file_path = tree_item.file_path
+    if not file_path or not Path(file_path).exists():
+        return None
+        
+    content = Path(file_path).read_bytes()
+    tags = tree_item.tags.copy()
+    
+    # Remove the sha1 from tags for hash calculation to avoid circular dependency
+    tags.pop("sha1", None)
+    
     tags_json = json.dumps(tags, sort_keys=True, separators=(",", ":"))
     sha1 = hashlib.sha1(content + tags_json.encode('utf-8')).hexdigest()
 
@@ -40,42 +94,16 @@ def calculate_file_obj_hash(file_obj: File):
 
 
 # Pydantic models for API
-File_Pydantic = pydantic_model_creator(File, name="File")
-FileIn_Pydantic = pydantic_model_creator(File, name="FileIn", exclude_readonly=True)
+TreeItem_Pydantic = pydantic_model_creator(TreeItem, name="TreeItem")
+TreeItemIn_Pydantic = pydantic_model_creator(TreeItem, name="TreeItemIn", exclude_readonly=True)
 
+# Backward compatibility aliases
+File = TreeItem
+Collection = TreeItem
+File_Pydantic = TreeItem_Pydantic
+FileIn_Pydantic = TreeItemIn_Pydantic
+Collection_Pydantic = TreeItem_Pydantic
+CollectionIn_Pydantic = TreeItemIn_Pydantic
 
-class Tree(models.Model):
-    id = fields.UUIDField(pk=True)
-    entries = ArrayField(element_type="varchar(40)")
-
-    name = fields.CharField(max_length=255, default="Root")
-    tags = fields.JSONField(default=dict)
-
-    def __repr__(self):
-        return f"Tree(id={self.id}, name='{self.name}', entries_count={len(self.entries)})"
-
-
-class TreeEntry(models.Model):
-    id = fields.UUIDField(pk=True)
-    path = fields.CharField(max_length=40)
-    object_type = fields.CharField(max_length=10)
-    object_id = fields.UUIDField()
-
-    def __repr__(self):
-        return f"TreeEntry(id={self.id}, path='{self.path}', object_type='{self.object_type}', object_id={self.object_id})"
-
-
-class Commit(models.Model):
-    id = fields.UUIDField(pk=True)
-    tree = fields.ForeignKeyField('models.Tree', related_name='commits')
-    parent = fields.ForeignKeyField('models.Commit', related_name='children', null=True)
-    message = fields.CharField(max_length=255)
-    timestamp = fields.DatetimeField(auto_now_add=True)
-
-
-class Ref(models.Model):
-    name = fields.CharField(pk=True, max_length=100)
-    commit = fields.ForeignKeyField('models.Commit', related_name='refs')
-
-    class Meta:
-        table = "refs"
+# Legacy function alias
+calculate_file_obj_hash = calculate_tree_item_hash

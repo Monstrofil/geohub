@@ -32,6 +32,7 @@
 <script setup>
 import { computed } from 'vue'
 import apiService from '../services/api.js'
+import { getBaseFileType } from '../utils/fileHelpers.js'
 
 const props = defineProps({
   name: { type: String, required: true },
@@ -45,7 +46,7 @@ const props = defineProps({
 const emit = defineEmits(['click', 'file-selected', 'removed'])
 
 const fileType = computed(() => {
-  return props.file.base_file_type || 'raw'
+  return getBaseFileType(props.file)
 })
 
 
@@ -93,7 +94,7 @@ const icon = computed(() => {
 const handleRemove = async () => {
   if (confirm(`Are you sure you want to remove "${props.name}"?`)) {
     try {
-              await apiService.removeObjectInTree(props.refName, fullPath.value)
+              await apiService.deleteTreeItem(props.file.id)
       emit('removed', props.path)
     } catch (error) {
       console.error('Failed to remove file:', error)

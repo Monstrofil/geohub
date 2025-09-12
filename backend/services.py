@@ -1,4 +1,4 @@
-from models import File, File_Pydantic, Tree, TreeEntry, Commit, Ref, calculate_file_obj_hash
+from models import TreeItem, TreeItem_Pydantic, File, Collection, calculate_tree_item_hash, calculate_file_obj_hash
 from tortoise.expressions import Q
 import os
 import uuid
@@ -10,6 +10,7 @@ from fastapi import UploadFile, HTTPException
 import hashlib
 from datetime import datetime, timezone
 import json
+
 
 
 def detect_file_type(file_path: str) -> str:
@@ -97,14 +98,165 @@ def validate_file_type(filename: str, expected_type: str) -> bool:
 
 class CollectionsService:
     @classmethod
-    async def create_collection(cls, name: str, tags: dict):
-        tree_obj = await Tree.create(
+    async def create_collection(cls, name: str, tags: dict, parent_path: str = "root"):
+        """Create a new collection"""
+        # Generate a unique path segment for this collection (LTREE compatible)
+        import uuid
+        import hashlib
+        
+        # Create LTREE-compatible ID: use 'c' prefix + first 12 chars of UUID hex (no hyphens)
+        collection_uuid = str(uuid.uuid4()).replace('-', '')[:12]
+        collection_segment = f"c{collection_uuid}"
+        
+        # Create the path: parent_path.collection_segment
+        if parent_path == "root":
+            collection_path = f"root.{collection_segment}"
+        else:
+            collection_path = f"{parent_path}.{collection_segment}"
+        
+        collection_obj = await TreeItem.create(
             name=name,
+            type="collection",
             tags=tags,
-            entries=[],
+            path=collection_path,
         )
         
-        return tree_obj
+        return collection_obj
+    
+    @classmethod
+    async def get_collection(cls, collection_id: str):
+        """Get collection by ID"""
+        return await TreeItem.get_or_none(id=collection_id, type="collection")
+    
+    @classmethod
+    async def get_collection_by_path(cls, path: str):
+        """Get collection by path"""
+        return await TreeItem.get_or_none(path=path, type="collection")
+    
+    @classmethod
+    async def update_collection(cls, collection_id: str, name: str = None, tags: dict = None, new_parent_path: str = None):
+        """Update collection"""
+        collection = await TreeItem.get_or_none(id=collection_id, type="collection")
+        if not collection:
+            return None
+        
+        old_path = collection.path
+        
+        if name is not None:
+            collection.name = name
+        if tags is not None:
+            collection.tags = tags
+        
+        if new_parent_path is not None:
+            # Update the collection's path and all its descendants
+            path_parts = old_path.split('.')
+            collection_segment = path_parts[-1]  # Keep the same collection ID segment
+            
+            if new_parent_path == "root":
+                new_path = f"root.{collection_segment}"
+            else:
+                new_path = f"{new_parent_path}.{collection_segment}"
+            
+            # Update this collection's path
+            collection.path = new_path
+            
+            # Update all descendants (files and subcollections)
+            await cls._update_descendant_paths(old_path, new_path)
+            
+        await collection.save()
+        return collection
+    
+    @classmethod
+    async def _update_descendant_paths(cls, old_path: str, new_path: str):
+        """Update paths of all descendants when a collection is moved"""
+        # Update all tree items that have paths starting with old_path
+        from tortoise import connections
+        connection = connections.get("default")
+        
+        # Update all tree items (both files and collections)
+        await connection.execute_query(
+            "UPDATE tree_items SET path = $1 || subpath(path, nlevel($2)) WHERE path <@ $2 AND path != $2",
+            [new_path, old_path]
+        )
+    
+    @classmethod
+    async def delete_collection(cls, collection_id: str, force: bool = False):
+        """Delete collection and optionally its contents"""
+        collection = await TreeItem.get_or_none(id=collection_id, type="collection")
+        if not collection:
+            return False
+        
+        collection_path = collection.path
+        
+        # Check if collection has contents using LTREE operators
+        if not force:
+            from tortoise import connections
+            connection = connections.get("default")
+            
+            # Check for any items in this collection or its descendants
+            item_count = await connection.execute_query_dict(
+                "SELECT COUNT(*) as count FROM tree_items WHERE path <@ $1 AND path != $1",
+                [collection_path]
+            )
+            
+            if item_count[0]['count'] > 0:
+                raise ValueError("Collection is not empty. Use force=True to delete anyway.")
+        
+        # If force=True, delete all contents first
+        if force:
+            from tortoise import connections
+            connection = connections.get("default")
+            
+            # Delete all items in this collection and its descendants
+            await connection.execute_query(
+                "DELETE FROM tree_items WHERE path <@ $1 AND path != $1",
+                [collection_path]
+            )
+        
+        await collection.delete()
+        return True
+    
+    @classmethod
+    async def list_collection_contents(cls, collection_path: str = "root", skip: int = 0, limit: int = 100):
+        """List files and subcollections in a collection as one iterable"""
+        # Use raw SQL with proper parameterization and manual model instantiation
+        from tortoise import connections
+        
+        connection = connections.get("default")
+        
+        # Construct regex pattern safely - escape special characters for PostgreSQL regex
+        # Pattern matches paths that are direct children of collection_path
+        regex_pattern = f"{collection_path}.*{{1}}"
+        
+        # Use parameterized query to prevent SQL injection
+        query = """
+            SELECT * FROM tree_items 
+            WHERE path ~ $1 
+            ORDER BY created_at 
+            OFFSET $2 LIMIT $3
+        """
+        
+        # Execute raw query and get results
+        results = await connection.execute_query_dict(query, [regex_pattern, skip, limit])
+        
+        # Manually instantiate TreeItem objects with proper field mapping
+        items = []
+        for row in results:
+            # Create TreeItem instance with all fields
+            item = TreeItem(
+                id=row['id'],
+                name=row['name'], 
+                type=row['type'],
+                tags=row['tags'],
+                created_at=row['created_at'],
+                updated_at=row['updated_at'],
+                path=row['path']
+            )
+            # Mark as fetched from DB so it behaves like a proper model instance
+            item._saved_in_db = True
+            items.append(item)
+        
+        return items
 
 class FileService:
     UPLOAD_DIR = "uploads"
@@ -142,8 +294,8 @@ class FileService:
         }
     
     @classmethod
-    async def create_file(cls, uploaded_file, tags: Dict[str, str] = None, expected_type: str = None) -> File_Pydantic:
-        """Create a new file record with automatic type detection and versioning"""
+    async def create_file(cls, uploaded_file, tags: Dict[str, str] = None, expected_type: str = None, parent_path: str = "root") -> TreeItem:
+        """Create a new file record with automatic type detection"""
         file_info = await cls.save_uploaded_file(uploaded_file, tags)
         
         # Detect file type
@@ -159,26 +311,116 @@ class FileService:
                 detail=f"File type not allowed for '{expected_type}'"
             )
 
+        # Merge user tags with file-specific metadata
         file_tags = tags or {}
+        file_tags.update({
+            "original_name": file_info["original_name"],
+            "file_path": file_info["file_path"],
+            "file_size": file_info["file_size"],
+            "mime_type": file_info["mime_type"],
+            "base_file_type": base_file_type,
+            "sha1": file_info["sha1"]
+        })
 
-        file_obj = await File.create(
+        # Generate a unique path segment for this file (LTREE compatible)
+        import uuid
+        
+        # Create LTREE-compatible ID: use 'f' prefix + first 12 chars of UUID hex (no hyphens)
+        file_uuid = str(uuid.uuid4()).replace('-', '')[:12]
+        file_segment = f"f{file_uuid}"
+        
+        # Create the path: parent_path.file_segment
+        if parent_path == "root":
+            file_ltree_path = f"root.{file_segment}"
+        else:
+            file_ltree_path = f"{parent_path}.{file_segment}"
+
+        file_obj = await TreeItem.create(
             name=file_info["name"],
-            original_name=file_info["original_name"],
-            file_path=file_info["file_path"],
-            file_size=file_info["file_size"],
-            mime_type=file_info["mime_type"],
-            base_file_type=base_file_type,
+            type="file",
             tags=file_tags,
-            sha1=file_info["sha1"]
+            path=file_ltree_path
         )
         
         return file_obj
     
     @classmethod
-    async def get_file(cls, file_id: int) -> Optional[File_Pydantic]:
+    async def get_file(cls, file_id: str) -> Optional[TreeItem]:
         """Get file by ID"""
-        file_obj = await File.get_or_none(id=file_id)
-        if file_obj:
-            return await File_Pydantic.from_tortoise_orm(file_obj)
-        return None
+        return await TreeItem.get_or_none(id=file_id, type="file")
+    
+    @classmethod
+    async def update_file(cls, file_id: str, tags: Dict[str, str] = None, new_parent_path: str = None) -> Optional[TreeItem]:
+        """Update file metadata"""
+        file_obj = await TreeItem.get_or_none(id=file_id, type="file")
+        if not file_obj:
+            return None
+        
+        if tags is not None:
+            # Merge new tags with existing file metadata (preserve file-specific tags)
+            existing_tags = file_obj.tags.copy()
+            existing_tags.update(tags)
+            file_obj.tags = existing_tags
+            
+            # Recalculate hash when tags change
+            new_sha1 = calculate_tree_item_hash(file_obj)
+            if new_sha1:
+                file_obj.tags["sha1"] = new_sha1
+        
+        if new_parent_path is not None:
+            # Update the file's path
+            path_parts = file_obj.path.split('.')
+            file_segment = path_parts[-1]  # Keep the same file ID segment
+            
+            if new_parent_path == "root":
+                new_path = f"root.{file_segment}"
+            else:
+                new_path = f"{new_parent_path}.{file_segment}"
+            
+            file_obj.path = new_path
+            
+        await file_obj.save()
+        return file_obj
+    
+    @classmethod
+    async def delete_file(cls, file_id: str) -> bool:
+        """Delete file and remove from disk"""
+        file_obj = await TreeItem.get_or_none(id=file_id, type="file")
+        if not file_obj:
+            return False
+            
+        # Remove file from disk
+        file_path = file_obj.file_path
+        if file_path and os.path.exists(file_path):
+            os.remove(file_path)
+            
+        await file_obj.delete()
+        return True
+    
+    @classmethod
+    async def search_files(cls, tags: Dict[str, str] = None, base_type: str = None, collection_path: str = None, skip: int = 0, limit: int = 100) -> Dict[str, Any]:
+        """Search files with filters"""
+        # Use Tortoise ORM query builder instead of raw SQL for better compatibility
+        query = TreeItem.filter(type="file")
+        
+        if tags:
+            for key, value in tags.items():
+                query = query.filter(tags__contains={key: value})
+        
+        if base_type:
+            # Check base_file_type in tags
+            query = query.filter(tags__contains={"base_file_type": base_type})
+        
+        if collection_path:
+            query = query.filter(path__contains=collection_path)
+        
+        total = await query.count()
+        files = await query.offset(skip).limit(limit).order_by('created_at').all()
+        
+        return {
+            "files": files,
+            "total": total,
+            "skip": skip,
+            "limit": limit
+        }
     

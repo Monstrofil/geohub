@@ -229,13 +229,13 @@ import { useRouter } from 'vue-router'
 const router = useRouter()
 
 function navigateToFileList() {
-  // Navigate directly to FileList with main branch and empty treePath
-  router.push('/explorer/main/list')
+  // Navigate directly to FileList
+  router.push('/explorer/list')
 }
 
 function navigateToCollection(collectionType) {
   // Navigate to explorer with specific collection filter
-  router.push(`/explorer/main?collection=${collectionType}`)
+  router.push(`/explorer/list?collection=${collectionType}`)
 }
 </script>
 

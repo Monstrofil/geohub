@@ -40,16 +40,17 @@ const props = defineProps({
   selected: { type: Boolean, default: false },
   path: { type: String, required: true },
   treePath: { type: [String, Array], required: false },
-  refName: { type: String, required: true }
+  file: { type: Object, required: false } // Add file prop to access collection object
 })
 
 const emit = defineEmits(['edit', 'removed'])
 
 const fullPath = computed(() => {
-  if (props.treePath) {
-    const currentPath = Array.isArray(props.treePath) ? props.treePath.join('/') : props.treePath
-    return currentPath + '/' + props.path
+  // Use the LTREE path from the collection object directly
+  if (props.file && props.file.path) {
+    return props.file.path
   }
+  // Fallback to the path prop (which should be the LTREE path)
   return props.path
 })
 
@@ -64,8 +65,13 @@ const icon = computed(() => {
 const handleRemove = async () => {
   if (confirm(`Are you sure you want to remove collection "${props.name}"?`)) {
     try {
-              await apiService.removeObjectInTree(props.refName, fullPath.value)
-      emit('removed', props.path)
+      if (props.file && props.file.id) {
+        await apiService.deleteCollection(props.file.id)
+        emit('removed', props.path)
+      } else {
+        console.error('Cannot remove collection: missing collection ID')
+        alert('Cannot remove collection: missing collection ID')
+      }
     } catch (error) {
       console.error('Failed to remove collection:', error)
       alert(`Failed to remove collection: ${error.message}`)

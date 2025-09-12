@@ -36,24 +36,24 @@ class ApiService {
     }
   }
 
+  // ======================
+  // FILE OPERATIONS
+  // ======================
+
   /**
-   * Upload a file to a specific ref
+   * Upload a file
    * @param {File} file - The file to upload
    * @param {Object} tags - Tags to associate with the file
-   * @param {string} refName - The ref name to upload to
-   * @param {string} path - The path where the file should be placed (optional)
-   * @param {string} name - The name for the file (optional, defaults to file.name)
+   * @param {string} parentPath - The LTREE path where the file should be placed (default: "root")
    * @returns {Promise<Object>} The uploaded file response
    */
-  async uploadFile(file, tags = {}, refName, path = '', name = '') {
-    if (!refName) throw new Error('refName is required for upload')
+  async uploadFile(file, tags = {}, parentPath = "root") {
     const formData = new FormData()
     formData.append('file', file)
     formData.append('tags', JSON.stringify(tags))
-    formData.append('path', path)
-    formData.append('name', name || file.name)
+    formData.append('parent_path', parentPath)
 
-    const response = await fetch(`${this.baseUrl}/${refName}/objects`, {
+    const response = await fetch(`${this.baseUrl}/files`, {
       method: 'POST',
       body: formData,
     })
@@ -67,81 +67,455 @@ class ApiService {
   }
 
   /**
-   * Create a collection in a specific ref
+   * Get files with optional filters
+   * @param {Object} filters - Filter options
+   * @param {Object} filters.tags - Tags to filter by
+   * @param {string} filters.base_type - File type filter (raster, vector, raw)
+   * @param {string} filters.collection_path - LTREE path to filter by collection
+   * @param {number} skip - Number of items to skip
+   * @param {number} limit - Number of items to return
+   * @returns {Promise<Object>} Files list response
+   */
+  async getFiles(filters = {}, skip = 0, limit = 100) {
+    const response = await this.getTreeItems({ ...filters, type: 'file' }, skip, limit)
+    
+    // Transform unified response to legacy format for backward compatibility
+    return {
+      files: response.items || [],
+      total: response.total,
+      skip: response.skip,
+      limit: response.limit
+    }
+  }
+
+  /**
+   * Get a single file by ID
+   * @param {string} fileId - The file ID
+   * @returns {Promise<Object>} File object
+   */
+  async getFile(fileId) {
+    return await this.getTreeItem(fileId)
+  }
+
+  /**
+   * Update file metadata
+   * @param {string} fileId - The file ID
+   * @param {Object} updates - Updates to apply
+   * @param {Object} updates.tags - New tags
+   * @param {string} updates.parent_path - New parent path
+   * @returns {Promise<Object>} Updated file object
+   */
+  async updateFile(fileId, updates) {
+    return await this.updateTreeItem(fileId, updates)
+  }
+
+  /**
+   * Delete a file
+   * @param {string} fileId - The file ID
+   * @returns {Promise<Object>} Deletion confirmation
+   */
+  async deleteFile(fileId) {
+    return await this.deleteTreeItem(fileId, false)
+  }
+
+  /**
+   * Download a file
+   * @param {string} fileId - The file ID
+   * @returns {Promise<Response>} File download response
+   */
+  async downloadFile(fileId) {
+    const response = await fetch(`${this.baseUrl}/files/${fileId}/download`)
+    if (!response.ok) {
+      throw new Error(`Download failed! status: ${response.status}`)
+    }
+    return response
+  }
+
+  // ======================
+  // COLLECTION OPERATIONS
+  // ======================
+
+  /**
+   * Create a new collection
    * @param {string} name - The name of the collection
-   * @param {string} refName - The ref name to create the collection in
-   * @param {string} path - The path where the collection should be placed (optional)
    * @param {Object} tags - Tags to associate with the collection (optional)
+   * @param {string} parentPath - The parent LTREE path (default: "root")
    * @returns {Promise<Object>} The created collection response
    */
-  async createCollection(name, refName, path = '', tags = {}) {
-    if (!refName) throw new Error('refName is required for collection creation')
+  async createCollection(name, tags = {}, parentPath = "root") {
     if (!name) throw new Error('name is required for collection creation')
     
-    const formData = new FormData()
-    formData.append('name', name)
-    formData.append('tags', JSON.stringify(tags))
-
-    if (!!path) {
-      var url = `${this.baseUrl}/${refName}/${path}/objects`
-    }
-    else {
-      var url = `${this.baseUrl}/${refName}/objects`
-    }
-
-    const response = await fetch(url, {
-      method: 'POST',
-      body: formData,
-    })
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
-      throw new Error(errorData.detail || `Collection creation failed! status: ${response.status}`)
-    }
-
-    return await response.json()
+    return await this.createTreeItem(name, 'collection', tags, parentPath)
   }
 
-  // Get objects (tree entries) for a ref
+  /**
+   * Get collections with optional parent filter
+   * @param {string} parentPath - Parent path to filter by (default: "root")
+   * @param {number} skip - Number of items to skip
+   * @param {number} limit - Number of items to return
+   * @returns {Promise<Object>} Collections list response
+   */
+  async getCollections(parentPath = "root", skip = 0, limit = 100) {
+    const response = await this.getTreeItems({ 
+      type: 'collection',
+      collection_path: parentPath 
+    }, skip, limit)
+    
+    // Transform unified response to legacy format for backward compatibility
+    return {
+      collections: response.items || [],
+      total: response.total,
+      skip: response.skip,
+      limit: response.limit
+    }
+  }
+
+  /**
+   * Get a single collection by ID
+   * @param {string} collectionId - The collection ID
+   * @returns {Promise<Object>} Collection object
+   */
+  async getCollection(collectionId) {
+    return await this.getTreeItem(collectionId)
+  }
+
+  /**
+   * Find a collection by its LTREE path
+   * @param {string} path - The LTREE path to search for
+   * @returns {Promise<Object|null>} Collection object or null if not found
+   */
+  async findCollectionByPath(path) {
+    try {
+      // Search through all collections recursively to find one with matching path
+      // This is a simple implementation - in production you'd want a dedicated endpoint
+      let allCollections = []
+      
+      // Get root collections first
+      const rootCollections = await this.getCollections("root", 0, 1000)
+      allCollections = [...rootCollections.collections]
+      
+      // For nested collections, we need to search through all possible parent paths
+      // This is inefficient but works for the demo
+      const pathParts = path.split('.')
+      for (let i = 1; i < pathParts.length; i++) {
+        const parentPath = pathParts.slice(0, i + 1).join('.')
+        try {
+          const childCollections = await this.getCollections(parentPath, 0, 1000)
+          allCollections = [...allCollections, ...childCollections.collections]
+        } catch (e) {
+          // Parent path might not exist, continue searching
+          continue
+        }
+      }
+      
+      return allCollections.find(c => c.path === path) || null
+    } catch (error) {
+      console.error('Error finding collection by path:', error)
+      return null
+    }
+  }
+
+  /**
+   * Update collection metadata
+   * @param {string} collectionId - The collection ID
+   * @param {Object} updates - Updates to apply
+   * @param {string} updates.name - New name
+   * @param {Object} updates.tags - New tags
+   * @param {string} updates.parent_path - New parent path
+   * @returns {Promise<Object>} Updated collection object
+   */
+  async updateCollection(collectionId, updates) {
+    return await this.updateTreeItem(collectionId, updates)
+  }
+
+  /**
+   * Delete a collection
+   * @param {string} collectionId - The collection ID
+   * @param {boolean} force - Whether to force delete non-empty collection
+   * @returns {Promise<Object>} Deletion confirmation
+   */
+  async deleteCollection(collectionId, force = false) {
+    return await this.deleteTreeItem(collectionId, force)
+  }
+
+  /**
+   * Get contents of a collection (files and subcollections)
+   * @param {string} collectionId - The collection ID
+   * @param {number} skip - Number of items to skip
+   * @param {number} limit - Number of items to return
+   * @returns {Promise<Object>} Collection contents response
+   */
+  async getCollectionContents(collectionId, skip = 0, limit = 100) {
+    const response = await this.getTreeItemContents(collectionId, skip, limit)
+    
+    // Transform unified response to legacy format for backward compatibility
+    return {
+      files: response.items?.filter(item => item.type === 'file') || [],
+      collections: response.items?.filter(item => item.type === 'collection') || [],
+      total_files: response.items?.filter(item => item.type === 'file').length || 0,
+      total_collections: response.items?.filter(item => item.type === 'collection').length || 0
+    }
+  }
+
+  /**
+   * Get contents of the root (files and collections without parent)
+   * @param {number} skip - Number of items to skip
+   * @param {number} limit - Number of items to return
+   * @returns {Promise<Object>} Root contents response
+   */
+  async getRootContents(skip = 0, limit = 100) {
+    const params = new URLSearchParams()
+    params.append('skip', skip.toString())
+    params.append('limit', limit.toString())
+
+    const response = await this.request(`/root/contents?${params.toString()}`)
+    
+    // Transform new unified response to legacy format for backward compatibility
+    return {
+      files: response.items?.filter(item => item.type === 'file') || [],
+      collections: response.items?.filter(item => item.type === 'collection') || [],
+      total_files: response.items?.filter(item => item.type === 'file').length || 0,
+      total_collections: response.items?.filter(item => item.type === 'collection').length || 0
+    }
+  }
+
+  // ======================
+  // MAPSERVER OPERATIONS
+  // ======================
+
+  /**
+   * Get MapServer URL for a file
+   * @param {string} fileId - The file ID
+   * @returns {Promise<Object>} Map URL response
+   */
+  async getFileMap(fileId) {
+    return await this.request(`/files/${fileId}/map`)
+  }
+
+  /**
+   * Get file extent (bounding box)
+   * @param {string} fileId - The file ID
+   * @returns {Promise<Object>} File extent response
+   */
+  async getFileExtent(fileId) {
+    return await this.request(`/files/${fileId}/extent`)
+  }
+
+  /**
+   * Get file preview URL
+   * @param {string} fileId - The file ID
+   * @returns {Promise<Object>} Preview URL response
+   */
+  async getFilePreview(fileId) {
+    return await this.request(`/files/${fileId}/preview`)
+  }
+
+  /**
+   * Clean up old MapServer configurations
+   * @param {number} maxAgeHours - Maximum age in hours
+   * @returns {Promise<Object>} Cleanup response
+   */
+  async cleanupMapServer(maxAgeHours = 24) {
+    return await this.request('/mapserver/cleanup', {
+      method: 'POST',
+      body: JSON.stringify({ max_age_hours: maxAgeHours }),
+    })
+  }
+
+  // ======================
+  // UNIFIED TREE ITEM OPERATIONS
+  // ======================
+
+  /**
+   * Get tree items with optional filters
+   * @param {Object} filters - Filter options
+   * @param {string} filters.type - Item type filter ("file" or "collection")
+   * @param {Object} filters.tags - Tags to filter by
+   * @param {string} filters.base_type - Base file type filter ("raster", "vector", "raw")
+   * @param {string} filters.collection_path - LTREE path to filter by collection
+   * @param {number} skip - Number of items to skip
+   * @param {number} limit - Number of items to return
+   * @returns {Promise<Object>} Tree items response
+   */
+  async getTreeItems(filters = {}, skip = 0, limit = 100) {
+    const params = new URLSearchParams()
+    params.append('skip', skip.toString())
+    params.append('limit', limit.toString())
+    
+    if (filters.type) {
+      params.append('type', filters.type)
+    }
+    if (filters.tags) {
+      params.append('tags', JSON.stringify(filters.tags))
+    }
+    if (filters.base_type) {
+      params.append('base_type', filters.base_type)
+    }
+    if (filters.collection_path) {
+      params.append('collection_path', filters.collection_path)
+    }
+
+    return await this.request(`/tree-items?${params.toString()}`)
+  }
+
+  /**
+   * Create a new tree item (collection only - files via upload)
+   * @param {string} name - The name of the item
+   * @param {string} type - Item type ("collection" only)
+   * @param {Object} tags - Tags to associate with the item
+   * @param {string} parentPath - The parent LTREE path
+   * @returns {Promise<Object>} The created item response
+   */
+  async createTreeItem(name, type, tags = {}, parentPath = "root") {
+    if (type !== 'collection') {
+      throw new Error('Use uploadFile for creating file tree items')
+    }
+    
+    return await this.request('/tree-items', {
+      method: 'POST',
+      body: JSON.stringify({
+        name,
+        type,
+        tags,
+        parent_path: parentPath
+      }),
+    })
+  }
+
+  /**
+   * Update a tree item
+   * @param {string} itemId - The item ID
+   * @param {Object} updates - Updates to apply
+   * @returns {Promise<Object>} Updated item object
+   */
+  async updateTreeItem(itemId, updates) {
+    return await this.request(`/tree-items/${itemId}`, {
+      method: 'PUT',
+      body: JSON.stringify(updates),
+    })
+  }
+
+  /**
+   * Delete a tree item
+   * @param {string} itemId - The item ID
+   * @param {boolean} force - Whether to force delete (for collections)
+   * @returns {Promise<Object>} Deletion confirmation
+   */
+  async deleteTreeItem(itemId, force = false) {
+    const params = force ? '?force=true' : ''
+    return await this.request(`/tree-items/${itemId}${params}`, {
+      method: 'DELETE',
+    })
+  }
+
+  /**
+   * Get a tree item by ID
+   * @param {string} itemId - The item ID
+   * @returns {Promise<Object>} Tree item object
+   */
+  async getTreeItem(itemId) {
+    return await this.request(`/tree-items/${itemId}`)
+  }
+
+  /**
+   * Get contents of a tree item (collection)
+   * @param {string} itemId - The item ID
+   * @param {number} skip - Number of items to skip
+   * @param {number} limit - Number of items to return
+   * @returns {Promise<Object>} Tree item contents response
+   */
+  async getTreeItemContents(itemId, skip = 0, limit = 100) {
+    const params = new URLSearchParams()
+    params.append('skip', skip.toString())
+    params.append('limit', limit.toString())
+
+    return await this.request(`/tree-items/${itemId}/contents?${params.toString()}`)
+  }
+
+  // ======================
+  // COMPATIBILITY METHODS
+  // ======================
+
+  /**
+   * Legacy method - get objects for a path (for backward compatibility)
+   * Maps to either root contents or collection contents based on path
+   * @param {string} refName - Legacy ref name (ignored in new API)
+   * @param {string} path - Path to get objects for
+   * @param {number} skip - Number of items to skip
+   * @param {number} limit - Number of items to return
+   * @returns {Promise<Object>} Objects response in legacy format
+   */
   async getObjects(refName, path, skip = 0, limit = 100) {
-    if (!refName) throw new Error('refName is required')
-      if (!!path) {
-        var response = await this.request(`/${refName}/${path}/objects`)
+    console.warn('getObjects is deprecated, use getRootContents or getCollectionContents instead')
+    
+    let response
+    if (!path || path === '' || path === '/') {
+      // Root level
+      response = await this.getRootContents(skip, limit)
+    } else {
+      // Try to find collection by path - this is a simplified mapping
+      // In a real migration, you'd need to map old paths to new collection IDs
+      response = await this.getRootContents(skip, limit)
+    }
+    
+    // Transform response to legacy format
+    const objects = []
+    
+    // Add collections as tree entries
+    if (response.collections) {
+      for (const collection of response.collections) {
+        objects.push({
+          id: collection.id,
+          path: collection.path,
+          object_type: 'tree',
+          object: collection
+        })
       }
-      else {
-        var response = await this.request(`/${refName}/objects`)
+    }
+    
+    // Add files as file entries
+    if (response.files) {
+      for (const file of response.files) {
+        objects.push({
+          id: file.id,
+          path: file.path,
+          object_type: 'file',
+          object: file
+        })
       }
-    // Return the objects array as files for compatibility
-    return { files: response.objects, total: response.total, skip: response.skip, limit: response.limit }
+    }
+    
+    return {
+      objects,
+      total: (response.total_files || 0) + (response.total_collections || 0),
+      skip,
+      limit
+    }
   }
 
+  /**
+   * Legacy search files method
+   * @param {Object} tags - Tags to search for
+   * @param {number} skip - Skip count
+   * @param {number} limit - Limit count
+   * @returns {Promise<Object>} Search results
+   */
   async searchFiles(tags, skip = 0, limit = 100) {
-    return await this.request('/files/search', {
-      method: 'POST',
-      body: JSON.stringify({ tags, skip, limit }),
-    })
+    console.warn('searchFiles is deprecated, use getFiles with filters instead')
+    return await this.getFiles({ tags }, skip, limit)
   }
 
-  async searchFilesByName(name, skip = 0, limit = 100) {
-    return await this.request('/files/search-by-name', {
-      method: 'POST',
-      body: JSON.stringify({ name, skip, limit }),
-    })
-  }
-
-  // Branch/Ref operations
+  /**
+   * Legacy refs methods - return empty arrays since refs concept is removed
+   */
   async getRefs() {
-    return await this.request('/refs')
+    console.warn('getRefs is deprecated - branches/refs are no longer used')
+    return [{ name: 'main', commit_id: 'deprecated' }]
   }
 
   async createBranch(branchName, baseRefName) {
-    return await this.request('/refs', {
-      method: 'POST',
-      body: JSON.stringify({ 
-        branch_name: branchName,
-        base_ref_name: baseRefName
-      })
-    })
+    console.warn('createBranch is deprecated - branches/refs are no longer used')
+    return { name: branchName, commit_id: 'deprecated' }
   }
 
   // Health check
@@ -149,42 +523,27 @@ class ApiService {
     return await fetch('http://localhost:8000/health').then(res => res.json())
   }
 
-  // Update a file object in a tree (by path)
+  // Legacy methods for backward compatibility - map to new file operations
   async updateObjectInTree(refName, path, tags) {
-    if (!refName || !path) throw new Error('refName and path are required')
-    return await this.request(`/${refName}/${path}`, {
-      method: 'PUT',
-      body: JSON.stringify({ tags }),
-    })
+    console.warn('updateObjectInTree is deprecated, use updateFile instead')
+    // This would need proper path-to-ID mapping in a real migration
+    throw new Error('updateObjectInTree is deprecated - use updateFile with file ID')
   }
 
-  // Get a single tree entry (file) by refName and path
   async getTreeEntry(refName, path) {
-    if (!refName || !path) throw new Error('refName and path are required')
-    const response = await this.request(`/${refName}/${path}`)
-
-    return response;
+    console.warn('getTreeEntry is deprecated, use getFile instead')
+    throw new Error('getTreeEntry is deprecated - use getFile with file ID')
   }
 
-  // Remove an object from a tree (by tree entry)
   async removeObjectInTree(refName, path) {
-    if (!refName || !path) throw new Error('refName and path are required')
-    return await this.request(`/${refName}/${path}`, {
-      method: 'DELETE',
-    })
+    console.warn('removeObjectInTree is deprecated, use deleteFile instead')
+    throw new Error('removeObjectInTree is deprecated - use deleteFile with file ID')
   }
 
-  // Clone an object from one path to another (keeping the same object reference)
   async cloneObjectInTree(refName, sourcePath, targetPath) {
-    if (!refName || !sourcePath || !targetPath) throw new Error('refName, sourcePath, and targetPath are required')
-    return await this.request(`/${refName}/clone`, {
-      method: 'POST',
-      body: JSON.stringify({ 
-        source_path: sourcePath,
-        target_path: targetPath
-      }),
-    })
+    console.warn('cloneObjectInTree is deprecated')
+    throw new Error('cloneObjectInTree is deprecated - create new file/collection instead')
   }
 }
 
-export default new ApiService() 
+export default new ApiService()

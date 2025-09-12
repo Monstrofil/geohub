@@ -1,13 +1,10 @@
-from fastapi import APIRouter, UploadFile, File, Form, Body, HTTPException, Depends, Path
+from fastapi import APIRouter, UploadFile, File, Form, Body, HTTPException, Depends, Path, Query
 from fastapi.responses import FileResponse as FastAPIFileResponse
-from typing import List, Dict, Optional, ForwardRef
+from typing import List, Dict, Optional, Any
 import os
 import datetime 
 import json
 import uuid
-import git_service
-import hashlib
-import random
 from pydantic import BaseModel, ConfigDict
 
 import models
@@ -21,212 +18,303 @@ router = APIRouter(tags=["files"])
 mapserver_service = MapServerService()
 
 
-# Helper function to resolve ref name to commit
-async def get_commit_from_ref(ref_name: str) -> models.Commit:
-    """Resolve a ref name to a commit, raising HTTPException if not found"""
-    ref = await models.Ref.get_or_none(name=ref_name)
-    if not ref:
-        raise HTTPException(status_code=404, detail=f"Ref '{ref_name}' not found")
-    return await ref.commit
-
-
-# Pydantic models for request/response
-class FileResponse(BaseModel):
+# Unified Pydantic models
+class TreeItemResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
     name: str
-    sha1: str | None
-    original_name: str
-    file_size: int
-    mime_type: str
-    base_file_type: str
-    tags: Dict[str, str]
+    type: str  # "file" or "collection"
+    tags: Dict[str, Any]  # Allow mixed types for file metadata
     created_at: datetime.datetime
     updated_at: datetime.datetime
-
-
-class FileListResponse(BaseModel):
-    files: list[FileResponse]
-    total: int
-    skip: int
-    limit: int
-
-
-class CategoryResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: uuid.UUID
-
-    name: str
-    tags: Dict[object, object]
-
-
-class TreeEntryResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: uuid.UUID
-
-    object_type: str
-    object: FileResponse | CategoryResponse
-
     path: str
 
-
-class ObjectsListResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+    # Computed properties for backward compatibility
+    @property
+    def sha1(self) -> str | None:
+        """Get SHA1 hash from tags (for files)"""
+        return self.tags.get("sha1") if self.type == "file" else None
     
-    objects: list[TreeEntryResponse]
+    @property
+    def original_name(self) -> str:
+        """Get original filename from tags (for files)"""
+        return self.tags.get("original_name", self.name) if self.type == "file" else self.name
+    
+    @property 
+    def file_size(self) -> int:
+        """Get file size from tags (for files)"""
+        return int(self.tags.get("file_size", 0)) if self.type == "file" else 0
+    
+    @property
+    def mime_type(self) -> str:
+        """Get MIME type from tags (for files)"""
+        return self.tags.get("mime_type", "") if self.type == "file" else ""
+    
+    @property
+    def base_file_type(self) -> str:
+        """Get base file type from tags (for files)"""
+        return self.tags.get("base_file_type", "raw") if self.type == "file" else ""
+
+
+class TreeItemListResponse(BaseModel):
+    items: list[TreeItemResponse]
     total: int
     skip: int
     limit: int
 
 
-class ObjectUpdateRequest(BaseModel):
-    tags: Dict[str, str]
+class TreeItemContentsResponse(BaseModel):
+    items: list[TreeItemResponse]
+    total: int
+    skip: int
+    limit: int
 
 
-class FileSearchRequest(BaseModel):
-    tags: Dict[str, str]
-    base_type: Optional[str] = None
+class TreeItemUpdateRequest(BaseModel):
+    name: Optional[str] = None
+    tags: Optional[Dict[str, Any]] = None
+    parent_path: Optional[str] = None
+
+
+class TreeItemCreateRequest(BaseModel):
+    name: str
+    type: str  # "file" or "collection"
+    tags: Optional[Dict[str, Any]] = None
+    parent_path: Optional[str] = "root"
+
+
+class TreeItemSearchRequest(BaseModel):
+    type: Optional[str] = None  # "file" or "collection"
+    tags: Optional[Dict[str, Any]] = None
+    base_type: Optional[str] = None  # For files: "raster", "vector", "raw"
+    collection_path: Optional[str] = None
     skip: int = 0
     limit: int = 100
 
 
-class RefResponse(BaseModel):
-    name: str
-    commit_id: uuid.UUID
 
 
-class CommitResponse(BaseModel):
-    id: str
-    tree_id: str
-    parent_id: Optional[str]
-    message: str
-    timestamp: str
+# Helper functions
+async def validate_parent_path(parent_path: str) -> None:
+    """Validate that parent path exists"""
+    if parent_path and parent_path != "root":
+        collection = await CollectionsService.get_collection_by_path(parent_path)
+        if not collection:
+            raise HTTPException(status_code=404, detail="Parent collection not found")
 
 
-# class TreeEntryResponse(BaseModel):
-#     id: int
-#     path: str
-#     object_type: str
-#     object_id: int
+# ======================
+# UNIFIED TREE ITEM ENDPOINTS
+# ======================
 
+@router.get("/tree-items", response_model=TreeItemListResponse)
+async def list_tree_items(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=1000),
+    type: Optional[str] = Query(None, regex="^(file|collection)$"),
+    tags: Optional[str] = Query(None),
+    base_type: Optional[str] = Query(None),
+    collection_path: Optional[str] = Query(None)
+):
+    """List tree items with optional filters"""
+    filter_tags = {}
+    if tags:
+        try:
+            filter_tags = json.loads(tags)
+        except json.JSONDecodeError:
+            raise HTTPException(status_code=400, detail="Invalid tags format")
 
-class TreeResponse(BaseModel):
-    id: str
-    entries: list[TreeEntryResponse]
-
-
-
-@router.get("/files/{file_id}/map")
-async def get_file_map(file_id: uuid.UUID):
-    """Get a MapServer URL for a GeoTIFF file"""
-    file_obj = await FileService.get_file(file_id)
-    if not file_obj:
-        raise HTTPException(status_code=404, detail="File not found")
-    
-    map_url = mapserver_service.get_map_url(file_obj.name)
-    if not map_url:
-        raise HTTPException(status_code=400, detail="File type not supported for mapping")
-    
-    return {"map_url": map_url}
-
-
-@router.get("/files/{file_id}/extent")
-async def get_file_extent(file_id: uuid.UUID):
-    """Get the extent (bounding box) of a GeoTIFF file"""
-    file_obj = await FileService.get_file(file_id)
-    if not file_obj:
-        raise HTTPException(status_code=404, detail="File not found")
-    
-    extent = mapserver_service.get_file_extent(file_obj.name)
-    if not extent:
-        raise HTTPException(status_code=400, detail="File type not supported for extent calculation")
-    
-    return {"extent": extent}
-
-# MapServer endpoints
-@router.get("/files/{file_id}/preview")
-async def get_file_preview(file_id: uuid.UUID):
-    """Get a preview URL for a file (especially GeoTIFF)"""
-    file_obj = await FileService.get_file(file_id)
-    if not file_obj:
-        raise HTTPException(status_code=404, detail="File not found")
-    
-    preview_url = mapserver_service.get_preview_url(file_obj.name)
-    if not preview_url:
-        raise HTTPException(status_code=400, detail="File type not supported for preview")
-    
-    return {"preview_url": preview_url}
-
-
-@router.get("/{ref_name}/objects", response_model=ObjectsListResponse)
-async def list_tree_root(ref_name: str):
-    return await list_tree(ref_name, path=None)
-
-
-@router.get("/{ref_name}/{path:path}/objects", response_model=ObjectsListResponse)
-async def list_tree_by_path(ref_name: str, path: str):
-    return await list_tree(ref_name, path)
-
-
-async def list_tree(ref_name: str, path: str | None = None):
-    commit = await get_commit_from_ref(ref_name)
-
-    resolved_path = await git_service.resolve_tree(await commit.tree, path or '')
-    tree = resolved_path[-1][0]
-
-    entries_query = models.TreeEntry.filter(id__in=tree.entries)
-    entries = await entries_query.all()
-
-    # Separate IDs by type
-    file_ids = [entry.object_id for entry in entries if entry.object_type == 'file']
-    tree_ids = [entry.object_id for entry in entries if entry.object_type == 'tree']
-
-    files = await models.File.filter(id__in=file_ids)
-    trees = await models.Tree.filter(id__in=tree_ids)
-
-    files_mapping = {f.id: f for f in files}
-    trees_mapping = {t.id: t for t in trees}
-
-    # Attach the correct object to each entry
-    for entry in entries:
-        if entry.object_type == 'file':
-            object = files_mapping.get(entry.object_id)
-        elif entry.object_type == 'tree':
-            object = trees_mapping.get(entry.object_id)
+    # Route to appropriate service based on type
+    if type == "file":
+        result = await FileService.search_files(
+            tags=filter_tags if filter_tags else None,
+            base_type=base_type,
+            collection_path=collection_path,
+            skip=skip,
+            limit=limit
+        )
+        items = [TreeItemResponse.model_validate(f) for f in result["files"]]
+        total = result["total"]
+    elif type == "collection":
+        collections_query = models.TreeItem.filter(type="collection")
+        if collection_path:
+            collections_query = collections_query.filter(path__contains=collection_path)
+        if filter_tags:
+            for key, value in filter_tags.items():
+                collections_query = collections_query.filter(tags__contains={key: value})
         
-        entry.object = object
+        total = await collections_query.count()
+        collections = await collections_query.offset(skip).limit(limit).order_by('created_at').all()
+        items = [TreeItemResponse.model_validate(c) for c in collections]
+    else:
+        # Get both files and collections
+        if not collection_path or collection_path == "root":
+            result_items = await CollectionsService.list_collection_contents("root", skip, limit)
+        else:
+            result_items = await CollectionsService.list_collection_contents(collection_path, skip, limit)
+        
+        items = [TreeItemResponse.model_validate(item) for item in result_items]
+        total = len(items)  # Since we don't have total counters anymore, use actual count
 
-    return ObjectsListResponse(
-        objects=entries,
-        total=len(entries),
-        skip=0,
-        limit=0
+    return TreeItemListResponse(
+        items=items,
+        total=total,
+        skip=skip,
+        limit=limit
     )
 
 
-@router.get("/{ref_name}/{path:path}", response_model=TreeEntryResponse)
-async def get_tree_object(ref_name: str, path: str):
-    commit = await get_commit_from_ref(ref_name)
+@router.get("/tree-items/{item_id}", response_model=TreeItemResponse)
+async def get_tree_item(item_id: uuid.UUID):
+    """Get tree item by ID"""
+    # Try to get as file first, then as collection
+    item = await FileService.get_file(str(item_id))
+    if not item:
+        item = await CollectionsService.get_collection(str(item_id))
+    
+    if not item:
+        raise HTTPException(status_code=404, detail="Tree item not found")
+    
+    return TreeItemResponse.model_validate(item)
 
-    entry = await git_service.resolve_entry(await commit.tree, path or '')
 
-    if entry.object_type == 'file':
-        object = await models.File.filter(id=entry.object_id).get()
+@router.put("/tree-items/{item_id}", response_model=TreeItemResponse)
+async def update_tree_item(item_id: uuid.UUID, request: TreeItemUpdateRequest):
+    """Update tree item metadata"""
+    await validate_parent_path(request.parent_path or "root")
+
+    # Try to update as file first, then as collection
+    item = await FileService.update_file(
+        str(item_id),
+        tags=request.tags,
+        new_parent_path=request.parent_path
+    )
+    
+    if not item:
+        item = await CollectionsService.update_collection(
+            str(item_id),
+            name=request.name,
+            tags=request.tags,
+            new_parent_path=request.parent_path
+        )
+    
+    if not item:
+        raise HTTPException(status_code=404, detail="Tree item not found")
+    
+    return TreeItemResponse.model_validate(item)
+
+
+@router.delete("/tree-items/{item_id}")
+async def delete_tree_item(item_id: uuid.UUID, force: bool = Query(False)):
+    """Delete tree item"""
+    # Try to delete as file first, then as collection
+    success = await FileService.delete_file(str(item_id))
+    
+    if not success:
+        try:
+            success = await CollectionsService.delete_collection(str(item_id), force=force)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+    
+    if not success:
+        raise HTTPException(status_code=404, detail="Tree item not found")
+    
+    return {"message": "Tree item deleted successfully"}
+
+
+@router.get("/tree-items/{collection_id}/contents", response_model=TreeItemContentsResponse)
+async def get_tree_item_contents(
+    collection_id: uuid.UUID,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=1000)
+):
+    """Get contents of a collection tree item"""
+    # Special case for root
+    if str(collection_id) == "root":
+        result_items = await CollectionsService.list_collection_contents("root", skip, limit)
     else:
-        object = await models.Tree.filter(id=entry.object_id).get()
-        
-    entry.object = object
+        # Verify collection exists and get its path
+        collection = await CollectionsService.get_collection(str(collection_id))
+        if not collection:
+            raise HTTPException(status_code=404, detail="Collection not found")
 
-    return entry
+        result_items = await CollectionsService.list_collection_contents(collection.path, skip, limit)
+    
+    items = [TreeItemResponse.model_validate(item) for item in result_items]
+    
+    return TreeItemContentsResponse(
+        items=items,
+        total=len(items),  # Since we don't have total counters anymore, use actual count
+        skip=skip,
+        limit=limit
+    )
+
+
+@router.post("/tree-items", response_model=TreeItemResponse)
+async def create_tree_item(request: TreeItemCreateRequest):
+    """Create a new tree item (collection only - files must be uploaded via /files)"""
+    if request.type != "collection":
+        raise HTTPException(status_code=400, detail="Only collections can be created via this endpoint. Use /files for file uploads.")
+    
+    await validate_parent_path(request.parent_path or "root")
+
+    collection_obj = await CollectionsService.create_collection(
+        request.name,
+        request.tags or {},
+        request.parent_path or "root"
+    )
+    
+    return TreeItemResponse.model_validate(collection_obj)
+
+
+# Special endpoint for root contents
+@router.get("/root/contents", response_model=TreeItemContentsResponse)
+async def get_root_contents(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=1000)
+):
+    """Get contents of the root"""
+    result_items = await CollectionsService.list_collection_contents("root", skip, limit)
+    
+    items = [TreeItemResponse.model_validate(item) for item in result_items]
+    
+    return TreeItemContentsResponse(
+        items=items,
+        total=len(items),  # Since we don't have total counters anymore, use actual count
+        skip=skip,
+        limit=limit
+    )
+
+
+# ======================
+# SPECIALIZED ENDPOINTS
+# ======================
+
+# File upload, download, and geospatial-specific endpoints
+@router.post("/files", response_model=TreeItemResponse)
+async def upload_file(
+    file: UploadFile = File(...),
+    tags: Optional[str] = Form(None),
+    parent_path: Optional[str] = Form("root")
+):
+    """Upload a new file"""
+    file_tags = {}
+    if tags:
+        try:
+            file_tags = json.loads(tags)
+        except json.JSONDecodeError:
+            raise HTTPException(status_code=400, detail="Invalid tags format")
+
+    await validate_parent_path(parent_path or "root")
+    file_obj = await FileService.create_file(file, file_tags, parent_path=parent_path or "root")
+    return TreeItemResponse.model_validate(file_obj)
 
 
 @router.get("/files/{file_id}/download")
-async def download_file(file_id: int):
+async def download_file(file_id: uuid.UUID):
     """Download a file"""
-    file_obj = await FileService.get_file(file_id)
+    file_obj = await FileService.get_file(str(file_id))
     if not file_obj:
         raise HTTPException(status_code=404, detail="File not found")
     
@@ -240,8 +328,52 @@ async def download_file(file_id: int):
     )
 
 
+# MapServer endpoints (specialized for geospatial files)
+@router.get("/files/{file_id}/map")
+async def get_file_map(file_id: uuid.UUID):
+    """Get a MapServer URL for a GeoTIFF file"""
+    file_obj = await FileService.get_file(str(file_id))
+    if not file_obj:
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    map_url = mapserver_service.get_map_url(file_obj.name)
+    if not map_url:
+        raise HTTPException(status_code=400, detail="File type not supported for mapping")
+    
+    return {"map_url": map_url}
 
 
+@router.get("/files/{file_id}/extent")
+async def get_file_extent(file_id: uuid.UUID):
+    """Get the extent (bounding box) of a GeoTIFF file"""
+    file_obj = await FileService.get_file(str(file_id))
+    if not file_obj:
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    extent = mapserver_service.get_file_extent(file_obj.name)
+    if not extent:
+        raise HTTPException(status_code=400, detail="File type not supported for extent calculation")
+    
+    return {"extent": extent}
+
+
+@router.get("/files/{file_id}/preview")
+async def get_file_preview(file_id: uuid.UUID):
+    """Get a preview URL for a file (especially GeoTIFF)"""
+    file_obj = await FileService.get_file(str(file_id))
+    if not file_obj:
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    preview_url = mapserver_service.get_preview_url(file_obj.name)
+    if not preview_url:
+        raise HTTPException(status_code=400, detail="File type not supported for preview")
+    
+    return {"preview_url": preview_url}
+
+
+
+
+# MapServer cleanup endpoint
 @router.post("/mapserver/cleanup")
 async def cleanup_mapserver_configs(max_age_hours: int = 24):
     """Clean up old MapServer configuration files"""
@@ -250,318 +382,3 @@ async def cleanup_mapserver_configs(max_age_hours: int = 24):
         return {"message": f"Cleaned up MapServer configs older than {max_age_hours} hours"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Cleanup failed: {str(e)}")
-
-
-@router.get("/refs", response_model=List[RefResponse])
-async def list_refs():
-    refs = await models.Ref.all().prefetch_related("commit")
-    return [
-        RefResponse(name=ref.name, commit_id=ref.commit_id)
-        for ref in refs
-    ]
-
-
-class CreateBranchRequest(BaseModel):
-    branch_name: str
-    base_ref_name: str
-
-@router.post("/refs", response_model=RefResponse)
-async def create_branch(request: CreateBranchRequest):
-    """Create a new branch based on the specified base ref"""
-    # Get the base ref
-    base_ref = await models.Ref.get_or_none(name=request.base_ref_name)
-    if not base_ref:
-        raise HTTPException(status_code=404, detail=f"Base ref '{request.base_ref_name}' not found")
-    
-    # Check if branch already exists
-    existing_ref = await models.Ref.get_or_none(name=request.branch_name)
-    if existing_ref:
-        raise HTTPException(status_code=409, detail="Branch already exists")
-    
-    # Create new ref pointing to the same commit as base ref
-    new_ref = await models.Ref.create(
-        name=request.branch_name,
-        commit_id=base_ref.commit_id
-    )
-    
-    return RefResponse(name=new_ref.name, commit_id=new_ref.commit_id)
-
-
-@router.get("/commits", response_model=List[CommitResponse])
-async def list_commits():
-    commits = await models.Commit.all().prefetch_related("tree", "parent")
-    return [
-        CommitResponse(
-            id=commit.id,
-            tree_id=commit.tree_id,
-            parent_id=commit.parent_id,
-            message=commit.message,
-            timestamp=commit.timestamp.isoformat(),
-        ) for commit in commits
-    ]
-
-
-@router.get("/commits/{commit_id}", response_model=CommitResponse)
-async def get_commit(commit_id: str):
-    commit = await models.Commit.get_or_none(id=commit_id)
-    if not commit:
-        raise HTTPException(status_code=404, detail="Commit not found")
-    return CommitResponse(
-        id=commit.id,
-        tree_id=commit.tree_id,
-        parent_id=commit.parent_id,
-        message=commit.message,
-        timestamp=commit.timestamp.isoformat(),
-    )
-
-
-@router.get("/trees/{tree_id}", response_model=TreeResponse)
-async def get_tree(tree_id: str):
-    tree = await models.Tree.get_or_none(id=tree_id)
-    if not tree:
-        raise HTTPException(status_code=404, detail="Tree not found")
-    
-    entries = await models.TreeEntry.filter(sha1__in=tree.entries)
-    return TreeResponse(
-        id=tree.id,
-        entries=[
-            TreeEntryResponse(
-                id=entry.id,
-                sha1=entry.sha1,
-                object_type=entry.object_type,
-                object_id=entry.object_id
-            ) for entry in entries
-        ]
-    )
-
-@router.post("/{ref_name}/{path:path}/objects", response_model=TreeEntryResponse)
-async def add_object_in_tree(
-    ref_name: str = Path(..., description="Ref name"),
-    file: UploadFile | None = None,
-    path: Optional[str] = Path(...),
-    name: Optional[str] = Body(...),
-    tags: Optional[str] = Form(None)
-):
-    """Add a new file object to a tree (by ref)."""
-    ref = await models.Ref.get_or_none(name="main")
-
-    commit = await get_commit_from_ref(ref_name)
-
-    object_tags = {}
-    if tags:
-        try:
-            object_tags = json.loads(tags)
-        except json.JSONDecodeError:
-            raise HTTPException(status_code=400, detail="Invalid tags format")
-
-
-    if file is not None:
-        object, obj_type = await FileService.create_file(file, object_tags), "file"
-    else:
-        object, obj_type = await CollectionsService.create_collection(name, object_tags), "tree"
-
-    tree_entry_path = hashlib.sha1(str(random.getrandbits(256)).encode()).hexdigest()
-    async with git_service.stage_changes(head=commit) as index:
-        new_entry = await models.TreeEntry.create(
-            path=tree_entry_path,
-            object_type=obj_type,
-            object_id=object.id
-        )
-        await index.insert_tree_entry(new_entry, path)
-        await index.commit(f"Add file {object.name}", ref)
-
-    return TreeEntryResponse(
-        id=new_entry.id,
-        object_type=obj_type,
-        object=object,
-        path=tree_entry_path
-    )
-
-
-@router.put("/{ref_name}/{path:path}", response_model=TreeEntryResponse)
-async def update_object_in_tree(
-    ref_name: str = Path(..., description="Ref name"),
-    path: str = Path(..., description="TreeEntry (object) path"),
-    request: ObjectUpdateRequest = None
-):
-    """Update a file or collection object in a tree (by tree entry)."""
-    ref = await models.Ref.get_or_none(name="main")
-
-    # Find the commit
-    commit = await get_commit_from_ref(ref_name)
-
-    entry = await git_service.resolve_entry(await commit.tree, path)
-    if not entry:
-        raise HTTPException(status_code=404, detail="Tree entry not found")
-
-    print('Requested tags: ', request.tags)
-
-    if entry.object_type == 'file':
-        orig_file_obj = await models.File.get_or_none(id=entry.object_id)
-        if not orig_file_obj:
-            raise HTTPException(status_code=404, detail="File not found")
-        
-        new_file_obj = await models.File.create(   
-            name=orig_file_obj.name,
-            original_name=orig_file_obj.original_name,
-            file_path=orig_file_obj.file_path,
-            file_size=orig_file_obj.file_size,
-            mime_type=orig_file_obj.mime_type,
-            base_file_type=orig_file_obj.base_file_type,
-            tags=request.tags,
-        )
-        new_file_obj.sha1 = models.calculate_file_obj_hash(new_file_obj)
-        await new_file_obj.save()
-
-        new_object = new_file_obj
-        object_type = 'file'
-
-    elif entry.object_type == 'tree':
-        orig_tree_obj = await models.Tree.get_or_none(id=entry.object_id)
-        if not orig_tree_obj:
-            raise HTTPException(status_code=404, detail="Collection not found")
-        
-        new_tree_obj = await models.Tree.create(
-            entries=list(orig_tree_obj.entries),
-            name=orig_tree_obj.name,
-            tags=request.tags,
-        )
-
-        new_object = new_tree_obj
-        object_type = 'tree'
-
-    else:
-        raise HTTPException(status_code=400, detail=f"Unsupported object type: {entry.object_type}")
-
-    async with git_service.stage_changes(head=commit) as index:
-        new_entry = await models.TreeEntry.create(
-            path=entry.path,
-            object_type=object_type,
-            object_id=new_object.id
-        )
-        await index.remove_tree_entry(path, force=True)
-
-        match path.rsplit('/', 1):
-            case folder, _:
-                await index.insert_tree_entry(new_entry, folder)
-            case _:
-                await index.insert_tree_entry(new_entry, None)
-        
-        commit_message = f"Update {'file' if object_type == 'file' else 'collection'} {new_object.name}"
-        await index.commit(commit_message, ref)
-
-    # Fetch the updated object to return
-    if object_type == 'file':
-        updated_object = await models.File.get_or_none(id=new_object.id)
-        if not updated_object:
-            raise HTTPException(status_code=500, detail="Updated file not found")
-    else:
-        updated_object = await models.Tree.get_or_none(id=new_object.id)
-        if not updated_object:
-            raise HTTPException(status_code=500, detail="Updated collection not found")
-
-    return TreeEntryResponse(
-        id=entry.id,
-        object_type=object_type,
-        object=updated_object,
-        path=entry.path
-    )
-
-
-@router.delete("/{ref_name}/{path:path}")
-async def remove_object_in_tree(
-    ref_name: str = Path(..., description="Ref name"),
-    path: str = Path(..., description="TreeEntry (object) path")
-):
-    """Remove a file or collection object from a tree (by tree entry)."""
-    ref = await models.Ref.get_or_none(name="main")
-
-    # Find the commit
-    commit = await get_commit_from_ref(ref_name)
-
-    # Resolve the entry to get object information for the commit message
-    entry = await git_service.resolve_entry(await commit.tree, path)
-    if not entry:
-        raise HTTPException(status_code=404, detail="Tree entry not found")
-
-    async with git_service.stage_changes(head=commit) as index:
-        # Remove the tree entry
-        await index.remove_tree_entry(path)
-        
-        # Create commit message
-        commit_message = f"Remove object"
-        await index.commit(commit_message, ref)
-
-    return {"message": f"Successfully removed object from path '{path}'"}
-
-
-class CloneObjectRequest(BaseModel):
-    source_path: str
-    target_path: str
-
-
-@router.post("/{ref_name}/clone", response_model=TreeEntryResponse)
-async def clone_object_in_tree(
-    ref_name: str = Path(..., description="Ref name"),
-    request: CloneObjectRequest = Body(..., description="Clone request with source and target paths")
-):
-    """Clone a file or collection object from one path to another (keeping the same object reference)."""
-    ref = await models.Ref.get_or_none(name="main")
-
-    # Find the commit
-    commit = await get_commit_from_ref(ref_name)
-
-    # Resolve the source entry
-    source_entry = await git_service.resolve_entry(await commit.tree, request.source_path)
-    if not source_entry:
-        raise HTTPException(status_code=404, detail="Source object not found")
-
-    # Check if target path already exists
-    target_entry = await git_service.resolve_entry(await commit.tree, request.target_path)
-    if not target_entry:
-        raise HTTPException(status_code=409, detail="Target collection does not exist")
-
-    # Get object details for commit message
-    object_name = "unknown"
-    object_type = source_entry.object_type
-    
-    if source_entry.object_type == 'file':
-        file_obj = await models.File.get_or_none(id=source_entry.object_id)
-        if file_obj:
-            object_name = file_obj.name
-    elif source_entry.object_type == 'tree':
-        tree_obj = await models.Tree.get_or_none(id=source_entry.object_id)
-        if tree_obj:
-            object_name = tree_obj.name
-
-    async with git_service.stage_changes(head=commit) as index:
-        # Create a new tree entry pointing to the same object
-        tree_entry_path = hashlib.sha1(str(random.getrandbits(256)).encode()).hexdigest()
-        new_entry = await models.TreeEntry.create(
-            path=tree_entry_path,
-            object_type=source_entry.object_type,
-            object_id=source_entry.object_id
-        )
-
-        await index.insert_tree_entry(new_entry, request.target_path)
-        
-        # Create commit message
-        commit_message = f"Clone {object_type} {object_name} from {request.source_path} to {request.target_path}"
-        await index.commit(commit_message, ref)
-
-    # Fetch the cloned object to return
-    if object_type == 'file':
-        cloned_object = await models.File.get_or_none(id=source_entry.object_id)
-        if not cloned_object:
-            raise HTTPException(status_code=500, detail="Cloned file not found")
-    else:
-        cloned_object = await models.Tree.get_or_none(id=source_entry.object_id)
-        if not cloned_object:
-            raise HTTPException(status_code=500, detail="Cloned collection not found")
-
-    return TreeEntryResponse(
-        id=new_entry.id,
-        object_type=object_type,
-        object=cloned_object,
-        path=request.target_path
-    ) 

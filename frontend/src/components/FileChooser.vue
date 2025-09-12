@@ -129,7 +129,7 @@ async function loadFiles() {
   loading.value = true
   error.value = null
   try {
-    const response = await apiService.getObjects(props.refName, props.currentPath, 0, 100)
+    const response = await apiService.getRootContents(0, 100)
     files.value = response.files || []
   } catch (err) {
     console.error('Failed to load files:', err)

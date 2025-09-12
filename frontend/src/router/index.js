@@ -12,7 +12,7 @@ const routes = [
     component: LandingPage
   },
   {
-    path: '/explorer/:branch',
+    path: '/explorer',
     name: 'Explorer',
     component: Explorer,
     children: [
@@ -21,7 +21,6 @@ const routes = [
           name: 'FileEditor',
           component: FileEditor,
           props: route => ({ 
-            refName: route.params.branch,
             treePath: route.query.treePath 
           })
       },
@@ -30,7 +29,6 @@ const routes = [
           name: 'FileList',
           component: FileList,
           props: route => ({ 
-            refName: route.params.branch,
             treePath: route.query.treePath 
           })
       },
@@ -39,7 +37,6 @@ const routes = [
           name: 'FileViewer',
           component: FileViewer,
           props: route => ({ 
-            refName: route.params.branch,
             treePath: route.query.treePath 
           })
       },

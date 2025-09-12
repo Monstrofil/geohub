@@ -8,7 +8,7 @@
             <h1 class="file-name">{{ getDisplayName() }}</h1>
             <div class="file-meta">
               <span class="file-type">{{ fileTypeLabel }}</span>
-              <span class="file-size" v-if="file?.file_size">{{ formatFileSize(file.file_size) }}</span>
+              <span class="file-size" v-if="getFileSize(file)">{{ formatFileSize(getFileSize(file)) }}</span>
               <span class="file-date" v-if="file?.created_at">{{ formatDate(file.created_at) }}</span>
               <span class="file-id" v-if="file?.id">ID: {{ file.id }}</span>
             </div>
@@ -94,9 +94,9 @@
               />
               
               <!-- Vector file content -->
-              <div v-else-if="file.base_file_type === 'vector'" class="vector-content">
+              <div v-else-if="getBaseFileType(file) === 'vector'" class="vector-content">
                 <h3>Vector File</h3>
-                <p>This is a vector file ({{ file.mime_type }}).</p>
+                <p>This is a vector file ({{ getMimeType(file) }}).</p>
                 <div class="preview-placeholder">
                   <i class="fas fa-draw-polygon"></i>
                   <p>Vector preview would be displayed here</p>
@@ -106,7 +106,7 @@
               <!-- Generic file content -->
               <div v-else class="generic-content">
                 <h3>File Content</h3>
-                <p>File type: {{ file.mime_type }}</p>
+                <p>File type: {{ getMimeType(file) }}</p>
                 <div class="preview-placeholder">
                   <i class="fas fa-file"></i>
                   <p>File preview would be displayed here</p>
@@ -158,7 +158,7 @@
               <div class="info-grid">
                 <div class="info-item">
                   <span class="info-label">Name:</span>
-                  <span class="info-value">{{ file.original_name || file.name }}</span>
+                  <span class="info-value">{{ getOriginalName(file) }}</span>
                 </div>
                 <div class="info-item">
                   <span class="info-label">Type:</span>
@@ -166,11 +166,11 @@
                 </div>
                 <div class="info-item">
                   <span class="info-label">MIME Type:</span>
-                  <span class="info-value">{{ file.mime_type || 'Unknown' }}</span>
+                  <span class="info-value">{{ getMimeType(file) || 'Unknown' }}</span>
                 </div>
-                <div class="info-item" v-if="file.file_size">
+                <div class="info-item" v-if="getFileSize(file)">
                   <span class="info-label">Size:</span>
-                  <span class="info-value">{{ formatFileSize(file.file_size) }}</span>
+                  <span class="info-value">{{ formatSize(getFileSize(file)) }}</span>
                 </div>
                 <div class="info-item" v-if="file.created_at">
                   <span class="info-label">Created:</span>
@@ -197,6 +197,7 @@ import CollectionFilesList from './CollectionFilesList.vue'
 import { matchTagsToPreset } from '../utils/tagMatcher.js'
 import { loadFieldDefinitions, resolveFields } from '../utils/fieldResolver.js'
 import apiService from '../services/api.js'
+import { getFileSize, getBaseFileType, getMimeType, getOriginalName, getDisplayName as getFileDisplayName, formatFileSize as formatSize } from '../utils/fileHelpers.js'
 
 const route = useRoute()
 const router = useRouter()
@@ -281,12 +282,28 @@ async function loadFile() {
   error.value = null
   
   try {
-    const response = await apiService.getTreeEntry(props.refName, props.treePath)
-    if (!response || !response.object) {
+    // Find the tree item by path - in the new API we need to parse the path to get the ID
+    // For now, we'll use the legacy getObjects method to find the item by path
+    const pathParts = props.treePath.split('/')
+    const fileName = pathParts[pathParts.length - 1]
+    
+    // Try to get the item from the current collection
+    const parentPath = pathParts.slice(0, -1).join('/') || ''
+    const collectionContents = await apiService.getRootContents(0, 1000) // Get all items to search
+    
+    // Find the matching item
+    const allItems = [...(collectionContents.files || []), ...(collectionContents.collections || [])]
+    const response = allItems.find(item => 
+      item.name === fileName || 
+      item.original_name === fileName || 
+      item.path?.endsWith(fileName)
+    )
+    
+    if (!response) {
       throw new Error('File not found')
     }
     
-    file.value = response.object
+    file.value = response
     // Store the object type for UI rendering
     file.value.object_type = response.object_type
 
@@ -338,7 +355,7 @@ const fileType = computed(() => {
   if (file.value?.object_type === 'tree') {
     return 'collection'
   }
-  return file.value?.base_file_type || 'raw'
+  return getBaseFileType(file.value)
 })
 
 const fileTypeLabel = computed(() => {

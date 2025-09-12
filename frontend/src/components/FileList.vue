@@ -33,11 +33,11 @@
       <template v-for="(segment, index) in pathSegments" :key="index">
         <span class="breadcrumb-separator">/</span>
         <button 
-          @click="navigateToPath(index)"
+          @click="navigateToPath(segment.path)"
           class="breadcrumb-item"
           :class="{ active: index === pathSegments.length - 1 }"
         >
-          {{ segment }}
+          {{ segment.name }}
         </button>
       </template>
     </div>
@@ -73,9 +73,8 @@
           :key="entry.id"
           :path="entry.path"
           :file="entry.object"
-          :name="entry.object?.tags.name || entry.object?.original_name || ''"
+          :name="getDisplayName(entry.object)"
           :tree-path="treePathString"
-          :ref-name="props.refName"
           :selected="selectedEntry && selectedEntry.object && selectedEntry.object.id === entry.object?.id"
           @click="selectFile(entry.object)"
           @file-selected="handleFileSelected"
@@ -88,7 +87,6 @@
     <!-- Upload Modal -->
     <UploadModal 
       :show="showUploadModal"
-      :ref-name="props.refName"
       :tree-path="treePathString"
       @close="closeModal"
       @upload-success="handleUploadSuccess"
@@ -103,12 +101,12 @@ import FileCard from './FileCard.vue'
 import TreeCard from './TreeCard.vue'
 import UploadModal from './UploadModal.vue'
 import apiService from '../services/api.js'
+import { getDisplayName } from '../utils/fileHelpers.js'
 
 const props = defineProps({
-  refName: { type: String, required: true },
   treePath: {type: [String, Array], required: false},
   selectedEntry: { type: Object, default: null },
-  currentBranchName: { type: String, required: false }
+  changeTracker: { type: Object, required: false }
 })
 
 const emit = defineEmits(['refresh', 'select-file', 'file-selected', 'files-loaded', 'file-uploaded', 'branch-created', 'object-removed', 'object-cloned'])
@@ -133,19 +131,79 @@ const treePathString = computed(() => {
 
 // Breadcrumb path segments
 const pathSegments = computed(() => {
-  return treePathString.value ? treePathString.value.split('/').filter(Boolean) : []
+  if (!treePathString.value || treePathString.value === 'root') {
+    return []
+  }
+  
+  // Split LTREE path by dots and create breadcrumb segments
+  const parts = treePathString.value.split('.').filter(Boolean)
+  
+  // Skip the 'root' part and create meaningful segments
+  const segments = []
+  if (parts.length > 1) {
+    for (let i = 1; i < parts.length; i++) {
+      segments.push({
+        name: `Collection ${i}`, // You could look up actual collection names
+        path: parts.slice(0, i + 1).join('.')
+      })
+    }
+  }
+  
+  return segments
 })
 
 async function loadFiles() {
   loading.value = true
   error.value = null
   try {
-    if (!props.refName) {
-      files.value = []
-      return
+    let response
+    
+    if (!treePathString.value || treePathString.value === '' || treePathString.value === 'root') {
+      // Load root contents
+      response = await apiService.getRootContents(0, 100)
+    } else {
+      // We have a collection path - find the collection and get its contents
+      const collection = await apiService.findCollectionByPath(treePathString.value)
+      
+      if (collection) {
+        // Found the collection, get its contents
+        response = await apiService.getCollectionContents(collection.id, 0, 100)
+      } else {
+        // Collection not found, show empty state with error
+        console.warn('Collection not found for path:', treePathString.value)
+        response = { files: [], collections: [], total_files: 0, total_collections: 0 }
+        error.value = `Колекція за шляхом "${treePathString.value}" не знайдена`
+      }
     }
-    const response = await apiService.getObjects(props.refName, treePathString.value, 0, 100)
-    files.value = response.files || []
+    
+    // Transform response to match expected format
+    const objects = []
+    
+    // Add collections as tree entries
+    if (response.collections) {
+      for (const collection of response.collections) {
+        objects.push({
+          id: collection.id,
+          path: collection.path,
+          object_type: 'tree',
+          object: collection
+        })
+      }
+    }
+    
+    // Add files as file entries
+    if (response.files) {
+      for (const file of response.files) {
+        objects.push({
+          id: file.id,
+          path: file.path,
+          object_type: 'file',
+          object: file
+        })
+      }
+    }
+    
+    files.value = objects
     emit('files-loaded', files.value)
   } catch (err) {
     console.error('Failed to load files:', err)
@@ -163,17 +221,14 @@ function handleRefresh() {
 function navigateToRoot() {
   router.push({
     name: 'FileList',
-    params: { branch: props.refName },
     query: { treePath: '' }
   })
 }
 
-function navigateToPath(index) {
-  const newPath = pathSegments.value.slice(0, index + 1).join('/')
+function navigateToPath(ltreePath) {
   router.push({
     name: 'FileList',
-    params: { branch: props.refName },
-    query: { treePath: newPath }
+    query: { treePath: ltreePath }
   })
 }
 

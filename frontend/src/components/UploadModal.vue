@@ -85,7 +85,6 @@ import apiService from '../services/api.js'
 
 const props = defineProps({
   show: { type: Boolean, default: false },
-  refName: { type: String, required: true },
   treePath: { type: String, default: '' }
 })
 
@@ -179,12 +178,18 @@ async function uploadFile() {
     }
   })
 
+  // Add name to tags if provided
+  if (name.value.trim()) {
+    tagsObj.name = name.value.trim()
+  }
+
+  // Convert tree path to parent path (for now, just use "root" since we need collection ID mapping)
+  const parentPath = props.treePath || "root"
+
   const response = await apiService.uploadFile(
     file.value,
     tagsObj,
-    props.refName,
-    props.treePath,
-    name.value.trim() || (file.value && file.value.name) || ''
+    parentPath
   )
   
   uploadSuccess.value = true
@@ -209,10 +214,14 @@ async function createCollection() {
     }
   })
 
-  collectionTags['name'] = name.value.trim();
-  console.log("coll", collectionTags)
+  // Convert tree path to parent path (for now, just use "root" since we need collection ID mapping)
+  const parentPath = props.treePath || "root"
 
-  const response = await apiService.createCollection(name.value.trim(), props.refName, props.treePath, collectionTags)
+  const response = await apiService.createCollection(
+    name.value.trim(), 
+    collectionTags, 
+    parentPath
+  )
   
   uploadSuccess.value = true
   uploadSuccessMessage.value = 'Колекцію успішно створено!'
