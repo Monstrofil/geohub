@@ -28,36 +28,14 @@ class TreeItemResponse(BaseModel):
     id: uuid.UUID
     name: str
     type: str  # "file" or "collection"
+    object_type: str
     tags: Dict[str, Any]  # Allow mixed types for file metadata
     created_at: datetime.datetime
     updated_at: datetime.datetime
     path: str
 
-    # Computed properties for backward compatibility
-    @property
-    def sha1(self) -> str | None:
-        """Get SHA1 hash from tags (for files)"""
-        return self.tags.get("sha1") if self.type == "file" else None
-    
-    @property
-    def original_name(self) -> str:
-        """Get original filename from tags (for files)"""
-        return self.tags.get("original_name", self.name) if self.type == "file" else self.name
-    
-    @property 
-    def file_size(self) -> int:
-        """Get file size from tags (for files)"""
-        return int(self.tags.get("file_size", 0)) if self.type == "file" else 0
-    
-    @property
-    def mime_type(self) -> str:
-        """Get MIME type from tags (for files)"""
-        return self.tags.get("mime_type", "") if self.type == "file" else ""
-    
-    @property
-    def base_file_type(self) -> str:
-        """Get base file type from tags (for files)"""
-        return self.tags.get("base_file_type", "raw") if self.type == "file" else ""
+class TreeItemDetails(TreeItemResponse):
+    object_details: models.KnownTreeItemTypes | None = None
 
 
 class TreeItemListResponse(BaseModel):
@@ -170,7 +148,7 @@ async def list_tree_items(
         items = [TreeItemResponse.model_validate(f) for f in result["files"]]
         total = result["total"]
     elif type == "collection":
-        collections_query = models.TreeItem.filter(type="collection")
+        collections_query = models.TreeItem.filter(object_type="collection")
         if collection_path:
             collections_query = collections_query.filter(path__contains=collection_path)
         if filter_tags:
@@ -198,18 +176,29 @@ async def list_tree_items(
     )
 
 
-@router.get("/tree-items/{item_id}", response_model=TreeItemResponse)
+@router.get("/tree-items/{item_id}", response_model=TreeItemDetails)
 async def get_tree_item(item_id: uuid.UUID):
     """Get tree item by ID"""
     # Try to get as file first, then as collection
-    item = await FileService.get_file(str(item_id))
-    if not item:
-        item = await CollectionsService.get_collection(str(item_id))
+    item = await models.TreeItem.filter(id=str(item_id)).first()
     
     if not item:
         raise HTTPException(status_code=404, detail="Tree item not found")
     
-    return TreeItemResponse.model_validate(item)
+    response = TreeItemDetails.model_validate(item)
+    
+    # Get the actual object and convert to appropriate Pydantic model
+    obj = await item.object
+    if isinstance(obj, models.RawFile):
+        response.object_details = models.RawFile_Pydantic.model_validate(obj)
+    elif isinstance(obj, models.GeoRasterFile):
+        response.object_details = models.GeoRasterFile_Pydantic.model_validate(obj)
+    elif isinstance(obj, models.Collection):
+        response.object_details = models.Collection_Pydantic.model_validate(obj)
+    else:
+        response.object_details = None
+    
+    return response
 
 
 @router.put("/tree-items/{item_id}", response_model=TreeItemResponse)
@@ -331,7 +320,11 @@ async def upload_file(
     tags: Optional[str] = Form(None),
     parent_path: Optional[str] = Form("root")
 ):
-    """Upload a new file with georeferencing detection"""
+    """Upload a new file with automatic georeferencing detection
+    
+    If the uploaded file is already georeferenced (has projection and geotransform),
+    it will be saved as a GeoRasterFile. Otherwise, it will be saved as a RawFile.
+    """
     file_tags = {}
     if tags:
         try:
@@ -345,6 +338,20 @@ async def upload_file(
     return TreeItemResponse.model_validate(file_obj)
 
 
+@router.post("/tree-items/{item_id}/probe")
+async def probe_tree_item(item_id: uuid.UUID):
+    """Probe a tree item to check if it can be georeferenced with GDAL"""
+    result = await FileService.probe_tree_item(str(item_id))
+    return result
+
+
+@router.post("/tree-items/{item_id}/convert-to-geo-raster", response_model=TreeItemResponse)
+async def convert_to_geo_raster(item_id: uuid.UUID):
+    """Convert a RawFile to GeoRasterFile for georeferencing"""
+    file_obj = await FileService.convert_to_geo_raster(str(item_id))
+    return TreeItemResponse.model_validate(file_obj)
+
+
 @router.get("/files/{file_id}/download")
 async def download_file(file_id: uuid.UUID):
     """Download a file (original version, not georeferenced)"""
@@ -352,15 +359,22 @@ async def download_file(file_id: uuid.UUID):
     if not file_obj:
         raise HTTPException(status_code=404, detail="File not found")
     
-    # Use original file path for downloads, not the georeferenced version
-    download_path = file_obj.original_file_path
+    # Get file details from the specialized model
+    obj = await file_obj.get_object()
+    
+    # Use original file path for downloads if available, otherwise use main file path
+    if hasattr(obj, 'original_file_path') and obj.original_file_path:
+        download_path = obj.original_file_path
+    else:
+        download_path = obj.file_path
+        
     if not os.path.exists(download_path):
         raise HTTPException(status_code=404, detail="File not found on disk")
     
     return FastAPIFileResponse(
         path=download_path,
-        filename=file_obj.original_name,
-        media_type=file_obj.mime_type
+        filename=obj.original_name,
+        media_type=obj.mime_type
     )
 
 
@@ -373,7 +387,7 @@ async def get_file_map(file_id: uuid.UUID):
         raise HTTPException(status_code=404, detail="File not found")
     
     # Use the actual file path (which may be georeferenced version) instead of just the name
-    file_path = file_obj.file_path
+    file_path = await file_obj.get_file_path()
     if not file_path:
         raise HTTPException(status_code=400, detail="File path not found")
     
@@ -395,7 +409,7 @@ async def get_file_extent(file_id: uuid.UUID):
         raise HTTPException(status_code=404, detail="File not found")
     
     # Use the actual file path (which may be georeferenced version) instead of just the name
-    file_path = file_obj.file_path
+    file_path = await file_obj.get_file_path()
     if not file_path:
         raise HTTPException(status_code=400, detail="File path not found")
     
@@ -447,18 +461,19 @@ async def get_georeferencing_status(file_id: uuid.UUID):
     if not file_obj:
         raise HTTPException(status_code=404, detail="File not found")
     
-    if not os.path.exists(file_obj.file_path):
+    file_path = await file_obj.get_file_path()
+    if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="File not found on disk")
     
     try:
         # Check if file is a raster
-        base_file_type = file_obj.tags.get("base_file_type", "raw")
+        base_file_type = await file_obj.get_base_file_type()
         if base_file_type != "raster":
             raise HTTPException(status_code=400, detail="File is not a raster image")
         
         # Get georeferencing status and image info
-        is_georeferenced = georeferencing_service.is_georeferenced(file_obj.file_path)
-        image_info = georeferencing_service.get_image_info(file_obj.file_path)
+        is_georeferenced = georeferencing_service.is_georeferenced(file_path)
+        image_info = georeferencing_service.get_image_info(file_path)
         
         return GeoreferencingStatusResponse(
             is_georeferenced=is_georeferenced,
@@ -477,13 +492,14 @@ async def create_file_preview(file_id: uuid.UUID, max_width: int = 512, max_heig
     if not file_obj:
         raise HTTPException(status_code=404, detail="File not found")
     
-    if not os.path.exists(file_obj.file_path):
+    file_path = await file_obj.get_file_path()
+    if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="File not found on disk")
     
     try:
         # Create preview
         preview_path = georeferencing_service.create_preview_image(
-            file_obj.file_path, 
+            file_path, 
             (max_width, max_height)
         )
         
@@ -528,7 +544,8 @@ async def preview_georeferencing(file_id: uuid.UUID, request: ControlPointsReque
     if not file_obj:
         raise HTTPException(status_code=404, detail="File not found")
     
-    if not os.path.exists(file_obj.file_path):
+    file_path = await file_obj.get_file_path()
+    if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="File not found on disk")
     
     try:
@@ -546,7 +563,7 @@ async def preview_georeferencing(file_id: uuid.UUID, request: ControlPointsReque
         
         # Create warped preview
         warped_path = georeferencing_service.warp_image_with_control_points(
-            file_obj.file_path,
+            file_path,
             control_points,
             request.control_points_srs
         )
@@ -570,7 +587,8 @@ async def apply_georeferencing(file_id: uuid.UUID, request: GeoreferencingApplyR
     if not file_obj:
         raise HTTPException(status_code=404, detail="File not found")
     
-    if not os.path.exists(file_obj.file_path):
+    file_path = await file_obj.get_file_path()
+    if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="File not found on disk")
     
     try:
@@ -588,50 +606,39 @@ async def apply_georeferencing(file_id: uuid.UUID, request: GeoreferencingApplyR
         
         # Create the final georeferenced file
         georeferenced_path = georeferencing_service.warp_image_with_control_points(
-            file_obj.file_path,
+            file_path,
             control_points,
             request.control_points_srs
         )
         
-        # Replace the original file with the georeferenced version
-        import shutil
-        backup_path = file_obj.file_path + ".backup"
-        shutil.move(file_obj.file_path, backup_path)  # Backup original
-        shutil.move(georeferenced_path, file_obj.file_path)  # Replace with georeferenced
+        # Replace with georeferenced
+        os.rename(georeferenced_path, file_path) 
         
-        # Update file metadata
-        updated_tags = file_obj.tags.copy()
-        updated_tags.update({
-            "georeferenced": True,
-            "georeferencing_method": "manual_control_points",
-            "target_srs": request.control_points_srs,
-            "control_points_count": len(control_points),
-            "georeferencing_accuracy": validation_results.get('statistics', {})
-        })
+        # Update georeferencing metadata in the specialized model
+        from model_helpers import TreeItemService
+        await TreeItemService.update_georeferencing(
+            str(file_id),
+            new_file_path=file_path  # Update to the new georeferenced file path
+        )
         
-        # Add custom metadata if provided
-        if request.metadata:
-            updated_tags.update(request.metadata)
+        # Update user metadata if provided
+        user_metadata = request.metadata or {}
+        updated_file = await FileService.update_file(str(file_id), tags=user_metadata)
         
-        # Update the file in database
-        updated_file = await FileService.update_file(str(file_id), tags=updated_tags)
-        
-        # Save control points for future reference
-        cp_file = georeferencing_service.save_control_points(str(file_id), control_points)
         
         return {
             "message": "Georeferencing applied successfully",
             "file": TreeItemResponse.model_validate(updated_file),
-            "validation_results": validation_results,
-            "control_points_file": cp_file
+            "validation_results": validation_results
         }
         
     except Exception as e:
         # If something went wrong, try to restore the backup
         try:
-            backup_path = file_obj.file_path + ".backup"
+            file_path = await file_obj.get_file_path()
+            backup_path = file_path + ".backup"
             if os.path.exists(backup_path):
-                shutil.move(backup_path, file_obj.file_path)
+                shutil.move(backup_path, file_path)
         except:
             pass
         

@@ -455,33 +455,6 @@ class GeoreferencingService:
         
         return result
     
-    def save_control_points(self, file_id: str, control_points: List[ControlPoint]) -> str:
-        """
-        Save control points to a JSON file
-        
-        Args:
-            file_id: Unique identifier for the file
-            control_points: List of control points
-            
-        Returns:
-            str: Path to the saved control points file
-        """
-        try:
-            cp_file = self.temp_dir / f"control_points_{file_id}.json"
-            
-            data = {
-                'file_id': file_id,
-                'control_points': [cp.to_dict() for cp in control_points],
-                'created_at': datetime.now().isoformat()
-            }
-            
-            with open(cp_file, 'w') as f:
-                json.dump(data, f, indent=2)
-            
-            return str(cp_file)
-            
-        except Exception as e:
-            raise ValueError(f"Error saving control points: {e}")
     
     def load_control_points(self, file_path: str) -> List[ControlPoint]:
         """

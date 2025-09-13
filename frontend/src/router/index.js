@@ -21,7 +21,7 @@ const routes = [
           name: 'FileEditor',
           component: FileEditor,
           props: route => ({ 
-            treePath: route.query.treePath 
+            treeItemId: route.query.id
           })
       },
       {
@@ -37,7 +37,7 @@ const routes = [
           name: 'FileViewer',
           component: FileViewer,
           props: route => ({ 
-            treePath: route.query.treePath 
+            treeItemId: route.query.id
           })
       },
     ],

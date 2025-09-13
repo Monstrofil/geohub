@@ -49,17 +49,21 @@ export function getMimeType(file) {
  * @returns {string} Base file type (raster, vector, raw)
  */
 export function getBaseFileType(file) {
+  if (!file) return 'raw'
+  
+  // New structure: derive from object_type
+  if (file.object_type === 'geo_raster_file') {
+    return 'raster'
+  } else if (file.object_type === 'raw_file') {
+    return 'raw'
+  } else if (file.object_type === 'collection') {
+    return 'collection'
+  }
+  
+  // Fallback to tags for backward compatibility
   return getFileProperty(file, 'base_file_type', 'raw')
 }
 
-/**
- * Get SHA1 hash, handling both structures
- * @param {Object} file - File object
- * @returns {string|null} SHA1 hash
- */
-export function getSha1(file) {
-  return getFileProperty(file, 'sha1')
-}
 
 /**
  * Get display name for a file or collection, prioritizing custom tags
@@ -70,7 +74,7 @@ export function getDisplayName(item) {
   if (!item) return 'Untitled'
   
   // For files, check tags first, then original_name, then name
-  if (item.type === 'file' || item.object_type === 'file') {
+  if (item.type === 'file' || item.object_type === 'raw_file' || item.object_type === 'geo_raster_file') {
     return item.tags?.name || getOriginalName(item) || item.name || 'Untitled File'
   }
   
@@ -99,7 +103,7 @@ export function formatFileSize(bytes) {
  * @returns {boolean} True if item is a file
  */
 export function isFile(item) {
-  return item?.type === 'file' || item?.object_type === 'file'
+  return item?.type === 'file' || item?.object_type === 'raw_file' || item?.object_type === 'geo_raster_file'
 }
 
 /**

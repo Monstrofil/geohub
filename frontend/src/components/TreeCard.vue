@@ -7,7 +7,7 @@
         <div class="tree-name tree-path">{{ path }}</div>
       </div>
     </router-link>
-    <router-link :to="{name: 'FileEditor', query: { treePath: fullPath }}">
+    <router-link :to="{name: 'FileEditor', query: { id: props.file.id }}" v-if="props.file?.id">
       <button 
         class="edit-btn" 
         title="Edit collection"

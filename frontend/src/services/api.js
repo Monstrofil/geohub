@@ -671,6 +671,28 @@ class ApiService {
       method: 'POST'
     })
   }
+
+  /**
+   * Probe a tree item to check if it can be georeferenced
+   * @param {string} itemId - The tree item ID
+   * @returns {Promise<Object>} Probe result with can_georeference flag and other info
+   */
+  async probeTreeItem(itemId) {
+    return await this.request(`/tree-items/${itemId}/probe`, {
+      method: 'POST'
+    })
+  }
+
+  /**
+   * Convert a tree item to geo-raster format for georeferencing
+   * @param {string} itemId - The tree item ID
+   * @returns {Promise<Object>} Updated tree item object
+   */
+  async convertToGeoRaster(itemId) {
+    return await this.request(`/tree-items/${itemId}/convert-to-geo-raster`, {
+      method: 'POST'
+    })
+  }
 }
 
 export default new ApiService()

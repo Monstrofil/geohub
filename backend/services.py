@@ -1,4 +1,5 @@
-from models import TreeItem, TreeItem_Pydantic, File, Collection, calculate_tree_item_hash, calculate_file_obj_hash
+from models import TreeItem, TreeItem_Pydantic, File, Collection, RawFile, GeoRasterFile
+from model_helpers import ModelFactory, TreeItemService
 from tortoise.expressions import Q
 import os
 import uuid
@@ -7,34 +8,9 @@ from osgeo import gdal, osr
 import geopandas as gpd
 from typing import List, Dict, Any, Optional, Tuple
 from fastapi import UploadFile, HTTPException
-import hashlib
 from datetime import datetime, timezone
 import json
 
-
-
-def detect_file_type(file_path: str) -> str:
-    """
-    Detect the base file type using GDAL and GeoPandas
-    
-    Returns:
-        str: base_file_type
-    """
-    
-    # Check if file exists
-    if not os.path.exists(file_path):
-        raise RuntimeError("Uploaded file is missing: check disk storage")
-    
-    # Try to detect as raster using GDAL
-    if _is_raster(file_path):
-        return "raster"
-    
-    # Try to detect as vector using GeoPandas
-    if _is_vector(file_path):
-        return "vector"
-    
-    # If neither, it's a raw file
-    return "raw"
 
 
 def _is_raster(file_path: str) -> bool:
@@ -65,36 +41,6 @@ def _is_vector(file_path: str) -> bool:
         return False
 
 
-def validate_file_type(filename: str, expected_type: str) -> bool:
-    """
-    Validate if a file matches the expected base type
-    
-    Args:
-        filename: The filename to check
-        expected_type: Expected base type ('raster', 'vector', 'raw')
-    
-    Returns:
-        bool: True if file type matches expected type
-    """
-    if not filename:
-        return False
-    
-    # For validation, we need to actually check the file
-    file_path = os.path.join(FileService.UPLOAD_DIR, filename)
-    
-    if not os.path.exists(file_path):
-        return False
-    
-    if expected_type == "raster":
-        return _is_raster(file_path)
-    elif expected_type == "vector":
-        return _is_vector(file_path)
-    elif expected_type == "raw":
-        # Raw accepts anything that's not raster or vector
-        return not _is_raster(file_path) and not _is_vector(file_path)
-    else:
-        return False
-
 
 class CollectionsService:
     @classmethod
@@ -102,7 +48,6 @@ class CollectionsService:
         """Create a new collection"""
         # Generate a unique path segment for this collection (LTREE compatible)
         import uuid
-        import hashlib
         
         # Create LTREE-compatible ID: use 'c' prefix + first 12 chars of UUID hex (no hyphens)
         collection_uuid = str(uuid.uuid4()).replace('-', '')[:12]
@@ -114,11 +59,12 @@ class CollectionsService:
         else:
             collection_path = f"{parent_path}.{collection_segment}"
         
-        collection_obj = await TreeItem.create(
+        # Use the new ModelFactory to create collection
+        collection_obj = await ModelFactory.create_collection(
             name=name,
-            type="collection",
-            tags=tags,
-            path=collection_path,
+            parent_path=collection_path,
+            description=tags.get('description', ''),
+            tags=tags
         )
         
         return collection_obj
@@ -126,17 +72,17 @@ class CollectionsService:
     @classmethod
     async def get_collection(cls, collection_id: str):
         """Get collection by ID"""
-        return await TreeItem.get_or_none(id=collection_id, type="collection")
+        return await TreeItem.get_or_none(id=collection_id, object_type="collection")
     
     @classmethod
     async def get_collection_by_path(cls, path: str):
         """Get collection by path"""
-        return await TreeItem.get_or_none(path=path, type="collection")
+        return await TreeItem.get_or_none(path=path, object_type="collection")
     
     @classmethod
     async def update_collection(cls, collection_id: str, name: str = None, tags: dict = None, new_parent_path: str = None):
         """Update collection"""
-        collection = await TreeItem.get_or_none(id=collection_id, type="collection")
+        collection = await TreeItem.get_or_none(id=collection_id, object_type="collection")
         if not collection:
             return None
         
@@ -246,7 +192,8 @@ class CollectionsService:
             item = TreeItem(
                 id=row['id'],
                 name=row['name'], 
-                type=row['type'],
+                object_type=row['object_type'],
+                object_id=row['object_id'],
                 tags=row['tags'],
                 created_at=row['created_at'],
                 updated_at=row['updated_at'],
@@ -267,6 +214,55 @@ class FileService:
         os.makedirs(cls.UPLOAD_DIR, exist_ok=True)
     
     @classmethod
+    def _analyze_raster_file(cls, file_path: str) -> Dict[str, Any]:
+        """
+        Analyze a raster file with GDAL to get georeferencing info and image metadata
+        
+        Returns:
+            Dict with keys: gdal_compatible, is_georeferenced, width, height, bands, 
+            has_projection, has_geotransform, error (if any)
+        """
+        try:
+            src_ds = gdal.Open(file_path)
+            if src_ds is None:
+                return {
+                    "gdal_compatible": False,
+                    "is_georeferenced": False,
+                    "error": "File cannot be opened by GDAL"
+                }
+            
+            # Get basic info
+            width = src_ds.RasterXSize
+            height = src_ds.RasterYSize
+            bands = src_ds.RasterCount
+            projection = src_ds.GetProjection()
+            geotransform = src_ds.GetGeoTransform()
+            
+            # Check if already georeferenced
+            has_projection = bool(projection and projection.strip())
+            has_geotransform = bool(geotransform and geotransform != (0.0, 1.0, 0.0, 0.0, 0.0, 1.0))
+            is_georeferenced = has_projection and has_geotransform
+            
+            src_ds = None  # Close dataset
+            
+            return {
+                "gdal_compatible": True,
+                "is_georeferenced": is_georeferenced,
+                "width": width,
+                "height": height,
+                "bands": bands,
+                "has_projection": has_projection,
+                "has_geotransform": has_geotransform
+            }
+            
+        except Exception as e:
+            return {
+                "gdal_compatible": False,
+                "is_georeferenced": False,
+                "error": f"Error analyzing file: {str(e)}"
+            }
+    
+    @classmethod
     async def save_uploaded_file(cls, file: UploadFile, tags: Dict[str, str] = None) -> Dict[str, Any]:
         """Save uploaded file to disk and return file info"""
         await cls.ensure_upload_dir()
@@ -276,11 +272,8 @@ class FileService:
         unique_filename = f"{uuid.uuid4()}{file_extension}"
         file_path = os.path.join(cls.UPLOAD_DIR, unique_filename)
         
-        # Save file and calculate sha1
+        # Save file
         content = await file.read()
-        tags = tags or {}
-        tags_json = json.dumps(tags, sort_keys=True, separators=(",", ":"))
-        sha1 = hashlib.sha1(content + tags_json.encode('utf-8')).hexdigest()
         async with aiofiles.open(file_path, 'wb') as f:
             await f.write(content)
         
@@ -289,57 +282,14 @@ class FileService:
             "name": unique_filename,
             "file_path": file_path,
             "file_size": len(content),
-            "mime_type": file.content_type or "application/octet-stream",
-            "sha1": sha1
+            "mime_type": file.content_type or "application/octet-stream"
         }
     
     @classmethod
-    async def create_file(cls, uploaded_file, tags: Dict[str, str] = None, expected_type: str = None, parent_path: str = "root") -> TreeItem:
-        """Create a new file record with automatic type detection"""
+    async def create_file(cls, uploaded_file, tags: Dict[str, str] = None, parent_path: str = "root") -> TreeItem:
+        """Create a new file record - detect if already georeferenced and create appropriate type"""
         file_info = await cls.save_uploaded_file(uploaded_file, tags)
         
-        # Detect file type
-        base_file_type = detect_file_type(file_info["file_path"])
-        
-        # Validate against expected type if provided
-        if expected_type and not validate_file_type(file_info["original_name"], expected_type):
-            # Delete the uploaded file if validation fails
-            if os.path.exists(file_info["file_path"]):
-                os.remove(file_info["file_path"])
-            raise HTTPException(
-                status_code=400, 
-                detail=f"File type not allowed for '{expected_type}'"
-            )
-
-        # For raster files, ensure they have a georeferenced version for MapServer
-        georef_file_path = file_info["file_path"]
-        is_georeferenced = False
-        
-        if base_file_type == "raster":
-            from georeferencing_service import GeoreferencingService
-            georef_service = GeoreferencingService()
-            is_georeferenced = georef_service.is_georeferenced(file_info["file_path"])
-            
-            if not is_georeferenced:
-                # Create a dummy georeferenced version
-                georef_file_path = await cls._create_dummy_georeferenced_file(file_info["file_path"])
-                print(f"Created dummy georeferenced file: {georef_file_path}")
-
-
-        # Merge user tags with file-specific metadata
-        file_tags = tags or {}
-        file_tags.update({
-            "original_name": file_info["original_name"],
-            "file_path": georef_file_path,  # Use georeferenced version for MapServer
-            "original_file_path": file_info["file_path"],  # Keep reference to original
-            "file_size": file_info["file_size"],
-            "mime_type": file_info["mime_type"],
-            "base_file_type": base_file_type,
-            "sha1": file_info["sha1"],
-            "georeferenced": is_georeferenced,
-            "has_dummy_georeference": not is_georeferenced and base_file_type == "raster"
-        })
-
         # Generate a unique path segment for this file (LTREE compatible)
         import uuid
         
@@ -348,20 +298,92 @@ class FileService:
         file_segment = f"f{file_uuid}"
         
         # Create the path: parent_path.file_segment
-        if parent_path == "root":
-            file_ltree_path = f"root.{file_segment}"
-        else:
-            file_ltree_path = f"{parent_path}.{file_segment}"
+        file_ltree_path = f"{parent_path}.{file_segment}"
 
-        file_obj = await TreeItem.create(
-            name=file_info["name"],
-            type="file",
-            tags=file_tags,
-            path=file_ltree_path
-        )
+        # Clean user tags (remove any system-level keys that shouldn't be in tags)
+        user_tags = tags or {}
+        system_keys = ['original_name', 'file_path', 'file_size', 'mime_type', 'base_file_type']
+        clean_tags = {k: v for k, v in user_tags.items() if k not in system_keys}
+
+        # Analyze file to check if it's already georeferenced
+        analysis = cls._analyze_raster_file(file_info["file_path"])
+        is_georeferenced = analysis.get("is_georeferenced", False)
+
+        # Create appropriate file type based on georeferencing status
+        if is_georeferenced:
+            # Add georeferencing metadata to tags for GeoRasterFile
+            georef_tags = clean_tags.copy()
+            georef_tags.update({
+                "is_georeferenced": True,
+                "georeferencing_method": "original"  # Mark as originally georeferenced
+            })
+            
+            # Create as GeoRasterFile since it's already georeferenced
+            file_obj = await ModelFactory.create_geo_raster_file(
+                name=file_info["name"],
+                file_path=file_info["file_path"],
+                original_name=file_info["original_name"],
+                file_size=file_info["file_size"],
+                mime_type=file_info["mime_type"],
+                parent_path=file_ltree_path,
+                tags=georef_tags
+            )
+        else:
+            # Create as RawFile (not georeferenced or not a raster)
+            file_obj = await ModelFactory.create_raw_file(
+                name=file_info["name"],
+                file_path=file_info["file_path"],
+                original_name=file_info["original_name"],
+                file_size=file_info["file_size"],
+                mime_type=file_info["mime_type"],
+                parent_path=file_ltree_path,
+                tags=clean_tags
+            )
         
         return file_obj
     
+    @classmethod
+    async def probe_tree_item(cls, item_id: str) -> Dict[str, Any]:
+        """Probe a tree item to see if it can be georeferenced with GDAL"""
+        tree_item = await TreeItem.get_or_none(id=item_id)
+        if not tree_item:
+            raise HTTPException(status_code=404, detail="Tree item not found")
+        
+        # Only files can be georeferenced
+        if not tree_item.is_file:
+            return {
+                "can_georeference": False,
+                "gdal_compatible": False,
+                "error": "Only files can be georeferenced"
+            }
+        
+        file_obj = await tree_item.get_object()
+        file_path = file_obj.file_path
+        
+        # Analyze the raster file
+        analysis = cls._analyze_raster_file(file_path)
+        
+        if not analysis.get("gdal_compatible", False):
+            return {
+                "can_georeference": False,
+                "gdal_compatible": False,
+                "error": analysis.get("error", "File cannot be opened by GDAL")
+            }
+        
+        return {
+            "can_georeference": True,
+            "gdal_compatible": True,
+            "is_already_georeferenced": analysis.get("is_georeferenced", False),
+            "image_info": {
+                "width": analysis.get("width"),
+                "height": analysis.get("height"),
+                "bands": analysis.get("bands"),
+                "has_projection": analysis.get("has_projection", False),
+                "has_geotransform": analysis.get("has_geotransform", False)
+            }
+        }
+
+        
     @classmethod
     async def _create_dummy_georeferenced_file(cls, original_file_path: str) -> str:
         """Create a dummy georeferenced GeoTIFF for MapServer compatibility"""
@@ -478,28 +500,78 @@ class FileService:
             print(f"Falling back to original file path: {original_file_path}")
             return original_file_path
     
+    
+    @classmethod
+    async def convert_to_geo_raster(cls, item_id: str) -> TreeItem:
+        """Convert a RawFile to GeoRasterFile and create dummy georeferenced TIF if needed"""
+        tree_item = await TreeItem.get_or_none(id=item_id, object_type="raw_file")
+        if not tree_item:
+            raise HTTPException(status_code=404, detail="Raw file not found")
+        
+        raw_file = await tree_item.get_object()
+        
+        # Probe first to make sure it's GDAL compatible
+        probe_result = await cls.probe_tree_item(item_id)
+        if not probe_result["gdal_compatible"]:
+            raise HTTPException(status_code=400, detail=f"File is not GDAL compatible: {probe_result.get('error', 'Unknown error')}")
+        
+        # Get image dimensions
+        src_ds = gdal.Open(raw_file.file_path)
+        image_width = src_ds.RasterXSize
+        image_height = src_ds.RasterYSize
+        image_bands = src_ds.RasterCount
+        src_ds = None
+        
+        dummy_georeferenced_file_path = await cls._create_dummy_georeferenced_file(raw_file.file_path)
+        geo_raster = await GeoRasterFile.create(
+            original_name=raw_file.original_name,
+            file_path=dummy_georeferenced_file_path,
+            original_file_path=raw_file.file_path,
+            file_size=raw_file.file_size,
+            mime_type=raw_file.mime_type,
+            image_width=image_width,
+            image_height=image_height,
+            image_bands=image_bands
+        )
+        
+        # Update TreeItem to point to GeoRasterFile
+        tree_item.object_type = "geo_raster_file"
+        tree_item.object_id = geo_raster.id
+        
+        # Update tags to reflect new type
+        updated_tags = tree_item.tags.copy()
+        updated_tags["base_file_type"] = "raster"
+        tree_item.tags = updated_tags
+        
+        await tree_item.save()
+        
+        # Delete the old RawFile
+        await raw_file.delete()
+        
+        return tree_item
+    
     @classmethod
     async def get_file(cls, file_id: str) -> Optional[TreeItem]:
         """Get file by ID"""
-        return await TreeItem.get_or_none(id=file_id, type="file")
+        return await TreeItem.get_or_none(id=file_id, object_type__in=["raw_file", "geo_raster_file"])
     
     @classmethod
     async def update_file(cls, file_id: str, tags: Dict[str, str] = None, new_parent_path: str = None) -> Optional[TreeItem]:
         """Update file metadata"""
-        file_obj = await TreeItem.get_or_none(id=file_id, type="file")
+        file_obj = await TreeItem.get_or_none(id=file_id, object_type__in=["raw_file", "geo_raster_file"])
         if not file_obj:
             return None
         
         if tags is not None:
-            # Merge new tags with existing file metadata (preserve file-specific tags)
-            existing_tags = file_obj.tags.copy()
-            existing_tags.update(tags)
-            file_obj.tags = existing_tags
+            # Update only user-editable tags (don't modify system metadata)
+            clean_tags = file_obj.tags.copy()
             
-            # Recalculate hash when tags change
-            new_sha1 = calculate_tree_item_hash(file_obj)
-            if new_sha1:
-                file_obj.tags["sha1"] = new_sha1
+            # Filter out system keys that shouldn't be updated via tags
+            system_keys = ['original_name', 'file_path', 'file_size', 'mime_type', 'base_file_type']
+            user_tags = {k: v for k, v in tags.items() if k not in system_keys}
+            
+            clean_tags.update(user_tags)
+            file_obj.tags = clean_tags
         
         if new_parent_path is not None:
             # Update the file's path
@@ -519,12 +591,12 @@ class FileService:
     @classmethod
     async def delete_file(cls, file_id: str) -> bool:
         """Delete file and remove from disk"""
-        file_obj = await TreeItem.get_or_none(id=file_id, type="file")
+        file_obj = await TreeItem.get_or_none(id=file_id, object_type__in=["raw_file", "geo_raster_file"])
         if not file_obj:
             return False
             
         # Remove file from disk
-        file_path = file_obj.file_path
+        file_path = await file_obj.get_file_path()
         if file_path and os.path.exists(file_path):
             os.remove(file_path)
             
@@ -535,7 +607,7 @@ class FileService:
     async def search_files(cls, tags: Dict[str, str] = None, base_type: str = None, collection_path: str = None, skip: int = 0, limit: int = 100) -> Dict[str, Any]:
         """Search files with filters"""
         # Use Tortoise ORM query builder instead of raw SQL for better compatibility
-        query = TreeItem.filter(type="file")
+        query = TreeItem.filter(object_type__in=["raw_file", "geo_raster_file"])
         
         if tags:
             for key, value in tags.items():

@@ -182,8 +182,7 @@
               
               <!-- Collection files list -->
               <CollectionFilesList 
-                :ref-name="props.refName"
-                :collection-path="treePathString"
+                :collection-id="props.treeItemId"
                 @files-updated="handleCollectionFilesUpdated"
                 ref="collectionFilesList"
               />
@@ -219,7 +218,6 @@
               <div v-if="showFileChooser" class="file-chooser-modal" @click="closeFileChooser">
                 <div class="file-chooser-container" @click.stop>
                   <FileChooser 
-                    :ref-name="props.refName"
                     :current-path="fileChooserPath"
                     @close="closeFileChooser"
                     @files-added="handleFilesAdded"
@@ -276,13 +274,9 @@ const props = defineProps({
     type: Object,
     required: true
   },
-  refName: {
+  treeItemId: {
     type: String,
-    required: true
-  },
-  treePath: {
-    type: [String, Number, Array],
-    required: true
+    required: true // Tree item ID for direct API access
   }
 })
 
@@ -319,13 +313,6 @@ const sidebarCollapsed = ref(false)
 
 const router = useRouter()
 
-// Convert treePath array to string for API calls
-const treePathString = computed(() => {
-  if (Array.isArray(props.treePath)) {
-    return props.treePath.join('/')
-  }
-  return props.treePath || ''
-})
 
 // Dynamically import all presets
 const presetModules = import.meta.glob('../data/presets/*/*.json', { eager: true })
@@ -335,28 +322,21 @@ function backButton() {
 }
 
 async function loadFile() {
+  if (!props.treeItemId) {
+    error.value = 'No tree item ID provided'
+    return
+  }
+
   loading.value = true
   error.value = null
+  
   try {
-    // Find the tree item by path - similar to FileViewer
-    const pathParts = treePathString.value.split('/')
-    const fileName = pathParts[pathParts.length - 1]
-    
-    const collectionContents = await apiService.getRootContents(0, 1000)
-    const allItems = [...(collectionContents.files || []), ...(collectionContents.collections || [])]
-    const entry = allItems.find(item => 
-      item.name === fileName || 
-      item.original_name === fileName || 
-      item.path?.endsWith(fileName)
-    )
-    
-    if (!entry) {
-      throw new Error('File not found')
-    }
+    // Use direct API call with tree item ID
+    const entry = await apiService.getTreeItem(props.treeItemId)
     
     file.value = entry
     // Store the object type for collection detection
-    file.value.object_type = entry.object_type || (entry.type === 'collection' ? 'tree' : 'file')
+    file.value.object_type = entry.object_type || entry.type || (entry.type === 'collection' ? 'tree' : 'file')
 
     // Set initial type based on file tags
     if (file.value && file.value.tags) {
@@ -383,8 +363,8 @@ onMounted(async () => {
   await loadFile()
 })
 
-// Reload file when treePath or refName changes
-watch(() => [props.treePath, props.refName], loadFile)
+// Reload file when treeItemId changes
+watch(() => props.treeItemId, loadFile)
 
 // Resolve field keys to full field definitions
 const selectedFields = computed(() => {
@@ -468,7 +448,8 @@ const isCollection = computed(() => {
 
 // Check if file is georeferenced
 const isFileGeoreferenced = computed(() => {
-  return file.value?.tags?.georeferenced === true
+  // Check if it's a geo_raster_file (already georeferenced)
+  return file.value?.object_type === 'geo_raster_file'
 })
 
 // Tags editor functions
@@ -554,7 +535,9 @@ async function processFile(uploadFileObj) {
       name: uploadFileObj.name,
     }
     // Upload file via API
-            const uploadedFile = await apiService.uploadFile(uploadFileObj, tags, props.refName, '', uploadFileObj.name)
+    // For collections, upload to the collection's path; for files, upload to root
+    const parentPath = file.value?.object_type === 'tree' ? file.value.path : 'root'
+    const uploadedFile = await apiService.uploadFile(uploadFileObj, tags, parentPath)
     uploadStatus.value = { state: 'success' }
     emit('file-uploaded', uploadedFile)
     setTimeout(() => {
