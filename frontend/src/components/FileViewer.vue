@@ -87,11 +87,46 @@
             <div v-else class="file-viewer">
               <!-- Interactive Map for GeoTIFF files -->
               <InteractiveMap 
-                v-if="isGeoTiff && file"
+                v-if="isGeoTiff && file && isFileGeoreferenced"
                 :fileId="file.id"
                 :filename="file.name"
                 class="interactive-map-container"
               />
+              
+              <!-- Georeferencing needed for raster files -->
+              <div v-else-if="isGeoTiff && file && !isFileGeoreferenced" class="georeferencing-needed">
+                <div class="georef-header">
+                  <div class="georef-icon">
+                    <svg width="64" height="64" viewBox="0 0 64 64">
+                      <circle cx="32" cy="32" r="30" fill="#ffc107"/>
+                      <path d="M32 16v16M32 40h0" stroke="white" stroke-width="4" fill="none" stroke-linecap="round"/>
+                    </svg>
+                  </div>
+                  <h3>Georeferencing Required</h3>
+                  <p>This raster file needs georeferencing to be displayed on a map. Add control points to georeference it.</p>
+                </div>
+                
+                <div class="georef-actions">
+                  <button class="btn btn-primary georef-btn" @click="startGeoreferencing">
+                    <svg width="24" height="24" viewBox="0 0 24 24">
+                      <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/>
+                      <circle cx="12" cy="12" r="2" fill="currentColor"/>
+                      <path d="M12 2v4M12 18v4M2 12h4M18 12h4" stroke="currentColor" stroke-width="2"/>
+                    </svg>
+                    Start Georeferencing
+                  </button>
+                </div>
+                
+                <div v-if="georeferencingStatus" class="georef-status">
+                  <div v-if="georeferencingStatus.loading" class="status-loading">
+                    <div class="spinner"></div>
+                    <span>Loading georeferencing interface...</span>
+                  </div>
+                  <div v-else-if="georeferencingStatus.error" class="status-error">
+                    <span>Error: {{ georeferencingStatus.error }}</span>
+                  </div>
+                </div>
+              </div>
               
               <!-- Vector file content -->
               <div v-else-if="getBaseFileType(file) === 'vector'" class="vector-content">
@@ -186,6 +221,15 @@
         </div>
       </div>
     </div>
+    
+    <!-- Georeferencing Modal -->
+    <GeoreferencingModal 
+      v-if="showGeoreferencingModal && file"
+      :file-id="file.id"
+      :file-info="file.tags"
+      @close="closeGeoreferencing"
+      @completed="onGeoreferencingCompleted" 
+    />
   </div>
 </template>
 
@@ -194,6 +238,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import InteractiveMap from './InteractiveMap.vue'
 import CollectionFilesList from './CollectionFilesList.vue'
+import GeoreferencingModal from './GeoreferencingModal.vue'
 import { matchTagsToPreset } from '../utils/tagMatcher.js'
 import { loadFieldDefinitions, resolveFields } from '../utils/fieldResolver.js'
 import apiService from '../services/api.js'
@@ -206,6 +251,10 @@ const router = useRouter()
 const file = ref(null)
 const loading = ref(false)
 const error = ref(null)
+
+// Georeferencing state
+const showGeoreferencingModal = ref(false)
+const georeferencingStatus = ref(null)
 
 // Field definitions and presets (reused from FileEditor)
 const allPresets = ref([])
@@ -373,6 +422,11 @@ const isGeoTiff = computed(() => {
   return fileType.value === 'raster'
 })
 
+// Check if file is georeferenced
+const isFileGeoreferenced = computed(() => {
+  return file.value?.tags?.georeferenced === true
+})
+
 // Handle collection files updates
 function handleCollectionFilesUpdated(files) {
   // Update the collection entries count if needed
@@ -388,6 +442,30 @@ const selectedFields = computed(() => {
   }
   return resolveFields(selectedType.value.fields, allFieldDefinitions.value)
 })
+
+// Georeferencing functions
+function startGeoreferencing() {
+  georeferencingStatus.value = { loading: true }
+  showGeoreferencingModal.value = true
+}
+
+function closeGeoreferencing() {
+  showGeoreferencingModal.value = false
+  georeferencingStatus.value = null
+}
+
+function onGeoreferencingCompleted(result) {
+  showGeoreferencingModal.value = false
+  georeferencingStatus.value = null
+  
+  // Update file tags to reflect georeferencing status
+  if (file.value && result.fileInfo) {
+    file.value.tags = { ...file.value.tags, ...result.fileInfo }
+  }
+  
+  // Force re-render to show the map
+  loadFile()
+}
 
 // Lifecycle
 onMounted(async () => {
@@ -877,5 +955,92 @@ watch(() => [props.refName, props.treePath], () => {
 .collection-content p {
   color: #666;
   margin-bottom: 1.5rem;
+}
+
+/* Georeferencing needed styles */
+.georeferencing-needed {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem;
+  text-align: center;
+  background: #fff;
+  border-radius: 8px;
+  margin: 2rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.georef-header {
+  margin-bottom: 2rem;
+}
+
+.georef-icon {
+  margin-bottom: 1rem;
+}
+
+.georef-header h3 {
+  margin: 0 0 0.5rem 0;
+  color: #333;
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.georef-header p {
+  margin: 0;
+  color: #666;
+  font-size: 1rem;
+  max-width: 500px;
+}
+
+.georef-actions {
+  margin-bottom: 1rem;
+}
+
+.georef-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  background: #007bff;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.georef-btn:hover {
+  background: #0056b3;
+}
+
+.georef-status {
+  min-height: 40px;
+}
+
+.status-loading {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #666;
+}
+
+.status-error {
+  color: #dc3545;
+}
+
+.spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid #f3f3f3;
+  border-top: 2px solid #007bff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 </style> 
