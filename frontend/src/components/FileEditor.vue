@@ -29,7 +29,7 @@
       <div class="left-panel" :class="{ 'collapsed': sidebarCollapsed }">
         <ObjectTypeSelector 
           v-model:selectedType="selectedType" 
-          :currentFile="file.value"
+          :currentFile="file"
           @menu-open="menuOpen = $event"
           @type-changed="handleTypeChange"
         />
@@ -186,45 +186,6 @@
                 @files-updated="handleCollectionFilesUpdated"
                 ref="collectionFilesList"
               />
-              
-              <!-- Add existing files to collection -->
-              <div class="add-files-section">
-                <h4>Додати існуючі файли до колекції</h4>
-                <p>Виберіть файли з дерева файлів для додавання до цієї колекції:</p>
-                
-                <button @click="showFileChooser = true" class="open-chooser-btn">
-                  <i class="fas fa-folder-open"></i>
-                  Відкрити вибір файлів
-                </button>
-                
-                <div v-if="addFileStatus" class="add-file-status">
-                  <div v-if="addFileStatus.state === 'success'" class="add-file-success">
-                    <svg width="16" height="16" viewBox="0 0 16 16">
-                      <path d="M3 8l3 3 7-7" stroke="#28a745" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-                    </svg>
-                    <span>{{ addFileStatus.message }}</span>
-                  </div>
-                  <div v-else-if="addFileStatus.state === 'error'" class="add-file-error">
-                    <svg width="16" height="16" viewBox="0 0 16 16">
-                      <path d="M8 2L2 8l6 6 6-6-6-6z" fill="#dc3545"/>
-                      <path d="M8 6v4M8 12h0" stroke="#fff" stroke-width="1" fill="none"/>
-                    </svg>
-                    <span>{{ addFileStatus.error }}</span>
-                  </div>
-                </div>
-              </div>
-              
-              <!-- File Chooser Modal -->
-              <div v-if="showFileChooser" class="file-chooser-modal" @click="closeFileChooser">
-                <div class="file-chooser-container" @click.stop>
-                  <FileChooser 
-                    :current-path="fileChooserPath"
-                    @close="closeFileChooser"
-                    @files-added="handleFilesAdded"
-                    @update:current-path="fileChooserPath = $event"
-                  />
-                </div>
-              </div>
             </div>
           </div>
           
@@ -260,7 +221,6 @@ import { ref, computed, onMounted } from 'vue'
 import ObjectTypeSelector from './ObjectTypeSelector.vue'
 import TagList from './TagList.vue'
 import InteractiveMap from './InteractiveMap.vue'
-import FileChooser from './FileChooser.vue'
 import CollectionFilesList from './CollectionFilesList.vue'
 import GeoreferencingModal from './GeoreferencingModal.vue'
 import { matchTagsToPreset } from '../utils/tagMatcher.js'
@@ -289,11 +249,6 @@ const file = ref(null)
 const loading = ref(false)
 const error = ref(null)
 
-// Add existing file to collection state
-const showFileChooser = ref(false)
-const fileChooserPath = ref('')
-const isAddingFile = ref(false)
-const addFileStatus = ref(null)
 
 // Collection files list ref
 const collectionFilesList = ref(null)
@@ -336,7 +291,7 @@ async function loadFile() {
     
     file.value = entry
     // Store the object type for collection detection
-    file.value.object_type = entry.object_type || entry.type || (entry.type === 'collection' ? 'tree' : 'file')
+    file.value.object_type = entry.object_type || entry.type || (entry.type === 'collection' ? 'collection' : 'file')
 
     // Set initial type based on file tags
     if (file.value && file.value.tags) {
@@ -377,10 +332,10 @@ const selectedFields = computed(() => {
 // File type detection and icon
 const fileType = computed(() => {
   // Check if this is a collection first
-  if (file.value?.object_type === 'tree') {
+  if (file.value?.object_type === 'collection') {
     return 'collection'
   }
-  return file.value?.base_file_type || 'raw'
+  return file.value?.object_type || 'raw'
 })
 
 const fileTypeLabel = computed(() => {
@@ -536,7 +491,7 @@ async function processFile(uploadFileObj) {
     }
     // Upload file via API
     // For collections, upload to the collection's path; for files, upload to root
-    const parentPath = file.value?.object_type === 'tree' ? file.value.path : 'root'
+    const parentPath = file.value?.object_type === 'collection' ? file.value.path : 'root'
     const uploadedFile = await apiService.uploadFile(uploadFileObj, tags, parentPath)
     uploadStatus.value = { state: 'success' }
     emit('file-uploaded', uploadedFile)
@@ -584,65 +539,6 @@ async function handleCommit() {
   }
 }
 
-function closeFileChooser() {
-  showFileChooser.value = false
-  fileChooserPath.value = ''
-}
-
-async function handleFilesAdded(selectedFiles) {
-  isAddingFile.value = true
-  addFileStatus.value = null
-  
-  try {
-    // Clone each selected file to the current collection
-    for (const selectedFile of selectedFiles) {
-      const sourcePath = selectedFile.fullPath
-      
-              // Clone operation: create a new tree item with the same tags but different name
-              if (file.value?.type === 'collection') {
-                await apiService.createTreeItem(
-                  file.value.name + '_copy',
-                  'collection',
-                  { ...file.value.tags }
-                )
-              } else {
-                throw new Error('File cloning not supported - use file upload instead')
-              }
-    }
-    
-    addFileStatus.value = {
-      state: 'success',
-      message: `${selectedFiles.length} файл(ів) успішно додано до колекції "${file.value.name}"`
-    }
-    
-    // Reload the file to update the entries count
-    await loadFile()
-    
-    // Reload collection files to show the newly added files
-    if (collectionFilesList.value) {
-      await collectionFilesList.value.reload()
-    }
-    
-    // Clear success message after 3 seconds
-    setTimeout(() => {
-      addFileStatus.value = null
-    }, 3000)
-    
-  } catch (error) {
-    console.error('Failed to add files to collection:', error)
-    addFileStatus.value = {
-      state: 'error',
-      error: error.message || 'Помилка додавання файлів до колекції'
-    }
-    
-    // Clear error message after 5 seconds
-    setTimeout(() => {
-      addFileStatus.value = null
-    }, 5000)
-  } finally {
-    isAddingFile.value = false
-  }
-}
 
 // Handle collection files updates
 function handleCollectionFilesUpdated(files) {
@@ -1075,89 +971,6 @@ function onGeoreferencingCompleted(result) {
   border-left: 4px solid #ffb300;
 }
 
-/* Add files section styles */
-.add-files-section {
-  margin-top: 2rem;
-  padding-top: 2rem;
-  border-top: 1px solid #eee;
-}
-
-.add-files-section h4 {
-  margin: 0 0 0.75rem 0;
-  color: #333;
-  font-size: 1.1rem;
-  font-weight: 600;
-}
-
-.add-files-section p {
-  margin: 0 0 1rem 0;
-  color: #666;
-  font-size: 0.9rem;
-}
-
-.open-chooser-btn {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.75rem 1rem;
-  background: #007bff;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  font-size: 0.9rem;
-  cursor: pointer;
-  transition: background-color 0.15s;
-  white-space: nowrap;
-  margin-bottom: 1rem;
-}
-
-.open-chooser-btn:hover {
-  background: #0056b3;
-}
-
-.file-chooser-modal {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-.file-chooser-container {
-  max-width: 90vw;
-  max-height: 90vh;
-}
-
-.add-file-status {
-  padding: 0.75rem;
-  border-radius: 6px;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.9rem;
-}
-
-.add-file-success {
-  background: #d4edda;
-  color: #155724;
-  border: 1px solid #c3e6cb;
-}
-
-.add-file-error {
-  background: #f8d7da;
-  color: #721c24;
-  border: 1px solid #f5c6cb;
-}
-
-.add-file-success svg,
-.add-file-error svg {
-  flex-shrink: 0;
-}
 
 /* Georeferencing needed styles */
 .georeferencing-needed {

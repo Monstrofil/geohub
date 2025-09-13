@@ -13,7 +13,7 @@
             <div class="label-inner">
               <div class="namepart">{{ currentType ? currentType.name : '' }}</div>
               <div v-if="!isCurrentTypeCompatible" class="incompatible-warning">
-                <span v-if="props.currentFile?.object_type === 'tree'">
+                <span v-if="props.currentFile?.object_type === 'collection'">
                   Несумісний з типом колекції
                 </span>
                 <span v-else>
@@ -39,11 +39,11 @@
         <input type="search" v-model="search" placeholder="Пошук" class="pure-input-1" />
       </div>
       <div v-if="filteredTypes.length === 0" class="no-compatible-types">
-        <p v-if="props.currentFile?.object_type === 'tree'">
+        <p v-if="props.currentFile?.object_type === 'collection'">
           Немає доступних типів для колекції
         </p>
         <p v-else>
-          Немає сумісних типів для файлу типу "{{ props.currentFile?.base_file_type || 'невідомий' }}"
+          Немає сумісних типів для об'єкту типу "{{ props.currentFile?.object_type || 'невідомий' }}"
         </p>
       </div>
       <div v-else class="type-modal-list">
@@ -86,23 +86,23 @@ onMounted(async () => {
   
   if (types.value.length > 0) {
     // If we have a selectedType from props, use it if it's compatible
-    if (props.selectedType && props.currentFile?.base_file_type) {
-      const isCompatible = props.selectedType.base_file_type && 
-                          props.selectedType.base_file_type.includes(props.currentFile.base_file_type)
+    if (props.selectedType && props.currentFile?.object_type) {
+      const isCompatible = props.selectedType.object_type && 
+                          props.selectedType.object_type.includes(props.currentFile.object_type)
       if (isCompatible) {
         currentType.value = props.selectedType
       } else {
         // Find first compatible type
         const compatibleType = types.value.find(preset => 
-          preset.base_file_type && preset.base_file_type.includes(props.currentFile.base_file_type)
+          preset.object_type && preset.object_type.includes(props.currentFile.object_type)
         )
         currentType.value = compatibleType || types.value[0]
       }
     } else {
       // Set current type to the first compatible one, or first available as fallback
-      if (props.currentFile?.base_file_type) {
+      if (props.currentFile?.object_type) {
         const compatibleType = types.value.find(preset => 
-          preset.base_file_type && preset.base_file_type.includes(props.currentFile.base_file_type)
+          preset.object_type && preset.object_type.includes(props.currentFile.object_type)
         )
         currentType.value = compatibleType || types.value[0]
       } else {
@@ -157,20 +157,13 @@ watch(openMenu, (val) => {
 })
 
 const filteredTypes = computed(() => {
-  // For collections, show all types since they don't have base_file_type restrictions
-  if (props.currentFile?.object_type === 'tree') {
-    let allTypes = types.value
-    if (!search.value) return allTypes
-    return allTypes.filter(t => t.name.toLowerCase().includes(search.value.toLowerCase()))
-  }
-  
-  // For files, filter by file type compatibility
+  // Filter by object type compatibility
   let compatibleTypes = types.value
   
-  if (props.currentFile?.base_file_type) {
+  if (props.currentFile?.object_type) {
     compatibleTypes = types.value.filter(preset => {
-      // Check if the preset's base_file_type array includes the current file's type
-      return preset.base_file_type && preset.base_file_type.includes(props.currentFile.base_file_type)
+      // Check if the preset's object_type array includes the current file's type
+      return preset.object_type && preset.object_type.includes(props.currentFile.object_type)
     })
   }
   
@@ -181,21 +174,18 @@ const filteredTypes = computed(() => {
 
 // Add a computed property to check if current type is still compatible
 const isCurrentTypeCompatible = computed(() => {
-  // Collections are always compatible with all types
-  if (props.currentFile?.object_type === 'tree') return true
-  
-  if (!currentType.value || !props.currentFile?.base_file_type) return true
-  return currentType.value.base_file_type && currentType.value.base_file_type.includes(props.currentFile.base_file_type)
+  if (!currentType.value || !props.currentFile?.object_type) return true
+  return currentType.value.object_type && currentType.value.object_type.includes(props.currentFile.object_type)
 })
 
 // Watch for file type changes and update current type if needed
-watch(() => props.currentFile?.base_file_type, (newFileType) => {
+watch(() => props.currentFile?.object_type, (newFileType) => {
   if (newFileType && types.value.length > 0) {
     // Check if current type is still compatible
     if (!isCurrentTypeCompatible.value) {
       // Find the first compatible type
       const compatibleType = types.value.find(preset => 
-        preset.base_file_type && preset.base_file_type.includes(newFileType)
+        preset.object_type && preset.object_type.includes(newFileType)
       )
       
       if (compatibleType) {

@@ -116,7 +116,7 @@ async function loadCollectionFiles() {
 
 // Helper functions for collection files display
 function getFileIcon(entry) {
-  const fileType = entry.object?.base_file_type || 'raw'
+  const fileType = entry.object?.object_type || 'raw'
   const isTree = entry.object_type === 'tree'
   
   if (isTree) {
@@ -163,7 +163,7 @@ function getFileTypeLabel(entry) {
     return 'Колекція'
   }
   
-  const fileType = entry.object?.base_file_type || 'raw'
+  const fileType = entry.object?.object_type || 'raw'
   const labels = {
     'raster': 'Геоприв\'язане растрове зображення',
     'vector': 'Геоприв\'язаний векторний файл', 

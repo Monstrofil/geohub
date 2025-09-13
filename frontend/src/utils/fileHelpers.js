@@ -61,7 +61,7 @@ export function getBaseFileType(file) {
   }
   
   // Fallback to tags for backward compatibility
-  return getFileProperty(file, 'base_file_type', 'raw')
+  return getFileProperty(file, 'object_type', 'raw')
 }
 
 

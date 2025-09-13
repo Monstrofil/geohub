@@ -208,7 +208,7 @@ function getFileIcon(entry) {
     </svg>`
   }
   
-  const fileType = entry.object?.base_file_type || 'raw'
+  const fileType = entry.object?.object_type || 'raw'
   switch (fileType) {
     case 'raster':
       return `<svg width="20" height="20" viewBox="0 0 20 20">
