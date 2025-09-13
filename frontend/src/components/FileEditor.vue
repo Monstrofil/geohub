@@ -291,15 +291,13 @@ async function loadFile() {
     
     file.value = entry
     // Store the object type for collection detection
-    file.value.object_type = entry.object_type || entry.type || (entry.type === 'collection' ? 'collection' : 'file')
+    file.value.object_type = entry.object_type
 
-    // Set initial type based on file tags
-    if (file.value && file.value.tags) {
-      const matchedPreset = matchTagsToPreset(file.value.tags, allPresets.value, file.value.object_type)
-      selectedType.value = matchedPreset
-      // Initialize previousType to avoid removing tags on first type change
-      previousType.value = matchedPreset
-    }
+    const matchedPreset = matchTagsToPreset(file.value.tags, allPresets.value, file.value.object_type)
+    selectedType.value = matchedPreset
+    // Initialize previousType to avoid removing tags on first type change
+    previousType.value = matchedPreset
+  
     
     // Collection files will be loaded by the CollectionFilesList component
   } catch (e) {

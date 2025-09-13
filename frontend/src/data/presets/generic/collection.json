@@ -3,7 +3,7 @@
   "fields": ["name", "description"],
   "object_type": ["collection"],
   "tags": {
-    "type": "collection"
+    
   },
   "terms": ["collection", "folder", "group"],
   "name": "Collection",
