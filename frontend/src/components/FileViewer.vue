@@ -1,28 +1,36 @@
 <template>
   <div class="file-viewer">
+    <!-- Header with back button -->
     <div class="viewer-header">
-      <div class="header-content">
-        <div class="file-info">
-          <div class="file-icon" v-html="fileIcon"></div>
-          <div class="file-details">
-            <h1 class="file-name">{{ getDisplayName() }}</h1>
-            <div class="file-meta">
-              <span class="file-type">{{ fileTypeLabel }}</span>
-              <span class="file-size" v-if="getFileSize(file)">{{ formatFileSize(getFileSize(file)) }}</span>
-              <span class="file-date" v-if="file?.created_at">{{ formatDate(file.created_at) }}</span>
-              <span class="file-id" v-if="file?.id">ID: {{ file.id }}</span>
-            </div>
+      <button class="back-btn" @click="goBack">
+        <svg width="16" height="16" viewBox="0 0 16 16">
+          <path d="M10 2L4 8L10 14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        Назад до списку
+      </button>
+      <div class="header-actions">
+        <router-link :to="{name: 'FileEditor', query: { id: props.treeItemId }}" class="edit-btn">
+          <svg width="16" height="16" viewBox="0 0 16 16">
+            <path d="M11 1L15 5L5 15H1V11L11 1Z" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M8 4L12 8" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          Редагувати
+        </router-link>
+      </div>
+    </div>
+
+    <!-- File info section moved below header -->
+    <div class="file-info-header" v-if="file">
+      <div class="file-info">
+        <div class="file-icon" v-html="fileIcon"></div>
+        <div class="file-details">
+          <h1 class="file-name">{{ getDisplayName() }}</h1>
+          <div class="file-meta">
+            <span class="file-type">{{ fileTypeLabel }}</span>
+            <span class="file-size" v-if="getFileSize(file)">{{ formatFileSize(getFileSize(file)) }}</span>
+            <span class="file-date" v-if="file?.created_at">{{ formatDate(file.created_at) }}</span>
+            <span class="file-id" v-if="file?.id">ID: {{ file.id }}</span>
           </div>
-        </div>
-        <div class="header-actions">
-          <router-link :to="{name: 'FileEditor', query: { id: props.treeItemId }}" class="edit-btn">
-            <i class="fas fa-edit"></i>
-            Edit
-          </router-link>
-          <button @click="goBack" class="back-btn">
-            <i class="fas fa-arrow-left"></i>
-            Back
-          </button>
         </div>
       </div>
     </div>
@@ -637,16 +645,14 @@ watch(() => props.treeItemId, () => {
 }
 
 .viewer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem;
   background: white;
   border-bottom: 1px solid #eee;
   box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-}
-
-.header-content {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  width: 100%;
 }
 
 .file-info {
@@ -683,13 +689,31 @@ watch(() => props.treeItemId, () => {
   font-weight: 500;
 }
 
+.back-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: none;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  color: #666;
+  transition: all 0.15s;
+}
+
+.back-btn:hover {
+  background: #f8f9fa;
+  border-color: #007bff;
+  color: #007bff;
+}
+
 .header-actions {
   display: flex;
   gap: 0.75rem;
-  padding-right: 1rem;
 }
 
-.edit-btn, .back-btn {
+.edit-btn {
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -698,9 +722,6 @@ watch(() => props.treeItemId, () => {
   text-decoration: none;
   font-size: 0.9rem;
   transition: all 0.15s;
-}
-
-.edit-btn {
   background: #007bff;
   color: white;
   border: none;
@@ -710,16 +731,6 @@ watch(() => props.treeItemId, () => {
   background: #0056b3;
 }
 
-.back-btn {
-  background: none;
-  color: #6c757d;
-  border: 1px solid #6c757d;
-}
-
-.back-btn:hover {
-  background: #6c757d;
-  color: white;
-}
 
 .viewer-content {
   flex: 1;
