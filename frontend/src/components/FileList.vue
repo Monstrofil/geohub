@@ -66,22 +66,35 @@
       </div>
     </div>
     <div v-else class="disclosure-wrap disclosure-wrap-feature_list">
-      <div class="feature-list">
-        <component 
-          :is="entry.object_type === 'file' ? FileCard : TreeCard"
-          v-for="entry in files" 
-          :key="entry.id"
-          :path="entry.path"
-          :file="entry.object"
-          :name="getDisplayName(entry.object)"
-          :tree-path="treePathString"
-          :ref-name="entry.object?.name || entry.id"
-          :selected="selectedEntry && selectedEntry.object && selectedEntry.object.id === entry.object?.id"
-          @click="selectFile(entry.object)"
-          @file-selected="handleFileSelected"
-          @removed="handleObjectRemoved"
-          @cloned="handleObjectCloned"
-        />
+      <div class="file-list-layout">
+        <!-- Main content area -->
+        <div class="file-list-main">
+          <div class="feature-list">
+            <component 
+              :is="entry.object_type === 'file' ? FileCard : TreeCard"
+              v-for="entry in files" 
+              :key="entry.id"
+              :path="entry.path"
+              :file="entry.object"
+              :name="getDisplayName(entry.object)"
+              :tree-path="treePathString"
+              :ref-name="entry.object?.name || entry.id"
+              :selected="selectedEntry && selectedEntry.object && selectedEntry.object.id === entry.object?.id"
+              @click="selectFile(entry.object)"
+              @file-selected="handleFileSelected"
+              @removed="handleObjectRemoved"
+              @cloned="handleObjectCloned"
+            />
+          </div>
+        </div>
+        
+        <!-- Collection details sidebar -->
+        <div class="file-list-sidebar">
+          <CollectionDetails 
+            :tree-path="treePathString"
+            :files="files"
+          />
+        </div>
       </div>
     </div>
 
@@ -103,6 +116,7 @@ import { useRouter, useRoute } from 'vue-router'
 import FileCard from './FileCard.vue'
 import TreeCard from './TreeCard.vue'
 import UploadModal from './UploadModal.vue'
+import CollectionDetails from './CollectionDetails.vue'
 import apiService from '../services/api.js'
 import { getDisplayName } from '../utils/fileHelpers.js'
 
@@ -354,6 +368,22 @@ watch(() => props.treePath, loadFiles)
   display: inline-block;
   vertical-align: middle;
   margin-right: 0.2em;
+}
+
+/* File list layout */
+.file-list-layout {
+  display: flex;
+  gap: 2rem;
+  align-items: flex-start;
+}
+
+.file-list-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.file-list-sidebar {
+  flex-shrink: 0;
 }
 
 .feature-list {

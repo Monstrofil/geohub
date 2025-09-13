@@ -444,7 +444,7 @@ async function loadFile() {
 
     // Set initial type based on file tags
     if (file.value && file.value.tags) {
-      const matchedPreset = matchTagsToPreset(file.value.tags, allPresets.value)
+      const matchedPreset = matchTagsToPreset(file.value.tags, allPresets.value, file.value.object_type)
       selectedType.value = matchedPreset
     }
 

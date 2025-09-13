@@ -1,4 +1,4 @@
-export function matchTagsToPreset(fileTags, allPresets) {
+export function matchTagsToPreset(fileTags, allPresets, objectType = null) {
   // Defensive programming: ensure allPresets is an array
   if (!Array.isArray(allPresets) || allPresets.length === 0) {
     return null
@@ -9,6 +9,13 @@ export function matchTagsToPreset(fileTags, allPresets) {
 
   for (const preset of allPresets) {
     const presetTags = preset.tags || {}
+
+    // Filter by object_type if provided
+    if (objectType && preset.object_type) {
+      if (!preset.object_type.includes(objectType)) {
+        continue // Skip this preset as it doesn't match the object type
+      }
+    }
 
     // Check if all preset tags exist in fileTags with the same value
     let allMatch = true
@@ -38,7 +45,7 @@ export function getFileType(file, allPresets) {
     return 'binary' // fallback
   }
 
-  const matchedPreset = matchTagsToPreset(file.tags, allPresets)
+  const matchedPreset = matchTagsToPreset(file.tags, allPresets, file.object_type)
   
   // Map preset names to file types for the FileCard component
   if (matchedPreset) {

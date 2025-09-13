@@ -125,7 +125,7 @@ watch(() => props.selectedType, (newType) => {
 // Watch for changes in currentFile tags and auto-detect type
 watch(() => props.currentFile?.tags, (newTags) => {
   if (newTags && types.value.length > 0) {
-    const matchedPreset = matchTagsToPreset(newTags, types.value)
+    const matchedPreset = matchTagsToPreset(newTags, types.value, props.currentFile?.object_type)
     if (matchedPreset && matchedPreset !== currentType.value) {
       currentType.value = matchedPreset
       emit('update:selectedType', currentType.value)
