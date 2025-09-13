@@ -9,9 +9,6 @@ class LTreeField(fields.Field):
     SQL_TYPE = "LTREE"
     field_type = str
 
-
-# Specialized Models for Different Content Types
-
 class RawFile(models.Model):
     """Model for raw files (documents, non-geospatial images, etc.)
     
@@ -83,7 +80,8 @@ class TreeItem(models.Model):
     name = fields.CharField(max_length=255)
     
     # Polymorphic relationship
-    object_type = fields.CharField(max_length=50)  # "raw_file", "geo_raster_file", "collection"
+    # "raw_file", "geo_raster_file", "collection"
+    object_type = fields.CharField(max_length=50)
     object_id = fields.UUIDField()
     
     # User-editable metadata (safe to modify)
@@ -118,11 +116,6 @@ class TreeItem(models.Model):
         """Check if this tree item is a file"""
         return self.object_type in ["raw_file", "geo_raster_file"]
     
-    @property
-    def is_collection(self) -> bool:
-        """Check if this tree item is a collection"""
-        return self.object_type == "collection"
-    
     async def get_object(self) -> Union[RawFile, GeoRasterFile, Collection]:
         """Get the actual object this tree item points to"""
         if self.object_type == "raw_file":
@@ -146,17 +139,7 @@ class TreeItem(models.Model):
         if hasattr(obj, 'file_path'):
             return obj.file_path
         return ""
-    
-    async def get_base_file_type(self) -> str:
-        """Get base file type based on object type"""
-        if self.object_type == "raw_file":
-            return "raw"
-        elif self.object_type == "geo_raster_file":
-            return "raster"
-        elif self.object_type == "collection":
-            return "collection"
-        return "raw"
-    
+
 
 
 # Pydantic models for API
