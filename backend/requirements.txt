@@ -8,7 +8,8 @@ python-jose[cryptography]
 passlib[bcrypt]
 pydantic
 aiohttp
-GDAL==3.6.2
+numpy
+GDAL==3.10.3
 geopandas
 pytest
 pytest-asyncio

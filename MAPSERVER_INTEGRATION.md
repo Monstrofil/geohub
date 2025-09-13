@@ -115,6 +115,7 @@ Currently supported for map preview:
 - `.tif` - Tagged Image File Format
 - `.tiff` - Tagged Image File Format
 - `.geotiff` - GeoTIFF format
+- `.pdf` - PDF files (treated as raster via GDAL)
 
 ## Development
 

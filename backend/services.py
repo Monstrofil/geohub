@@ -3,7 +3,7 @@ from tortoise.expressions import Q
 import os
 import uuid
 import aiofiles
-from osgeo import gdal
+from osgeo import gdal, osr
 import geopandas as gpd
 from typing import List, Dict, Any, Optional, Tuple
 from fastapi import UploadFile, HTTPException
@@ -311,15 +311,33 @@ class FileService:
                 detail=f"File type not allowed for '{expected_type}'"
             )
 
+        # For raster files, ensure they have a georeferenced version for MapServer
+        georef_file_path = file_info["file_path"]
+        is_georeferenced = False
+        
+        if base_file_type == "raster":
+            from georeferencing_service import GeoreferencingService
+            georef_service = GeoreferencingService()
+            is_georeferenced = georef_service.is_georeferenced(file_info["file_path"])
+            
+            if not is_georeferenced:
+                # Create a dummy georeferenced version
+                georef_file_path = await cls._create_dummy_georeferenced_file(file_info["file_path"])
+                print(f"Created dummy georeferenced file: {georef_file_path}")
+
+
         # Merge user tags with file-specific metadata
         file_tags = tags or {}
         file_tags.update({
             "original_name": file_info["original_name"],
-            "file_path": file_info["file_path"],
+            "file_path": georef_file_path,  # Use georeferenced version for MapServer
+            "original_file_path": file_info["file_path"],  # Keep reference to original
             "file_size": file_info["file_size"],
             "mime_type": file_info["mime_type"],
             "base_file_type": base_file_type,
-            "sha1": file_info["sha1"]
+            "sha1": file_info["sha1"],
+            "georeferenced": is_georeferenced,
+            "has_dummy_georeference": not is_georeferenced and base_file_type == "raster"
         })
 
         # Generate a unique path segment for this file (LTREE compatible)
@@ -343,6 +361,122 @@ class FileService:
         )
         
         return file_obj
+    
+    @classmethod
+    async def _create_dummy_georeferenced_file(cls, original_file_path: str) -> str:
+        """Create a dummy georeferenced GeoTIFF for MapServer compatibility"""
+        import uuid
+        
+        # Generate unique filename for georeferenced version
+        file_extension = os.path.splitext(original_file_path)[1]
+        base_name = os.path.splitext(os.path.basename(original_file_path))[0]
+        georef_filename = f"{base_name}_georef_{uuid.uuid4().hex[:8]}.tif"
+        georef_path = os.path.join(cls.UPLOAD_DIR, georef_filename)
+        
+    
+        # Open the original file
+        src_ds = gdal.Open(original_file_path)
+        if src_ds is None:
+            raise ValueError("Cannot open source file with GDAL")
+        
+        # Get image dimensions
+        width = src_ds.RasterXSize
+        height = src_ds.RasterYSize
+        
+        # Create dummy georeference in EPSG:3857 (Web Mercator)
+        # This is more compatible with MapLibre GL JS tiling system
+        
+        # Use (0,0) as top-left corner and (max_x, max_y) as bottom-right corner
+        # Scale the image to fit within a reasonable area for meaningful coordinates
+        max_dimension = max(width, height)
+        
+        # Use a 1000km area in Web Mercator coordinates (meters)
+        scale_factor = 1000000.0 / max_dimension  # 1000km = 1,000,000 meters
+        
+        # Calculate geographic dimensions
+        geo_width_meters = width * scale_factor
+        geo_height_meters = height * scale_factor
+        
+        # Set up coordinate system with y_max as top-left Y (GDAL convention)
+        x_min = 0.0
+        x_max = geo_width_meters
+        y_min = 0.0
+        y_max = geo_height_meters
+        
+        # Calculate pixel size in meters
+        pixel_size_x = (x_max - x_min) / width
+        pixel_size_y = (y_max - y_min) / height
+        
+        # Create geotransform with correct Y-axis orientation:
+        # Geo (x_min, y_max) = Pixel (0,0)
+        # Geo (x_max, y_min) = Pixel (width, height)
+        geotransform = (
+            x_min,              # top-left X
+            pixel_size_x,       # pixel width
+            0,                  # rotation
+            y_max,              # top-left Y (note: MAX because Y decreases downwards)
+            0,                  # rotation
+            -pixel_size_y       # pixel height (negative so Y increases downward in pixel space)
+        )
+        
+        # Create output GeoTIFF from scratch to ensure projection is set properly
+        driver = gdal.GetDriverByName('GTiff')
+        
+        # Get source dataset dimensions and data type
+        width = src_ds.RasterXSize
+        height = src_ds.RasterYSize
+        bands = src_ds.RasterCount
+        data_type = src_ds.GetRasterBand(1).DataType
+        
+        try:
+            # Create new dataset
+            dst_ds = driver.Create(georef_path, width, height, bands, data_type)
+            
+            # Copy all raster data using GDAL's internal methods (avoid ReadAsArray)
+            for band_idx in range(1, bands + 1):
+                src_band = src_ds.GetRasterBand(band_idx)
+                dst_band = dst_ds.GetRasterBand(band_idx)
+                
+                # Use GDAL's RasterIO to copy data without needing numpy
+                # Read the entire band as binary data and write directly
+                band_data = src_band.ReadRaster(0, 0, width, height)
+                dst_band.WriteRaster(0, 0, width, height, band_data)
+                
+                # Copy band metadata
+                no_data_value = src_band.GetNoDataValue()
+                if no_data_value is not None:
+                    dst_band.SetNoDataValue(no_data_value)
+            
+            # Apply geotransform
+            dst_ds.SetGeoTransform(geotransform)
+            
+            # Set EPSG:3857 projection (Web Mercator)
+            srs = osr.SpatialReference()
+            srs.ImportFromEPSG(3857)
+            wkt = srs.ExportToWkt()
+            dst_ds.SetProjection(wkt)
+            
+            print(f"Set projection on dummy georeferenced file: {wkt[:100]}...")
+            
+            # Flush and close datasets to ensure changes are written
+            dst_ds.FlushCache()
+            src_ds = None
+            dst_ds = None
+            
+            return georef_path
+            
+        except Exception as e:
+            # If georeferencing fails, clean up and return original path
+            print(f"Failed to create dummy georeferenced file: {e}")
+            if os.path.exists(georef_path):
+                try:
+                    os.remove(georef_path)
+                except Exception as cleanup_error:
+                    print(f"Failed to cleanup georeferenced file: {cleanup_error}")
+            
+            # Return original file path as fallback instead of raising
+            print(f"Falling back to original file path: {original_file_path}")
+            return original_file_path
     
     @classmethod
     async def get_file(cls, file_id: str) -> Optional[TreeItem]:

@@ -10,12 +10,15 @@ from pydantic import BaseModel, ConfigDict
 import models
 from services import FileService, CollectionsService
 from mapserver_service import MapServerService
+from georeferencing_service import GeoreferencingService, ControlPoint
 
 
 router = APIRouter(tags=["files"])
 
-# Initialize MapServer service
+# Initialize services
 mapserver_service = MapServerService()
+# Use uploads directory for temp files to ensure MapServer can access them
+georeferencing_service = GeoreferencingService(uploads_dir="./uploads", temp_dir="./uploads")
 
 
 # Unified Pydantic models
@@ -91,6 +94,36 @@ class TreeItemSearchRequest(BaseModel):
     collection_path: Optional[str] = None
     skip: int = 0
     limit: int = 100
+
+
+# Georeferencing-specific models
+class ControlPointModel(BaseModel):
+    image_x: float
+    image_y: float
+    world_x: float
+    world_y: float
+
+
+class GeoreferencingStatusResponse(BaseModel):
+    is_georeferenced: bool
+    needs_georeferencing: bool
+    image_info: Dict[str, Any]
+
+
+class ControlPointsRequest(BaseModel):
+    control_points: List[ControlPointModel]
+    target_srs: str = "EPSG:4326"
+
+
+class GeoreferencingPreviewResponse(BaseModel):
+    preview_url: str
+    validation_results: Dict[str, Any]
+
+
+class GeoreferencingApplyRequest(BaseModel):
+    control_points: List[ControlPointModel]
+    control_points_srs: str = "EPSG:4326"
+    metadata: Optional[Dict[str, Any]] = None
 
 
 
@@ -298,7 +331,7 @@ async def upload_file(
     tags: Optional[str] = Form(None),
     parent_path: Optional[str] = Form("root")
 ):
-    """Upload a new file"""
+    """Upload a new file with georeferencing detection"""
     file_tags = {}
     if tags:
         try:
@@ -308,21 +341,24 @@ async def upload_file(
 
     await validate_parent_path(parent_path or "root")
     file_obj = await FileService.create_file(file, file_tags, parent_path=parent_path or "root")
+    
     return TreeItemResponse.model_validate(file_obj)
 
 
 @router.get("/files/{file_id}/download")
 async def download_file(file_id: uuid.UUID):
-    """Download a file"""
+    """Download a file (original version, not georeferenced)"""
     file_obj = await FileService.get_file(str(file_id))
     if not file_obj:
         raise HTTPException(status_code=404, detail="File not found")
     
-    if not os.path.exists(file_obj.file_path):
+    # Use original file path for downloads, not the georeferenced version
+    download_path = file_obj.original_file_path
+    if not os.path.exists(download_path):
         raise HTTPException(status_code=404, detail="File not found on disk")
     
     return FastAPIFileResponse(
-        path=file_obj.file_path,
+        path=download_path,
         filename=file_obj.original_name,
         media_type=file_obj.mime_type
     )
@@ -336,7 +372,15 @@ async def get_file_map(file_id: uuid.UUID):
     if not file_obj:
         raise HTTPException(status_code=404, detail="File not found")
     
-    map_url = mapserver_service.get_map_url(file_obj.name)
+    # Use the actual file path (which may be georeferenced version) instead of just the name
+    file_path = file_obj.file_path
+    if not file_path:
+        raise HTTPException(status_code=400, detail="File path not found")
+    
+    # Extract filename from the full path
+    filename = os.path.basename(file_path)
+    
+    map_url = mapserver_service.get_map_url(filename)
     if not map_url:
         raise HTTPException(status_code=400, detail="File type not supported for mapping")
     
@@ -350,7 +394,15 @@ async def get_file_extent(file_id: uuid.UUID):
     if not file_obj:
         raise HTTPException(status_code=404, detail="File not found")
     
-    extent = mapserver_service.get_file_extent(file_obj.name)
+    # Use the actual file path (which may be georeferenced version) instead of just the name
+    file_path = file_obj.file_path
+    if not file_path:
+        raise HTTPException(status_code=400, detail="File path not found")
+    
+    # Extract filename from the full path
+    filename = os.path.basename(file_path)
+    
+    extent = mapserver_service.get_file_extent(filename)
     if not extent:
         raise HTTPException(status_code=400, detail="File type not supported for extent calculation")
     
@@ -380,5 +432,217 @@ async def cleanup_mapserver_configs(max_age_hours: int = 24):
     try:
         mapserver_service.cleanup_old_configs(max_age_hours)
         return {"message": f"Cleaned up MapServer configs older than {max_age_hours} hours"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Cleanup failed: {str(e)}")
+
+
+# ======================
+# GEOREFERENCING ENDPOINTS
+# ======================
+
+@router.get("/files/{file_id}/georeferencing-status", response_model=GeoreferencingStatusResponse)
+async def get_georeferencing_status(file_id: uuid.UUID):
+    """Check if a file is georeferenced and get image information"""
+    file_obj = await FileService.get_file(str(file_id))
+    if not file_obj:
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    if not os.path.exists(file_obj.file_path):
+        raise HTTPException(status_code=404, detail="File not found on disk")
+    
+    try:
+        # Check if file is a raster
+        base_file_type = file_obj.tags.get("base_file_type", "raw")
+        if base_file_type != "raster":
+            raise HTTPException(status_code=400, detail="File is not a raster image")
+        
+        # Get georeferencing status and image info
+        is_georeferenced = georeferencing_service.is_georeferenced(file_obj.file_path)
+        image_info = georeferencing_service.get_image_info(file_obj.file_path)
+        
+        return GeoreferencingStatusResponse(
+            is_georeferenced=is_georeferenced,
+            needs_georeferencing=not is_georeferenced,
+            image_info=image_info
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error checking georeferencing status: {str(e)}")
+
+
+@router.post("/files/{file_id}/create-preview")
+async def create_file_preview(file_id: uuid.UUID, max_width: int = 512, max_height: int = 512):
+    """Create a preview image for the file"""
+    file_obj = await FileService.get_file(str(file_id))
+    if not file_obj:
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    if not os.path.exists(file_obj.file_path):
+        raise HTTPException(status_code=404, detail="File not found on disk")
+    
+    try:
+        # Create preview
+        preview_path = georeferencing_service.create_preview_image(
+            file_obj.file_path, 
+            (max_width, max_height)
+        )
+        
+        # Return file response for the preview
+        return FastAPIFileResponse(
+            path=preview_path,
+            media_type="image/png",
+            filename=f"preview_{file_obj.name}.png"
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error creating preview: {str(e)}")
+
+
+@router.post("/files/{file_id}/validate-control-points")
+async def validate_control_points(file_id: uuid.UUID, request: ControlPointsRequest):
+    """Validate control points and return accuracy statistics"""
+    file_obj = await FileService.get_file(str(file_id))
+    if not file_obj:
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    try:
+        # Convert Pydantic models to ControlPoint objects
+        control_points = [
+            ControlPoint(cp.image_x, cp.image_y, cp.world_x, cp.world_y)
+            for cp in request.control_points
+        ]
+        
+        # Validate control points
+        validation_results = georeferencing_service.validate_control_points(control_points)
+        
+        return validation_results
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error validating control points: {str(e)}")
+
+
+@router.post("/files/{file_id}/preview-georeferencing", response_model=GeoreferencingPreviewResponse)
+async def preview_georeferencing(file_id: uuid.UUID, request: ControlPointsRequest):
+    """Create a preview of the georeferencing with control points"""
+    file_obj = await FileService.get_file(str(file_id))
+    if not file_obj:
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    if not os.path.exists(file_obj.file_path):
+        raise HTTPException(status_code=404, detail="File not found on disk")
+    
+    try:
+        # Convert Pydantic models to ControlPoint objects
+        control_points = [
+            ControlPoint(cp.image_x, cp.image_y, cp.world_x, cp.world_y)
+            for cp in request.control_points
+        ]
+        
+        # Validate control points first
+        validation_results = georeferencing_service.validate_control_points(control_points)
+        
+        if not validation_results['valid']:
+            raise HTTPException(status_code=400, detail=f"Invalid control points: {validation_results['errors']}")
+        
+        # Create warped preview
+        warped_path = georeferencing_service.warp_image_with_control_points(
+            file_obj.file_path,
+            control_points,
+            request.control_points_srs
+        )
+        
+        # Create MapServer URL for the warped file
+        preview_url = mapserver_service.get_preview_url(os.path.basename(warped_path))
+        
+        return GeoreferencingPreviewResponse(
+            preview_url=preview_url,
+            validation_results=validation_results
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error creating georeferencing preview: {str(e)}")
+
+
+@router.post("/files/{file_id}/apply-georeferencing")
+async def apply_georeferencing(file_id: uuid.UUID, request: GeoreferencingApplyRequest):
+    """Apply georeferencing to a file and update the database"""
+    file_obj = await FileService.get_file(str(file_id))
+    if not file_obj:
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    if not os.path.exists(file_obj.file_path):
+        raise HTTPException(status_code=404, detail="File not found on disk")
+    
+    try:
+        # Convert Pydantic models to ControlPoint objects
+        control_points = [
+            ControlPoint(cp.image_x, cp.image_y, cp.world_x, cp.world_y)
+            for cp in request.control_points
+        ]
+        
+        # Validate control points
+        validation_results = georeferencing_service.validate_control_points(control_points)
+        
+        if not validation_results['valid']:
+            raise HTTPException(status_code=400, detail=f"Invalid control points: {validation_results['errors']}")
+        
+        # Create the final georeferenced file
+        georeferenced_path = georeferencing_service.warp_image_with_control_points(
+            file_obj.file_path,
+            control_points,
+            request.control_points_srs
+        )
+        
+        # Replace the original file with the georeferenced version
+        import shutil
+        backup_path = file_obj.file_path + ".backup"
+        shutil.move(file_obj.file_path, backup_path)  # Backup original
+        shutil.move(georeferenced_path, file_obj.file_path)  # Replace with georeferenced
+        
+        # Update file metadata
+        updated_tags = file_obj.tags.copy()
+        updated_tags.update({
+            "georeferenced": True,
+            "georeferencing_method": "manual_control_points",
+            "target_srs": request.control_points_srs,
+            "control_points_count": len(control_points),
+            "georeferencing_accuracy": validation_results.get('statistics', {})
+        })
+        
+        # Add custom metadata if provided
+        if request.metadata:
+            updated_tags.update(request.metadata)
+        
+        # Update the file in database
+        updated_file = await FileService.update_file(str(file_id), tags=updated_tags)
+        
+        # Save control points for future reference
+        cp_file = georeferencing_service.save_control_points(str(file_id), control_points)
+        
+        return {
+            "message": "Georeferencing applied successfully",
+            "file": TreeItemResponse.model_validate(updated_file),
+            "validation_results": validation_results,
+            "control_points_file": cp_file
+        }
+        
+    except Exception as e:
+        # If something went wrong, try to restore the backup
+        try:
+            backup_path = file_obj.file_path + ".backup"
+            if os.path.exists(backup_path):
+                shutil.move(backup_path, file_obj.file_path)
+        except:
+            pass
+        
+        raise HTTPException(status_code=500, detail=f"Error applying georeferencing: {str(e)}")
+
+
+@router.post("/georeferencing/cleanup")
+async def cleanup_georeferencing_temp_files(max_age_hours: int = 24):
+    """Clean up temporary georeferencing files"""
+    try:
+        georeferencing_service.cleanup_temp_files(max_age_hours)
+        return {"message": f"Cleaned up georeferencing temp files older than {max_age_hours} hours"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Cleanup failed: {str(e)}")

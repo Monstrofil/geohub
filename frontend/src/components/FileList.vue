@@ -11,7 +11,7 @@
           </svg>
           Оновити
         </button>
-        <button @click="showUploadModal = true" class="action-btn upload-btn" title="Завантажити новий файл або створити колекцію">
+        <button @click="showUploadChoice = true" class="action-btn upload-btn" title="Завантажити новий файл або створити колекцію">
           <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
             <path d="M10 15V5M10 5L6 9M10 5l4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
             <rect x="4" y="15" width="12" height="2" rx="1" fill="currentColor"/>
@@ -56,7 +56,7 @@
         <br>Перейдіть до батьківської папки або створіть новий вміст.
       </p>
       <div class="empty-actions">
-        <button @click="showUploadModal = true" class="action-btn upload-btn" title="Додати файл або колекцію">
+        <button @click="showUploadChoice = true" class="action-btn upload-btn" title="Додати файл або колекцію">
           <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
             <path d="M10 15V5M10 5L6 9M10 5l4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
             <rect x="4" y="15" width="12" height="2" rx="1" fill="currentColor"/>
@@ -86,20 +86,79 @@
 
     <!-- Upload Modal -->
     <UploadModal 
-      :show="showUploadModal"
+      :show="showUploadModal && uploadMode === 'modal'"
       :tree-path="treePathString"
       @close="closeModal"
       @upload-success="handleUploadSuccess"
     />
+
+    <!-- Upload Wizard for Raster Files -->
+    <UploadWizard 
+      :show="showUploadModal && uploadMode === 'wizard'"
+      :parent-path="treePathString || 'root'"
+      @close="closeModal"
+      @upload-success="handleUploadSuccess"
+    />
+
+    <!-- Upload Choice Modal -->
+    <div v-if="showUploadChoice" class="upload-choice-overlay" @click="closeUploadChoice">
+      <div class="upload-choice-modal" @click.stop>
+        <div class="choice-header">
+          <h3>Choose Upload Type</h3>
+          <button class="close-btn" @click="closeUploadChoice">×</button>
+        </div>
+        
+        <div class="choice-content">
+          <div class="choice-option" @click="startRasterUpload">
+            <div class="option-icon">
+              <svg width="48" height="48" viewBox="0 0 48 48">
+                <rect x="6" y="6" width="36" height="36" rx="4" fill="#e0e7ef" stroke="#007bff" stroke-width="2"/>
+                <circle cx="18" cy="30" r="4" fill="#007bff"/>
+                <rect x="24" y="18" width="14" height="8" fill="#b3d1ff"/>
+                <path d="M8 8l6 6M14 8l6 6M20 8l6 6" stroke="#007bff" stroke-width="1" fill="none"/>
+              </svg>
+            </div>
+            <h4>Raster Image</h4>
+            <p>Upload raster files with guided georeferencing</p>
+            <div class="option-features">
+              <span>✓ Automatic georeferencing detection</span>
+              <span>✓ Interactive control point mapping</span>
+              <span>✓ Preview and validation</span>
+            </div>
+          </div>
+          
+          <div class="choice-option" @click="startRegularUpload">
+            <div class="option-icon">
+              <svg width="48" height="48" viewBox="0 0 48 48">
+                <rect x="8" y="8" width="32" height="32" rx="4" fill="#f7f7e7" stroke="#6c757d" stroke-width="2"/>
+                <rect x="14" y="18" width="20" height="2" fill="#6c757d"/>
+                <rect x="14" y="24" width="12" height="2" fill="#6c757d"/>
+                <rect x="14" y="30" width="16" height="2" fill="#6c757d"/>
+                <circle cx="36" cy="12" r="8" fill="#ffb300"/>
+                <path d="M32 12h8M36 8v8" stroke="white" stroke-width="2"/>
+              </svg>
+            </div>
+            <h4>Regular File or Collection</h4>
+            <p>Upload any file type or create a collection</p>
+            <div class="option-features">
+              <span>✓ All file types supported</span>
+              <span>✓ Create collections</span>
+              <span>✓ Quick upload</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, watch, onMounted, defineProps, defineEmits, computed } from 'vue'
+import { ref, watch, onMounted, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import FileCard from './FileCard.vue'
 import TreeCard from './TreeCard.vue'
 import UploadModal from './UploadModal.vue'
+import UploadWizard from './UploadWizard.vue'
 import apiService from '../services/api.js'
 import { getDisplayName } from '../utils/fileHelpers.js'
 
@@ -120,6 +179,8 @@ const error = ref(null)
 
 // Upload modal state
 const showUploadModal = ref(false)
+const showUploadChoice = ref(false)
+const uploadMode = ref('modal') // 'modal' or 'wizard'
 
 // Convert treePath array to string for API calls
 const treePathString = computed(() => {
@@ -262,6 +323,22 @@ function handleObjectCloned(cloneData) {
 // Upload modal functions
 function closeModal() {
   showUploadModal.value = false
+}
+
+function closeUploadChoice() {
+  showUploadChoice.value = false
+}
+
+function startRasterUpload() {
+  uploadMode.value = 'wizard'
+  showUploadChoice.value = false
+  showUploadModal.value = true
+}
+
+function startRegularUpload() {
+  uploadMode.value = 'modal'
+  showUploadChoice.value = false
+  showUploadModal.value = true
 }
 
 function handleUploadSuccess(response) {
@@ -473,5 +550,121 @@ watch(() => props.treePath, loadFiles)
 
 .btn-secondary:hover {
   background: #5a6268;
+}
+
+/* Upload Choice Modal */
+.upload-choice-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1500;
+  backdrop-filter: blur(4px);
+}
+
+.upload-choice-modal {
+  background: white;
+  border-radius: 12px;
+  max-width: 700px;
+  width: 90%;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+}
+
+.choice-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem 2rem;
+  border-bottom: 1px solid #eee;
+  background: #f8f9fa;
+}
+
+.choice-header h3 {
+  margin: 0;
+  color: #333;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.choice-header .close-btn {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: #666;
+  cursor: pointer;
+  padding: 0.5rem;
+  border-radius: 50%;
+  transition: all 0.2s;
+}
+
+.choice-header .close-btn:hover {
+  background: #e9ecef;
+  color: #333;
+}
+
+.choice-content {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+}
+
+.choice-option {
+  padding: 2rem;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s;
+  border-right: 1px solid #eee;
+  position: relative;
+}
+
+.choice-option:last-child {
+  border-right: none;
+}
+
+.choice-option:hover {
+  background: #f8f9ff;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 123, 255, 0.15);
+}
+
+.option-icon {
+  margin-bottom: 1.5rem;
+  transition: transform 0.3s;
+}
+
+.choice-option:hover .option-icon {
+  transform: scale(1.1);
+}
+
+.choice-option h4 {
+  margin: 0 0 0.75rem 0;
+  color: #333;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.choice-option p {
+  margin: 0 0 1.5rem 0;
+  color: #666;
+  line-height: 1.5;
+}
+
+.option-features {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  text-align: left;
+}
+
+.option-features span {
+  color: #28a745;
+  font-size: 0.9rem;
+  font-weight: 500;
 }
 </style> 

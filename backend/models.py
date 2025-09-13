@@ -48,8 +48,13 @@ class TreeItem(models.Model):
     
     @property
     def file_path(self) -> str:
-        """Get file path from tags"""
+        """Get file path from tags (may be georeferenced version)"""
         return self.tags.get("file_path", "")
+    
+    @property
+    def original_file_path(self) -> str:
+        """Get original file path from tags (before georeferencing)"""
+        return self.tags.get("original_file_path", self.tags.get("file_path", ""))
     
     @property
     def file_size(self) -> int:

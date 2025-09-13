@@ -544,6 +544,133 @@ class ApiService {
     console.warn('cloneObjectInTree is deprecated')
     throw new Error('cloneObjectInTree is deprecated - create new file/collection instead')
   }
+
+  // ======================
+  // GEOREFERENCING OPERATIONS
+  // ======================
+
+  /**
+   * Get georeferencing status for a file
+   * @param {string} fileId - The file ID
+   * @returns {Promise<Object>} Georeferencing status
+   */
+  async getGeoreferencingStatus(fileId) {
+    return await this.request(`/files/${fileId}/georeferencing-status`)
+  }
+
+  /**
+   * Create a preview image for a file
+   * @param {string} fileId - The file ID
+   * @param {number} maxWidth - Maximum width
+   * @param {number} maxHeight - Maximum height
+   * @returns {Promise<Blob>} Preview image blob
+   */
+  async createFilePreview(fileId, maxWidth = 512, maxHeight = 512) {
+    const response = await fetch(`${this.baseUrl}/files/${fileId}/create-preview?max_width=${maxWidth}&max_height=${maxHeight}`, {
+      method: 'POST'
+    })
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.detail || `Preview creation failed! status: ${response.status}`)
+    }
+    
+    return await response.blob()
+  }
+
+  /**
+   * Validate control points
+   * @param {string} fileId - The file ID
+   * @param {Object} request - Control points request
+   * @returns {Promise<Object>} Validation results
+   */
+  async validateControlPoints(fileId, request) {
+    return await this.request(`/files/${fileId}/validate-control-points`, {
+      method: 'POST',
+      body: JSON.stringify(request)
+    })
+  }
+
+  /**
+   * Preview georeferencing with control points
+   * @param {string} fileId - The file ID
+   * @param {Object} request - Control points request
+   * @returns {Promise<Object>} Preview result
+   */
+  async previewGeoreferencing(fileId, request) {
+    return await this.request(`/files/${fileId}/preview-georeferencing`, {
+      method: 'POST',
+      body: JSON.stringify(request)
+    })
+  }
+
+  /**
+   * Apply georeferencing to a file
+   * @param {string} fileId - The file ID
+   * @param {Object} request - Georeferencing request
+   * @returns {Promise<Object>} Apply result
+   */
+  async applyGeoreferencing(fileId, request) {
+    return await this.request(`/files/${fileId}/apply-georeferencing`, {
+      method: 'POST',
+      body: JSON.stringify(request)
+    })
+  }
+
+  /**
+   * Upload file with progress tracking
+   * @param {FormData} formData - Form data with file
+   * @param {Function} onProgress - Progress callback
+   * @returns {Promise<Object>} Upload result
+   */
+  async uploadFileWithProgress(formData, onProgress) {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest()
+      
+      xhr.upload.addEventListener('progress', (event) => {
+        if (event.lengthComputable) {
+          const progress = event.loaded / event.total
+          onProgress(progress)
+        }
+      })
+      
+      xhr.addEventListener('load', () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            const response = JSON.parse(xhr.responseText)
+            resolve(response)
+          } catch (error) {
+            reject(new Error('Failed to parse response'))
+          }
+        } else {
+          try {
+            const errorData = JSON.parse(xhr.responseText)
+            reject(new Error(errorData.detail || `Upload failed! status: ${xhr.status}`))
+          } catch (error) {
+            reject(new Error(`Upload failed! status: ${xhr.status}`))
+          }
+        }
+      })
+      
+      xhr.addEventListener('error', () => {
+        reject(new Error('Network error occurred'))
+      })
+      
+      xhr.open('POST', `${this.baseUrl}/files`)
+      xhr.send(formData)
+    })
+  }
+
+  /**
+   * Clean up georeferencing temporary files
+   * @param {number} maxAgeHours - Maximum age in hours
+   * @returns {Promise<Object>} Cleanup result
+   */
+  async cleanupGeoreferencingFiles(maxAgeHours = 24) {
+    return await this.request(`/georeferencing/cleanup?max_age_hours=${maxAgeHours}`, {
+      method: 'POST'
+    })
+  }
 }
 
 export default new ApiService()

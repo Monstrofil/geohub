@@ -5,8 +5,6 @@ services:
       POSTGRES_DB: tagger_db
       POSTGRES_USER: tagger_user
       POSTGRES_PASSWORD: tagger_password
-    ports:
-      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -22,6 +20,7 @@ services:
     volumes:
       - ./backend:/app
       - ./backend/uploads:/opt/shared/uploads
+      - ./backend/temp:/opt/shared/temp
       - mapserver_configs:/opt/shared/mapserver
     environment:
       DATABASE_URL: postgres://tagger_user:tagger_password@postgres:5432/tagger_db
@@ -45,6 +44,7 @@ services:
       - "8082:80"
     volumes:
       - ./backend/uploads:/opt/mapserver
+      - ./backend/temp:/opt/mapserver/temp
       - mapserver_configs:/opt/shared/mapserver
       - ./mapserver/mapserver.conf:/usr/local/etc/mapserver.conf
     depends_on:

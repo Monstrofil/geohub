@@ -20,15 +20,21 @@ class MapServerService:
         if not filename:
             return None
             
+        # Check in uploads directory first, then temp directory
         file_path = self.uploads_dir / filename
         
+        if not file_path.exists():
+            # Try temp directory (for georeferencing temp files)
+            temp_dir = Path("./temp")
+            file_path = temp_dir / filename
+            
         if not file_path.exists():
             print(f"File not found: {file_path}")
             return None
             
-        # Check if it's a GeoTIFF file
-        if not self._is_geotiff(filename):
-            print(f"File is not a GeoTIFF: {filename}")
+        # Check if it's a GeoTIFF file or raster file
+        if not self._is_geotiff(filename) and not filename.endswith(('.tif', '.tiff', '.pdf')):
+            print(f"File is not a raster: {filename}")
             return None
             
         # Create a MapServer configuration for this specific file
@@ -39,10 +45,17 @@ class MapServerService:
     
     def _is_geotiff(self, filename):
         """
-        Check if a file is a GeoTIFF based on extension
+        Check if a file is a GeoTIFF or supported raster based on extension
         """
-        geotiff_extensions = {'.tif', '.tiff', '.geotiff'}
+        geotiff_extensions = {'.tif', '.tiff', '.geotiff', '.pdf'}
         return Path(filename).suffix.lower() in geotiff_extensions
+    
+    def _get_file_data_path(self, filename):
+        """
+        Get the correct data path for a file - all files are now in the main directory
+        """
+        # All files (including warped files) are now in the uploads directory
+        return filename
     
     def _validate_gdal(self):
         """
@@ -65,44 +78,52 @@ class MapServerService:
             print("GDAL validation failed, cannot extract geospatial information")
             return None, None
             
+        # All files are in the uploads directory
         file_path = self.uploads_dir / filename
         
         try:
+            print(f"File path: {file_path}")
             # Open the dataset
             dataset = gdal.Open(str(file_path))
             if dataset is None:
                 print(f"Could not open file with GDAL: {file_path}")
                 return None, None
             
-            # Get the geotransform
+            # Get the extent from the dataset
             geotransform = dataset.GetGeoTransform()
-            if geotransform is None:
-                print(f"No geotransform found in file: {file_path}")
-                return None, None
+
+            print(f"Geotransform: {geotransform}")
             
-            # Calculate extent from geotransform
-            # geotransform = (x_min, pixel_width, 0, y_max, 0, -pixel_height)
-            x_min = geotransform[0]
-            y_max = geotransform[3]
-            x_max = x_min + geotransform[1] * dataset.RasterXSize
-            y_min = y_max + geotransform[5] * dataset.RasterYSize
+            # Use GDAL's built-in extent calculation
+            ulx = geotransform[0]
+            uly = geotransform[3]
+            lrx = geotransform[0] + geotransform[1] * dataset.RasterXSize
+            lry = geotransform[3] + geotransform[5] * dataset.RasterYSize
             
-            extent = (x_min, y_min, x_max, y_max)
-            print(f"Extracted extent: {extent}")
+            extent = (ulx, lry, lrx, uly)  # (min_x, min_y, max_x, max_y)
+            print(f"Raw extent from geotransform: {extent}")
             
             # Get the projection
             projection = dataset.GetProjection()
-            if projection:
+            print(f"Raw projection from file: '{projection}' '{str(file_path)}'")
+            print(f"Projection length: {len(projection) if projection else 0}")
+            
+            if projection and len(projection.strip()) > 0:
                 # Convert to WKT format for MapServer
                 spatial_ref = osr.SpatialReference()
-                spatial_ref.ImportFromWkt(projection)
+                try:
+                    spatial_ref.ImportFromWkt(projection)
+                    print("Successfully imported projection from WKT")
+                except Exception as e:
+                    print(f"Failed to import projection from WKT: {e}")
                 
                 # Get EPSG code if available
                 epsg_code = None
                 try:
                     epsg_code = spatial_ref.GetAuthorityCode(None)
-                except:
-                    pass
+                    print(f"Extracted EPSG code: {epsg_code}")
+                except Exception as e:
+                    print(f"Failed to get EPSG code: {e}")
                 
                 if epsg_code:
                     projection_str = f'"init=epsg:{epsg_code}"'
@@ -152,6 +173,9 @@ class MapServerService:
             projection_str = '"init=epsg:4326"'
             print(f"Using default projection: {projection_str}")
         
+        # Determine the correct data path for the file
+        data_path = self._get_file_data_path(filename)
+        
         config_content = f"""
 MAP
   NAME "Tagger MapServer - {filename}"
@@ -179,7 +203,7 @@ MAP
     NAME "geotiff_layer"
     TYPE RASTER
     STATUS ON
-    DATA "/opt/mapserver/{filename}"
+    DATA "/opt/mapserver/{data_path}"
 
     PROJECTION
         {projection_str}
@@ -198,7 +222,8 @@ END"""
         """
         Get a simple preview URL for a GeoTIFF file
         """
-        if not self._is_geotiff(filename):
+        # Support both regular files and temp files
+        if not self._is_geotiff(filename) and not filename.endswith(('.tif', '.tiff', '.pdf')):
             return None
             
         # Create a MapServer configuration for this specific file
@@ -217,12 +242,19 @@ END"""
         extent, projection_str = self._get_gdal_info(filename)
         
         if extent:
+            print(f"Original extent: {extent}")
+            print(f"Projection string: {projection_str}")
+            
             # Convert extent to WGS84 if needed
             wgs84_extent = self._transform_extent_to_wgs84(extent, projection_str)
             
+            print(f"Transformed extent: {wgs84_extent}")
+            
             if wgs84_extent:
                 # Return extent as a comma-separated string in WGS84
-                return f"{wgs84_extent[0]},{wgs84_extent[1]},{wgs84_extent[2]},{wgs84_extent[3]}"
+                result = f"{wgs84_extent[0]},{wgs84_extent[1]},{wgs84_extent[2]},{wgs84_extent[3]}"
+                print(f"Returning extent: {result}")
+                return result
         
         return None
     
