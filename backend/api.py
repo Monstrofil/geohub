@@ -1,10 +1,11 @@
-from fastapi import APIRouter, UploadFile, File, Form, Body, HTTPException, Depends, Path, Query
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Path, Query
 from fastapi.responses import FileResponse as FastAPIFileResponse
 from typing import List, Dict, Optional, Any
 import os
 import datetime 
 import json
 import uuid
+import shutil
 from pydantic import BaseModel, ConfigDict
 
 import models
@@ -91,11 +92,6 @@ class GeoreferencingStatusResponse(BaseModel):
 class ControlPointsRequest(BaseModel):
     control_points: List[ControlPointModel]
     target_srs: str = "EPSG:4326"
-
-
-class GeoreferencingPreviewResponse(BaseModel):
-    preview_url: str
-    validation_results: Dict[str, Any]
 
 
 class GeoreferencingApplyRequest(BaseModel):
@@ -537,67 +533,27 @@ async def validate_control_points(file_id: uuid.UUID, request: ControlPointsRequ
         raise HTTPException(status_code=500, detail=f"Error validating control points: {str(e)}")
 
 
-@router.post("/files/{file_id}/preview-georeferencing", response_model=GeoreferencingPreviewResponse)
-async def preview_georeferencing(file_id: uuid.UUID, request: ControlPointsRequest):
-    """Create a preview of the georeferencing with control points"""
-    file_obj = await FileService.get_file(str(file_id))
-    if not file_obj:
-        raise HTTPException(status_code=404, detail="File not found")
-    
-    file_path = await file_obj.get_file_path()
-    if not os.path.exists(file_path):
-        raise HTTPException(status_code=404, detail="File not found on disk")
-    
-    try:
-        # Convert Pydantic models to ControlPoint objects
-        control_points = [
-            ControlPoint(cp.image_x, cp.image_y, cp.world_x, cp.world_y)
-            for cp in request.control_points
-        ]
-        
-        # Validate control points first
-        validation_results = georeferencing_service.validate_control_points(control_points)
-        
-        if not validation_results['valid']:
-            raise HTTPException(status_code=400, detail=f"Invalid control points: {validation_results['errors']}")
-        
-        # Create warped preview
-        warped_path = georeferencing_service.warp_image_with_control_points(
-            file_path,
-            control_points,
-            request.control_points_srs
-        )
-        
-        # Create MapServer URL for the warped file
-        preview_url = mapserver_service.get_preview_url(os.path.basename(warped_path))
-        
-        return GeoreferencingPreviewResponse(
-            preview_url=preview_url,
-            validation_results=validation_results
-        )
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error creating georeferencing preview: {str(e)}")
-
-
 @router.post("/files/{file_id}/apply-georeferencing")
 async def apply_georeferencing(file_id: uuid.UUID, request: GeoreferencingApplyRequest):
     """Apply georeferencing to a file and update the database"""
-    file_obj = await FileService.get_file(str(file_id))
-    if not file_obj:
+    tree_obj = await models.TreeItem.get_or_none(id=file_id, object_type="geo_raster_file")
+    if not tree_obj:
         raise HTTPException(status_code=404, detail="File not found")
     
-    file_path = await file_obj.get_file_path()
+
+    geo_raster_file = await tree_obj.get_object()
+    file_path = geo_raster_file.file_path
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="File not found on disk")
     
-    try:
-        # Convert Pydantic models to ControlPoint objects
-        control_points = [
-            ControlPoint(cp.image_x, cp.image_y, cp.world_x, cp.world_y)
-            for cp in request.control_points
-        ]
+    # Convert Pydantic models to ControlPoint objects
+    control_points = [
+        ControlPoint(cp.image_x, cp.image_y, cp.world_x, cp.world_y)
+        for cp in request.control_points
+    ]
         
+    
+    try:
         # Validate control points
         validation_results = georeferencing_service.validate_control_points(control_points)
         
@@ -614,12 +570,8 @@ async def apply_georeferencing(file_id: uuid.UUID, request: GeoreferencingApplyR
         # Replace with georeferenced
         os.rename(georeferenced_path, file_path) 
         
-        # Update georeferencing metadata in the specialized model
-        from model_helpers import TreeItemService
-        await TreeItemService.update_georeferencing(
-            str(file_id),
-            new_file_path=file_path  # Update to the new georeferenced file path
-        )
+        geo_raster_file.file_path = file_path
+        await geo_raster_file.save()
         
         # Update user metadata if provided
         user_metadata = request.metadata or {}

@@ -1,14 +1,11 @@
-from models import TreeItem, TreeItem_Pydantic, File, Collection, RawFile, GeoRasterFile
-from model_helpers import ModelFactory, TreeItemService
-from tortoise.expressions import Q
+from models import TreeItem, File, Collection, RawFile, GeoRasterFile
 import os
 import uuid
 import aiofiles
 from osgeo import gdal, osr
-import geopandas as gpd
 from typing import List, Dict, Any, Optional, Tuple
 from fastapi import UploadFile, HTTPException
-from datetime import datetime, timezone
+from datetime import datetime
 import json
 
 
@@ -29,16 +26,6 @@ def _is_raster(file_path: str) -> bool:
     return True
 
 
-def _is_vector(file_path: str) -> bool:
-    """
-    Check if file is a vector using GeoPandas
-    """
-    try:
-        gdf = gpd.read_file(file_path)
-        return True
-    except Exception as e:
-        print(f"Error checking vector with GeoPandas: {e}")
-        return False
 
 
 
@@ -59,12 +46,22 @@ class CollectionsService:
         else:
             collection_path = f"{parent_path}.{collection_segment}"
         
-        # Use the new ModelFactory to create collection
-        collection_obj = await ModelFactory.create_collection(
+        # Create collection directly
+        # Create Collection (minimal model - data stored in TreeItem.tags)
+        collection = await Collection.create()
+        
+        # Prepare tags with name and description
+        collection_tags = tags.copy() if tags else {}
+        if tags.get('description'):
+            collection_tags["description"] = tags['description']
+        
+        # Create TreeItem
+        collection_obj = await TreeItem.create(
             name=name,
-            parent_path=collection_path,
-            description=tags.get('description', ''),
-            tags=tags
+            object_type="collection",
+            object_id=collection.id,
+            path=collection_path,
+            tags=collection_tags
         )
         
         return collection_obj
@@ -319,24 +316,49 @@ class FileService:
             })
             
             # Create as GeoRasterFile since it's already georeferenced
-            file_obj = await ModelFactory.create_geo_raster_file(
-                name=file_info["name"],
-                file_path=file_info["file_path"],
+            # Create GeoRasterFile (minimal model)
+            geo_raster = await GeoRasterFile.create(
                 original_name=file_info["original_name"],
+                file_path=file_info["file_path"],
+                original_file_path=None,
                 file_size=file_info["file_size"],
-                mime_type=file_info["mime_type"],
-                parent_path=file_ltree_path,
+                mime_type=file_info["mime_type"]
+            )
+            
+            # Prepare tags with base file type  
+            georef_tags.update({
+                "base_file_type": "raster"
+            })
+            
+            # Create TreeItem
+            file_obj = await TreeItem.create(
+                name=file_info["name"],
+                object_type="geo_raster_file",
+                object_id=geo_raster.id,
+                path=file_ltree_path,
                 tags=georef_tags
             )
         else:
             # Create as RawFile (not georeferenced or not a raster)
-            file_obj = await ModelFactory.create_raw_file(
-                name=file_info["name"],
-                file_path=file_info["file_path"],
+            # Create RawFile (minimal model)
+            raw_file = await RawFile.create(
                 original_name=file_info["original_name"],
+                file_path=file_info["file_path"],
                 file_size=file_info["file_size"],
-                mime_type=file_info["mime_type"],
-                parent_path=file_ltree_path,
+                mime_type=file_info["mime_type"]
+            )
+            
+            # Prepare tags with base file type
+            clean_tags.update({
+                "base_file_type": "raw"
+            })
+            
+            # Create TreeItem
+            file_obj = await TreeItem.create(
+                name=file_info["name"],
+                object_type="raw_file",
+                object_id=raw_file.id,
+                path=file_ltree_path,
                 tags=clean_tags
             )
         

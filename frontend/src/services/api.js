@@ -592,19 +592,6 @@ class ApiService {
   }
 
   /**
-   * Preview georeferencing with control points
-   * @param {string} fileId - The file ID
-   * @param {Object} request - Control points request
-   * @returns {Promise<Object>} Preview result
-   */
-  async previewGeoreferencing(fileId, request) {
-    return await this.request(`/files/${fileId}/preview-georeferencing`, {
-      method: 'POST',
-      body: JSON.stringify(request)
-    })
-  }
-
-  /**
    * Apply georeferencing to a file
    * @param {string} fileId - The file ID
    * @param {Object} request - Georeferencing request

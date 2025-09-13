@@ -151,20 +151,12 @@ class TreeItem(models.Model):
 
 # Pydantic models for API
 TreeItem_Pydantic = pydantic_model_creator(TreeItem, name="TreeItem")
-TreeItemIn_Pydantic = pydantic_model_creator(TreeItem, name="TreeItemIn", exclude_readonly=True)
-
 RawFile_Pydantic = pydantic_model_creator(RawFile, name="RawFile")
-RawFileIn_Pydantic = pydantic_model_creator(RawFile, name="RawFileIn", exclude_readonly=True)
-
 GeoRasterFile_Pydantic = pydantic_model_creator(GeoRasterFile, name="GeoRasterFile")
-GeoRasterFileIn_Pydantic = pydantic_model_creator(GeoRasterFile, name="GeoRasterFileIn", exclude_readonly=True)
-
 Collection_Pydantic = pydantic_model_creator(Collection, name="Collection")
-CollectionIn_Pydantic = pydantic_model_creator(Collection, name="CollectionIn", exclude_readonly=True)
 
 # Backward compatibility aliases
 File = TreeItem
 File_Pydantic = TreeItem_Pydantic
-FileIn_Pydantic = TreeItemIn_Pydantic
 
 KnownTreeItemTypes = RawFile_Pydantic | GeoRasterFile_Pydantic | Collection_Pydantic

@@ -4,12 +4,11 @@ Georeferencing service for handling image warping and control point management
 import os
 import json
 import uuid
-import tempfile
 import numpy as np
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Tuple
 from datetime import datetime
-from osgeo import gdal, osr, ogr
+from osgeo import gdal, osr
 from dataclasses import dataclass
 import math
 

@@ -27,7 +27,6 @@ The system now provides a streamlined 4-step process for uploading and georefere
 - `GET /files/{file_id}/georeferencing-status` - Check georeferencing status
 - `POST /files/{file_id}/create-preview` - Generate preview images
 - `POST /files/{file_id}/validate-control-points` - Validate control points
-- `POST /files/{file_id}/preview-georeferencing` - Preview warped result
 - `POST /files/{file_id}/apply-georeferencing` - Apply final georeferencing
 - `POST /georeferencing/cleanup` - Clean up temporary files
 

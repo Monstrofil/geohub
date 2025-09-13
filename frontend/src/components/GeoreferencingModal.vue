@@ -131,9 +131,6 @@
         <button class="btn btn-outline" @click="clearAllPoints" :disabled="controlPoints.length === 0">
           Clear All
         </button>
-        <button class="btn btn-outline" @click="previewGeoreferencing" :disabled="!canPreview">
-          Preview
-        </button>
         <button class="btn btn-primary" @click="applyGeoreferencing" :disabled="!canApply">
           Apply Georeferencing
         </button>
@@ -188,8 +185,7 @@ const imageTransform = computed(() => {
   }
 })
 
-const canPreview = computed(() => controlPoints.value.length >= minControlPoints)
-const canApply = computed(() => canPreview.value && validationResults.value?.valid)
+const canApply = computed(() => controlPoints.value.length >= minControlPoints && validationResults.value?.valid)
 
 // Methods
 function closeModal() {
@@ -585,23 +581,6 @@ async function validateControlPoints() {
   } catch (error) {
     console.error('Validation failed:', error)
     validationResults.value = { valid: false, errors: [error.message] }
-  }
-}
-
-async function previewGeoreferencing() {
-  if (!canPreview.value) return
-  
-  try {
-    const response = await apiService.previewGeoreferencing(props.fileId, {
-      control_points: controlPoints.value,
-      control_points_srs: 'EPSG:3857'
-    })
-    
-    // Show preview in a new window or modal
-    window.open(response.preview_url, '_blank')
-  } catch (error) {
-    console.error('Preview failed:', error)
-    alert('Failed to create preview: ' + error.message)
   }
 }
 
