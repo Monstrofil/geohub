@@ -59,7 +59,7 @@
 <script setup>
 import { ref, onMounted, watch, computed } from 'vue'
 import { loadFieldDefinitions } from '../utils/fieldResolver.js'
-import { matchTagsToPreset } from '../utils/tagMatcher.js'
+import { matchTagsToPreset, getAllPresets } from '../utils/tagMatcher.js'
 
 const props = defineProps({
   modelValue: Object,
@@ -74,12 +74,10 @@ const selectedIndex = ref(0)
 const openMenu = ref(false)
 const search = ref('')
 
-// Dynamically import all presets
-const presetModules = import.meta.glob('../data/presets/*/*.json', { eager: true })
 
 onMounted(async () => {
-  // Load all preset JSONs into the types array
-  types.value = Object.values(presetModules)
+  // Load all preset JSONs into the types array using centralized loading
+  types.value = getAllPresets()
   
   // Load field definitions (for future use if needed)
   await loadFieldDefinitions()

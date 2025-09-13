@@ -339,7 +339,7 @@ import { useRoute, useRouter } from 'vue-router'
 import InteractiveMap from './InteractiveMap.vue'
 import CollectionFilesList from './CollectionFilesList.vue'
 import GeoreferencingModal from './GeoreferencingModal.vue'
-import { matchTagsToPreset } from '../utils/tagMatcher.js'
+import { matchTagsToPreset, getAllPresets } from '../utils/tagMatcher.js'
 import { loadFieldDefinitions, resolveFields } from '../utils/fieldResolver.js'
 import apiService from '../services/api.js'
 import { getFileSize, getBaseFileType, getMimeType, getOriginalName, getDisplayName as getFileDisplayName, formatFileSize as formatSize } from '../utils/fileHelpers.js'
@@ -422,8 +422,6 @@ const fileIcon = computed(() => {
 })
 
 // Methods
-// Dynamically import all presets (reused from FileEditor)
-const presetModules = import.meta.glob('../data/presets/*/*.json', { eager: true })
 
 async function loadFile() {
   if (!props.treeItemId) {
@@ -617,8 +615,8 @@ async function convertToGeoRaster() {
 
 // Lifecycle
 onMounted(async () => {
-  // Load all field definitions and presets (reused from FileEditor)
-  allPresets.value = Object.values(presetModules).map(module => module.default || module)
+  // Load all field definitions and presets using centralized loading
+  allPresets.value = getAllPresets()
   console.log('Loaded presets:', allPresets.value)
   allFieldDefinitions.value = await loadFieldDefinitions()
   await loadFile()

@@ -120,7 +120,7 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { matchTagsToPreset } from '../utils/tagMatcher.js'
+import { matchTagsToPreset, getAllPresets } from '../utils/tagMatcher.js'
 import { loadFieldDefinitions, resolveFields } from '../utils/fieldResolver.js'
 import apiService from '../services/api.js'
 
@@ -148,8 +148,6 @@ const allPresets = ref([])
 const allFieldDefinitions = ref({})
 const selectedType = ref(null)
 
-// Dynamically import all presets
-const presetModules = import.meta.glob('../data/presets/*/*.json', { eager: true })
 
 // Computed properties
 const selectedFields = computed(() => {
@@ -283,8 +281,8 @@ function editCollection() {
 
 // Lifecycle
 onMounted(async () => {
-  // Load all field definitions and presets (use same pattern as FileEditor)
-  allPresets.value = Object.values(presetModules)
+  // Load all field definitions and presets using centralized loading
+  allPresets.value = getAllPresets()
   allFieldDefinitions.value = await loadFieldDefinitions()
   await loadCollection()
 })

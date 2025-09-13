@@ -32,7 +32,7 @@
         />
         
         <!-- File upload section moved to left panel -->
-        <div class="upload-section">
+        <div class="upload-section" v-if="!isCollection">
           <div class="upload-header">
             <h3>Завантажити нову версію</h3>
             <p>Виберіть файл для заміни поточної версії</p>
@@ -211,7 +211,7 @@ import TagList from './TagList.vue'
 import InteractiveMap from './InteractiveMap.vue'
 import CollectionFilesList from './CollectionFilesList.vue'
 import GeoreferencingModal from './GeoreferencingModal.vue'
-import { matchTagsToPreset } from '../utils/tagMatcher.js'
+import { matchTagsToPreset, getAllPresets } from '../utils/tagMatcher.js'
 import { loadFieldDefinitions, resolveFields } from '../utils/fieldResolver.js'
 import apiService from '../services/api.js'
 import { watch } from 'vue'
@@ -257,8 +257,6 @@ const sidebarCollapsed = ref(false)
 const router = useRouter()
 
 
-// Dynamically import all presets
-const presetModules = import.meta.glob('../data/presets/*/*.json', { eager: true })
 
 function backButton() {
   router.go(-1); 
@@ -299,7 +297,7 @@ async function loadFile() {
 
 
 onMounted(async () => {
-  allPresets.value = Object.values(presetModules)
+  allPresets.value = getAllPresets()
   allFieldDefinitions.value = await loadFieldDefinitions()
   await loadFile()
 })

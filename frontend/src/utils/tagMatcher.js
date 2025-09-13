@@ -1,4 +1,23 @@
-export function matchTagsToPreset(fileTags, allPresets, objectType = null) {
+// Centralized preset loading
+const presetModules = import.meta.glob('../data/presets/*/*.json', { eager: true })
+let loadedPresets = null
+
+/**
+ * Get all loaded presets
+ * @returns {Array} Array of preset objects
+ */
+export function getAllPresets() {
+  if (!loadedPresets) {
+    loadedPresets = Object.values(presetModules).map(module => module.default || module)
+  }
+  return loadedPresets
+}
+
+export function matchTagsToPreset(fileTags, allPresets = null, objectType = null) {
+  // Use centralized presets if none provided
+  if (!allPresets) {
+    allPresets = getAllPresets()
+  }
   // Defensive programming: ensure allPresets is an array
   if (!Array.isArray(allPresets) || allPresets.length === 0) {
     return null
@@ -39,7 +58,12 @@ export function matchTagsToPreset(fileTags, allPresets, objectType = null) {
   return bestMatch
 }
 
-export function getFileType(file, allPresets) {
+export function getFileType(file, allPresets = null) {
+  // Use centralized presets if none provided
+  if (!allPresets) {
+    allPresets = getAllPresets()
+  }
+  
   // Defensive programming: ensure allPresets is an array
   if (!Array.isArray(allPresets) || allPresets.length === 0) {
     return 'binary' // fallback
