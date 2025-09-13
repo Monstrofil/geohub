@@ -4,6 +4,7 @@ from tortoise.contrib.fastapi import register_tortoise
 
 from database import TORTOISE_ORM
 from api import router as api_router
+from auth_api import router as auth_router
 
 app = FastAPI(
     title="File Tagger API",
@@ -30,6 +31,7 @@ app.add_middleware(
 
 # Include API routes
 app.include_router(api_router, prefix="/api/v1")
+app.include_router(auth_router, prefix="/api/v1")
 
 
 @app.get("/")

@@ -1,5 +1,7 @@
 from tortoise import fields, models
 from tortoise.contrib.pydantic import pydantic_model_creator
+import hashlib
+import secrets
 
 from datetime import datetime
 from typing import Dict, Any, Optional, Union
@@ -8,6 +10,52 @@ from typing import Dict, Any, Optional, Union
 class LTreeField(fields.Field):
     SQL_TYPE = "LTREE"
     field_type = str
+
+
+class User(models.Model):
+    """User model for authentication and permissions"""
+    id = fields.UUIDField(pk=True)
+    username = fields.CharField(max_length=50, unique=True)
+    email = fields.CharField(max_length=255, unique=True)
+    password_hash = fields.CharField(max_length=128)  # SHA-512 hash
+    salt = fields.CharField(max_length=32)  # Random salt for password hashing
+    is_active = fields.BooleanField(default=True)
+    is_admin = fields.BooleanField(default=False)
+    created_at = fields.DatetimeField(auto_now_add=True)
+    updated_at = fields.DatetimeField(auto_now=True)
+    
+    class Meta:
+        table = "users"
+
+    def __str__(self):
+        return f"User(id={self.id}, username='{self.username}')"
+    
+    def set_password(self, password: str):
+        """Hash and set password with salt"""
+        self.salt = secrets.token_hex(16)
+        self.password_hash = hashlib.sha512((password + self.salt).encode()).hexdigest()
+    
+    def check_password(self, password: str) -> bool:
+        """Verify password against stored hash"""
+        return self.password_hash == hashlib.sha512((password + self.salt).encode()).hexdigest()
+
+
+class Group(models.Model):
+    """Group model for organizing users and permissions"""
+    id = fields.UUIDField(pk=True)
+    name = fields.CharField(max_length=100, unique=True)
+    description = fields.TextField(null=True)
+    created_at = fields.DatetimeField(auto_now_add=True)
+    updated_at = fields.DatetimeField(auto_now=True)
+    
+    # Many-to-many relationship with users
+    members = fields.ManyToManyField('models.User', related_name='groups', through='user_groups')
+    
+    class Meta:
+        table = "groups"
+
+    def __str__(self):
+        return f"Group(id={self.id}, name='{self.name}')"
 
 class RawFile(models.Model):
     """Model for raw files (documents, non-geospatial images, etc.)
@@ -90,6 +138,11 @@ class TreeItem(models.Model):
     # Hierarchical path using LTREE
     path = LTreeField(default="root")
     
+    # Linux-style permissions
+    owner_user = fields.ForeignKeyField('models.User', related_name='owned_items', null=True)
+    owner_group = fields.ForeignKeyField('models.Group', related_name='owned_items', null=True)
+    permissions = fields.IntField(default=0o644)  # rwxrwxrwx format, but only rw- rw- r-- used
+    
     created_at = fields.DatetimeField(auto_now_add=True)
     updated_at = fields.DatetimeField(auto_now=True)
 
@@ -139,10 +192,79 @@ class TreeItem(models.Model):
         if hasattr(obj, 'file_path'):
             return obj.file_path
         return ""
+    
+    # Permission checking methods
+    async def can_read(self, user: Optional['User'] = None) -> bool:
+        """Check if user has read permission on this item"""
+        if user is None:
+            # No user provided, check "other" permissions (last 3 bits)
+            return bool(self.permissions & 0o004)
+        
+        if user.is_admin:
+            return True
+        
+        # Check owner permissions (first 3 bits)
+        if self.owner_user_id == user.id:
+            return bool(self.permissions & 0o400)
+        
+        # Check group permissions (middle 3 bits)
+        if self.owner_group_id:
+            user_groups = await user.groups.all()
+            if any(group.id == self.owner_group_id for group in user_groups):
+                return bool(self.permissions & 0o040)
+        
+        # Check other permissions (last 3 bits)
+        return bool(self.permissions & 0o004)
+    
+    async def can_write(self, user: Optional['User'] = None) -> bool:
+        """Check if user has write permission on this item"""
+        if user is None:
+            # No user provided, check "other" permissions
+            return bool(self.permissions & 0o002)
+        
+        if user.is_admin:
+            return True
+        
+        # Check owner permissions
+        if self.owner_user_id == user.id:
+            return bool(self.permissions & 0o200)
+        
+        # Check group permissions
+        if self.owner_group_id:
+            user_groups = await user.groups.all()
+            if any(group.id == self.owner_group_id for group in user_groups):
+                return bool(self.permissions & 0o020)
+        
+        # Check other permissions
+        return bool(self.permissions & 0o002)
+    
+    def get_permission_string(self) -> str:
+        """Get human-readable permission string like 'rw-rw-r--'"""
+        perm = self.permissions
+        result = ""
+        
+        # Owner permissions
+        result += "r" if perm & 0o400 else "-"
+        result += "w" if perm & 0o200 else "-"
+        result += "-"  # Execute not used
+        
+        # Group permissions  
+        result += "r" if perm & 0o040 else "-"
+        result += "w" if perm & 0o020 else "-"
+        result += "-"  # Execute not used
+        
+        # Other permissions
+        result += "r" if perm & 0o004 else "-"
+        result += "w" if perm & 0o002 else "-"
+        result += "-"  # Execute not used
+        
+        return result
 
 
 
 # Pydantic models for API
+User_Pydantic = pydantic_model_creator(User, name="User", exclude=("password_hash", "salt"))
+Group_Pydantic = pydantic_model_creator(Group, name="Group")
 TreeItem_Pydantic = pydantic_model_creator(TreeItem, name="TreeItem")
 RawFile_Pydantic = pydantic_model_creator(RawFile, name="RawFile")
 GeoRasterFile_Pydantic = pydantic_model_creator(GeoRasterFile, name="GeoRasterFile")

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Path, Query
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Path, Query, Depends
 from fastapi.responses import FileResponse as FastAPIFileResponse
 from typing import List, Dict, Optional, Any
 import os
@@ -9,10 +9,11 @@ import shutil
 from pydantic import BaseModel, ConfigDict
 
 import models
-from models import TreeItem
+from models import TreeItem, User
 from services import FileService, CollectionsService
 from mapserver_service import MapServerService
 from georeferencing_service import GeoreferencingService, ControlPoint
+from auth import get_current_user, require_permission
 
 
 router = APIRouter(tags=["files"])
@@ -97,6 +98,8 @@ class GeoreferencingApplyRequest(BaseModel):
 
 
 
+
+
 # Helper functions
 async def validate_parent_path(parent_path: str) -> None:
     """Validate that parent path exists"""
@@ -168,13 +171,19 @@ async def list_tree_items(
 
 
 @router.get("/tree-items/{item_id}", response_model=TreeItemDetails)
-async def get_tree_item(item_id: uuid.UUID):
+async def get_tree_item(
+    item_id: uuid.UUID,
+    current_user: Optional[User] = Depends(get_current_user)
+):
     """Get tree item by ID"""
     # Try to get as file first, then as collection
     item = await models.TreeItem.filter(id=str(item_id)).first()
     
     if not item:
         raise HTTPException(status_code=404, detail="Tree item not found")
+    
+    # Check read permission
+    await require_permission(item, current_user, "read")
     
     response = TreeItemDetails.model_validate(item)
     
@@ -193,9 +202,21 @@ async def get_tree_item(item_id: uuid.UUID):
 
 
 @router.put("/tree-items/{item_id}", response_model=TreeItemResponse)
-async def update_tree_item(item_id: uuid.UUID, request: TreeItemUpdateRequest):
+async def update_tree_item(
+    item_id: uuid.UUID,
+    request: TreeItemUpdateRequest,
+    current_user: Optional[User] = Depends(get_current_user)
+):
     """Update tree item metadata"""
     await validate_parent_path(request.parent_path or "root")
+
+    # First check if item exists and user has write permission
+    item = await models.TreeItem.filter(id=str(item_id)).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Tree item not found")
+    
+    # Check write permission
+    await require_permission(item, current_user, "write")
 
     # Try to update as file first, then as collection
     item = await FileService.update_file(
@@ -219,8 +240,20 @@ async def update_tree_item(item_id: uuid.UUID, request: TreeItemUpdateRequest):
 
 
 @router.delete("/tree-items/{item_id}")
-async def delete_tree_item(item_id: uuid.UUID, force: bool = Query(False)):
+async def delete_tree_item(
+    item_id: uuid.UUID,
+    force: bool = Query(False),
+    current_user: Optional[User] = Depends(get_current_user)
+):
     """Delete tree item"""
+    # First check if item exists and user has write permission
+    item = await models.TreeItem.filter(id=str(item_id)).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Tree item not found")
+    
+    # Check write permission
+    await require_permission(item, current_user, "write")
+    
     # Try to delete as file first, then as collection
     success = await FileService.delete_file(str(item_id))
     
@@ -309,7 +342,8 @@ async def get_root_contents(
 async def upload_file(
     file: UploadFile = File(...),
     tags: Optional[str] = Form(None),
-    parent_path: Optional[str] = Form("root")
+    parent_path: Optional[str] = Form("root"),
+    current_user: Optional[User] = Depends(get_current_user)
 ):
     """Upload a new file with automatic georeferencing detection
     
@@ -325,6 +359,13 @@ async def upload_file(
 
     await validate_parent_path(parent_path or "root")
     file_obj = await FileService.create_file(file, file_tags, parent_path=parent_path or "root")
+    
+    # Set ownership if user is authenticated
+    if current_user:
+        file_obj.owner_user_id = current_user.id
+        # Default permissions: owner can read/write, group can read, others can read
+        file_obj.permissions = 0o644
+        await file_obj.save()
     
     return TreeItemResponse.model_validate(file_obj)
 
