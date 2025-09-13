@@ -16,7 +16,7 @@
             <path d="M10 15V5M10 5L6 9M10 5l4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
             <rect x="4" y="15" width="12" height="2" rx="1" fill="currentColor"/>
           </svg>
-          Завантажити
+          Додати
         </button>
       </div>
     </h3>
@@ -52,7 +52,7 @@
         <br>Створіть нову колекцію або завантажте файл, щоб почати роботу.
       </p>
       <p v-else>
-        У папці "{{ pathSegments[pathSegments.length - 1] }}" поки немає файлів.
+        У папці "{{ pathSegments[pathSegments.length - 1].name }}" поки немає файлів.
         <br>Перейдіть до батьківської папки або створіть новий вміст.
       </p>
       <div class="empty-actions">

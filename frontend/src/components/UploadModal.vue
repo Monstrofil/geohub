@@ -54,16 +54,6 @@
           <input v-model="name" type="text" placeholder="Введіть назву файлу" class="form-control" />
         </div>
 
-        <!-- Tags Section -->
-        <div class="tags-section">
-          <label>Додаткові теґи (необов'язково):</label>
-          <div v-for="(tag, idx) in tags" :key="idx" class="tag-row">
-            <input v-model="tag.key" placeholder="Ключ" class="tag-key" />
-            <input v-model="tag.value" placeholder="Значення" class="tag-value" />
-            <button type="button" @click="removeTag(idx)" class="remove-tag">×</button>
-          </div>
-          <button type="button" @click="addTag" class="add-tag">Додати теґ</button>
-        </div>
 
         <div class="modal-actions">
           <button type="button" @click="closeModal" class="cancel-btn">Скасувати</button>
@@ -94,7 +84,6 @@ const emit = defineEmits(['close', 'upload-success'])
 const fileInput = ref(null)
 const file = ref(null)
 const name = ref('')
-const tags = ref([])
 const uploading = ref(false)
 const uploadError = ref('')
 const uploadSuccess = ref(false)
@@ -119,7 +108,6 @@ function closeModal() {
 function resetForm() {
   file.value = null
   name.value = ''
-  tags.value = []
   uploadError.value = ''
   uploadSuccess.value = false
   uploadSuccessMessage.value = ''
@@ -140,13 +128,6 @@ function onFileChange(event) {
   }
 }
 
-function addTag() {
-  tags.value.push({ key: '', value: '' })
-}
-
-function removeTag(index) {
-  tags.value.splice(index, 1)
-}
 
 async function handleUpload() {
   if (!isFormValid.value) return
@@ -172,11 +153,6 @@ async function handleUpload() {
 async function uploadFile() {
   // Build tags object
   const tagsObj = {}
-  tags.value.forEach(tag => {
-    if (tag.key.trim() && tag.value.trim()) {
-      tagsObj[tag.key.trim()] = tag.value.trim()
-    }
-  })
 
   // Add name to tags if provided
   if (name.value.trim()) {
@@ -206,13 +182,6 @@ async function uploadFile() {
 
 async function createCollection() {
   var collectionTags = {}
-  
-  // Add tags
-  tags.value.forEach(tag => {
-    if (tag.key.trim() && tag.value.trim()) {
-      collectionTags[tag.key.trim()] = tag.value.trim()
-    }
-  })
 
   // Convert tree path to parent path (for now, just use "root" since we need collection ID mapping)
   const parentPath = props.treePath || "root"
@@ -315,73 +284,36 @@ watch(() => props.show, (newValue) => {
 
 .form-control {
   width: 100%;
-  padding: 0.5rem;
+  padding: 0.75rem;
   border: 1px solid #ccc;
-  border-radius: 4px;
-  font-size: 0.9rem;
+  border-radius: 6px;
+  font-size: 1rem;
+  box-sizing: border-box;
 }
 
 .form-control:focus {
   outline: none;
   border-color: #007bff;
+  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
 }
 
-.tags-section {
-  margin: 1rem 0;
-}
-
-.tags-section label {
-  display: block;
-  margin-bottom: 0.5rem;
-  font-weight: 500;
-  color: #333;
-}
-
-.tag-row {
-  display: flex;
-  gap: 0.5rem;
-  margin-bottom: 0.5rem;
-}
-
-.tag-key, .tag-value {
-  flex: 1;
-  padding: 0.5rem;
+/* File input styling */
+input[type="file"] {
+  width: 100%;
+  padding: 0.75rem;
   border: 1px solid #ccc;
-  border-radius: 4px;
-  font-size: 0.9rem;
+  border-radius: 6px;
+  font-size: 1rem;
+  background: white;
+  cursor: pointer;
 }
 
-.tag-key:focus, .tag-value:focus {
+input[type="file"]:focus {
   outline: none;
   border-color: #007bff;
+  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
 }
 
-.add-tag, .remove-tag {
-  background: #eee;
-  border: none;
-  border-radius: 4px;
-  padding: 0.5rem 0.7rem;
-  cursor: pointer;
-  font-size: 0.9rem;
-}
-
-.add-tag {
-  margin-top: 0.5rem;
-}
-
-.add-tag:hover {
-  background: #ddd;
-}
-
-.remove-tag {
-  color: #c00;
-  padding: 0.5rem;
-  width: 40px;
-}
-
-.remove-tag:hover {
-  background: #ffebee;
-}
 
 .modal-actions {
   display: flex;
@@ -396,9 +328,12 @@ watch(() => props.show, (newValue) => {
   background: #6c757d;
   color: white;
   border: none;
-  border-radius: 4px;
-  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  padding: 0.75rem 1.5rem;
   cursor: pointer;
+  font-weight: 500;
+  font-size: 1rem;
+  transition: all 0.15s;
 }
 
 .cancel-btn:hover {
@@ -409,9 +344,12 @@ watch(() => props.show, (newValue) => {
   background: #007bff;
   color: white;
   border: none;
-  border-radius: 4px;
-  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  padding: 0.75rem 1.5rem;
   cursor: pointer;
+  font-weight: 500;
+  font-size: 1rem;
+  transition: all 0.15s;
 }
 
 .upload-btn:hover:not(:disabled) {
@@ -426,17 +364,19 @@ watch(() => props.show, (newValue) => {
 .error {
   color: #dc3545;
   margin-top: 1rem;
-  padding: 0.5rem;
+  padding: 0.75rem;
   background: #f8d7da;
-  border-radius: 4px;
+  border-radius: 6px;
+  border: 1px solid #f5c6cb;
 }
 
 .success {
-  color: #28a745;
+  color: #155724;
   margin-top: 1rem;
-  padding: 0.5rem;
+  padding: 0.75rem;
   background: #d4edda;
-  border-radius: 4px;
+  border-radius: 6px;
+  border: 1px solid #c3e6cb;
 }
 
 /* Type selector styles */
@@ -451,9 +391,9 @@ watch(() => props.show, (newValue) => {
   align-items: center;
   gap: 0.5rem;
   cursor: pointer;
-  padding: 0.5rem 1rem;
+  padding: 0.75rem 1rem;
   border: 1px solid #ddd;
-  border-radius: 4px;
+  border-radius: 6px;
   transition: all 0.15s;
   background: white;
   flex: 1;
@@ -466,8 +406,7 @@ watch(() => props.show, (newValue) => {
 }
 
 .type-option input[type="radio"] {
-  transform: scale(1.2);
-  margin-right: 0.5rem;
+  display: none;
 }
 
 .type-option input[type="radio"]:checked + .type-label {
