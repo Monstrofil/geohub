@@ -641,7 +641,6 @@ watch(() => props.treeItemId, () => {
 .viewer-header {
   background: white;
   border-bottom: 1px solid #eee;
-  padding: 1rem;
   box-shadow: 0 1px 3px rgba(0,0,0,0.1);
 }
 
@@ -689,6 +688,7 @@ watch(() => props.treeItemId, () => {
 .header-actions {
   display: flex;
   gap: 0.75rem;
+  padding-right: 1rem;
 }
 
 .edit-btn, .back-btn {
@@ -1274,9 +1274,7 @@ watch(() => props.treeItemId, () => {
 }
 
 .file-info {
-  margin-top: 1rem;
   padding: 1rem;
-  background: #e9ecef;
   border-radius: 6px;
   font-size: 0.9rem;
   color: #495057;

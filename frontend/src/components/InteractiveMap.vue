@@ -72,7 +72,7 @@ export default {
   name: 'InteractiveMap',
   props: {
     fileId: {
-      type: Number,
+      type: String,
       required: true
     },
     filename: {

@@ -75,6 +75,7 @@
           :file="entry.object"
           :name="getDisplayName(entry.object)"
           :tree-path="treePathString"
+          :ref-name="entry.object?.name || entry.id"
           :selected="selectedEntry && selectedEntry.object && selectedEntry.object.id === entry.object?.id"
           @click="selectFile(entry.object)"
           @file-selected="handleFileSelected"
