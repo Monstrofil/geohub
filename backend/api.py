@@ -9,6 +9,7 @@ import shutil
 from pydantic import BaseModel, ConfigDict
 
 import models
+from models import TreeItem
 from services import FileService, CollectionsService
 from mapserver_service import MapServerService
 from georeferencing_service import GeoreferencingService, ControlPoint
@@ -81,12 +82,6 @@ class ControlPointModel(BaseModel):
     image_y: float
     world_x: float
     world_y: float
-
-
-class GeoreferencingStatusResponse(BaseModel):
-    is_georeferenced: bool
-    needs_georeferencing: bool
-    image_info: Dict[str, Any]
 
 
 class ControlPointsRequest(BaseModel):
@@ -350,20 +345,25 @@ async def convert_to_geo_raster(item_id: uuid.UUID):
 
 @router.get("/files/{file_id}/download")
 async def download_file(file_id: uuid.UUID):
-    """Download a file (original version, not georeferenced)"""
-    file_obj = await FileService.get_file(str(file_id))
-    if not file_obj:
-        raise HTTPException(status_code=404, detail="File not found")
+    """Download a file"""
+    # Look for TreeItem by ID
+    tree_item = await TreeItem.get_or_none(id=file_id)
+    if not tree_item:
+        raise HTTPException(status_code=404, detail="TreeItem not found")
     
-    # Get file details from the specialized model
-    obj = await file_obj.get_object()
+    # Get object of that tree item
+    try:
+        obj = await tree_item.get_object()
+    except ValueError as e:
+        raise HTTPException(status_code=500, detail=f"Error getting object: {str(e)}")
     
-    # Use original file path for downloads if available, otherwise use main file path
-    if hasattr(obj, 'original_file_path') and obj.original_file_path:
-        download_path = obj.original_file_path
-    else:
-        download_path = obj.file_path
-        
+    # Check if object has get_download_path method
+    if not hasattr(obj, 'get_download_path'):
+        raise HTTPException(status_code=400, detail="Download is not available for this item")
+    
+    # Get download path
+    download_path = obj.get_download_path()
+    
     if not os.path.exists(download_path):
         raise HTTPException(status_code=404, detail="File not found on disk")
     
@@ -433,81 +433,11 @@ async def get_file_preview(file_id: uuid.UUID):
     return {"preview_url": preview_url}
 
 
-
-
-# MapServer cleanup endpoint
-@router.post("/mapserver/cleanup")
-async def cleanup_mapserver_configs(max_age_hours: int = 24):
-    """Clean up old MapServer configuration files"""
-    try:
-        mapserver_service.cleanup_old_configs(max_age_hours)
-        return {"message": f"Cleaned up MapServer configs older than {max_age_hours} hours"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Cleanup failed: {str(e)}")
-
-
 # ======================
 # GEOREFERENCING ENDPOINTS
 # ======================
 
-@router.get("/files/{file_id}/georeferencing-status", response_model=GeoreferencingStatusResponse)
-async def get_georeferencing_status(file_id: uuid.UUID):
-    """Check if a file is georeferenced and get image information"""
-    file_obj = await FileService.get_file(str(file_id))
-    if not file_obj:
-        raise HTTPException(status_code=404, detail="File not found")
-    
-    file_path = await file_obj.get_file_path()
-    if not os.path.exists(file_path):
-        raise HTTPException(status_code=404, detail="File not found on disk")
-    
-    try:
-        # Check if file is a raster
-        base_file_type = await file_obj.get_base_file_type()
-        if base_file_type != "raster":
-            raise HTTPException(status_code=400, detail="File is not a raster image")
-        
-        # Get georeferencing status and image info
-        is_georeferenced = georeferencing_service.is_georeferenced(file_path)
-        image_info = georeferencing_service.get_image_info(file_path)
-        
-        return GeoreferencingStatusResponse(
-            is_georeferenced=is_georeferenced,
-            needs_georeferencing=not is_georeferenced,
-            image_info=image_info
-        )
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error checking georeferencing status: {str(e)}")
 
-
-@router.post("/files/{file_id}/create-preview")
-async def create_file_preview(file_id: uuid.UUID, max_width: int = 512, max_height: int = 512):
-    """Create a preview image for the file"""
-    file_obj = await FileService.get_file(str(file_id))
-    if not file_obj:
-        raise HTTPException(status_code=404, detail="File not found")
-    
-    file_path = await file_obj.get_file_path()
-    if not os.path.exists(file_path):
-        raise HTTPException(status_code=404, detail="File not found on disk")
-    
-    try:
-        # Create preview
-        preview_path = georeferencing_service.create_preview_image(
-            file_path, 
-            (max_width, max_height)
-        )
-        
-        # Return file response for the preview
-        return FastAPIFileResponse(
-            path=preview_path,
-            media_type="image/png",
-            filename=f"preview_{file_obj.name}.png"
-        )
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error creating preview: {str(e)}")
 
 
 @router.post("/files/{file_id}/validate-control-points")

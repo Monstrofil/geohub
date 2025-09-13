@@ -10,53 +10,25 @@ import json
 
 
 
-def _is_raster(file_path: str) -> bool:
-    """
-    Check if file is a raster using GDAL
-    """
-    dataset = gdal.Open(file_path)
-    if dataset is None:
-        return False
-    
-    # Check if it has geotransform (extent)
-    geotransform = dataset.GetGeoTransform()
-    if geotransform is None:
-        return False
-    
-    return True
-
-
-
-
-
 class CollectionsService:
     @classmethod
     async def create_collection(cls, name: str, tags: dict, parent_path: str = "root"):
         """Create a new collection"""
-        # Generate a unique path segment for this collection (LTREE compatible)
-        import uuid
-        
         # Create LTREE-compatible ID: use 'c' prefix + first 12 chars of UUID hex (no hyphens)
         collection_uuid = str(uuid.uuid4()).replace('-', '')[:12]
         collection_segment = f"c{collection_uuid}"
         
         # Create the path: parent_path.collection_segment
-        if parent_path == "root":
-            collection_path = f"root.{collection_segment}"
-        else:
-            collection_path = f"{parent_path}.{collection_segment}"
+        collection_path = f"{parent_path}.{collection_segment}"
         
-        # Create collection directly
         # Create Collection (minimal model - data stored in TreeItem.tags)
         collection = await Collection.create()
         
         # Prepare tags with name and description
         collection_tags = tags.copy() if tags else {}
-        if tags.get('description'):
-            collection_tags["description"] = tags['description']
         
         # Create TreeItem
-        collection_obj = await TreeItem.create(
+        tree_item_obj = await TreeItem.create(
             name=name,
             object_type="collection",
             object_id=collection.id,
@@ -64,7 +36,7 @@ class CollectionsService:
             tags=collection_tags
         )
         
-        return collection_obj
+        return tree_item_obj
     
     @classmethod
     async def get_collection(cls, collection_id: str):
@@ -287,9 +259,6 @@ class FileService:
         """Create a new file record - detect if already georeferenced and create appropriate type"""
         file_info = await cls.save_uploaded_file(uploaded_file, tags)
         
-        # Generate a unique path segment for this file (LTREE compatible)
-        import uuid
-        
         # Create LTREE-compatible ID: use 'f' prefix + first 12 chars of UUID hex (no hyphens)
         file_uuid = str(uuid.uuid4()).replace('-', '')[:12]
         file_segment = f"f{file_uuid}"
@@ -307,14 +276,7 @@ class FileService:
         is_georeferenced = analysis.get("is_georeferenced", False)
 
         # Create appropriate file type based on georeferencing status
-        if is_georeferenced:
-            # Add georeferencing metadata to tags for GeoRasterFile
-            georef_tags = clean_tags.copy()
-            georef_tags.update({
-                "is_georeferenced": True,
-                "georeferencing_method": "original"  # Mark as originally georeferenced
-            })
-            
+        if is_georeferenced:            
             # Create as GeoRasterFile since it's already georeferenced
             # Create GeoRasterFile (minimal model)
             geo_raster = await GeoRasterFile.create(
@@ -326,7 +288,7 @@ class FileService:
             )
             
             # Prepare tags with base file type  
-            georef_tags.update({
+            clean_tags.update({
                 "base_file_type": "raster"
             })
             

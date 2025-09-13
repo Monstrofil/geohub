@@ -30,13 +30,14 @@ class RawFile(models.Model):
 
     def __str__(self):
         return f"RawFile(id={self.id}, name='{self.original_name}', size={self.file_size})"
+    
+    def get_download_path(self) -> str:
+        """Get the path for downloading this file"""
+        return self.file_path
 
 
 class GeoRasterFile(models.Model):
     """Model for georeferenced raster files (GeoTIFF, georeferenced images)
-    
-    Note: Metadata like sha1, is_georeferenced, georeferencing_method, target_srs,
-    control_points_count, and georeferencing_accuracy are stored in TreeItem.tags
     """
     id = fields.UUIDField(pk=True)
     original_name = fields.CharField(max_length=500)
@@ -52,6 +53,15 @@ class GeoRasterFile(models.Model):
 
     def __str__(self):
         return f"GeoRasterFile(id={self.id}, name='{self.original_name}')"
+    
+    def get_download_path(self) -> str:
+        """Get the path for downloading this file
+        
+        Use original file path for downloads if available, otherwise use main file path
+        """
+        if self.original_file_path:
+            return self.original_file_path
+        return self.file_path
 
 
 class Collection(models.Model):

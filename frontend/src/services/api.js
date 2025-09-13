@@ -432,151 +432,17 @@ class ApiService {
     return await this.request(`/tree-items/${itemId}/contents?${params.toString()}`)
   }
 
-  // ======================
-  // COMPATIBILITY METHODS
-  // ======================
-
-  /**
-   * Legacy method - get objects for a path (for backward compatibility)
-   * Maps to either root contents or collection contents based on path
-   * @param {string} refName - Legacy ref name (ignored in new API)
-   * @param {string} path - Path to get objects for
-   * @param {number} skip - Number of items to skip
-   * @param {number} limit - Number of items to return
-   * @returns {Promise<Object>} Objects response in legacy format
-   */
-  async getObjects(refName, path, skip = 0, limit = 100) {
-    console.warn('getObjects is deprecated, use getRootContents or getCollectionContents instead')
-    
-    let response
-    if (!path || path === '' || path === '/') {
-      // Root level
-      response = await this.getRootContents(skip, limit)
-    } else {
-      // Try to find collection by path - this is a simplified mapping
-      // In a real migration, you'd need to map old paths to new collection IDs
-      response = await this.getRootContents(skip, limit)
-    }
-    
-    // Transform response to legacy format
-    const objects = []
-    
-    // Add collections as tree entries
-    if (response.collections) {
-      for (const collection of response.collections) {
-        objects.push({
-          id: collection.id,
-          path: collection.path,
-          object_type: 'tree',
-          object: collection
-        })
-      }
-    }
-    
-    // Add files as file entries
-    if (response.files) {
-      for (const file of response.files) {
-        objects.push({
-          id: file.id,
-          path: file.path,
-          object_type: 'file',
-          object: file
-        })
-      }
-    }
-    
-    return {
-      objects,
-      total: (response.total_files || 0) + (response.total_collections || 0),
-      skip,
-      limit
-    }
-  }
-
-  /**
-   * Legacy search files method
-   * @param {Object} tags - Tags to search for
-   * @param {number} skip - Skip count
-   * @param {number} limit - Limit count
-   * @returns {Promise<Object>} Search results
-   */
-  async searchFiles(tags, skip = 0, limit = 100) {
-    console.warn('searchFiles is deprecated, use getFiles with filters instead')
-    return await this.getFiles({ tags }, skip, limit)
-  }
-
-  /**
-   * Legacy refs methods - return empty arrays since refs concept is removed
-   */
-  async getRefs() {
-    console.warn('getRefs is deprecated - branches/refs are no longer used')
-    return [{ name: 'main', commit_id: 'deprecated' }]
-  }
-
-  async createBranch(branchName, baseRefName) {
-    console.warn('createBranch is deprecated - branches/refs are no longer used')
-    return { name: branchName, commit_id: 'deprecated' }
-  }
-
   // Health check
   async healthCheck() {
     return await fetch('http://localhost:8000/health').then(res => res.json())
   }
 
-  // Legacy methods for backward compatibility - map to new file operations
-  async updateObjectInTree(refName, path, tags) {
-    console.warn('updateObjectInTree is deprecated, use updateFile instead')
-    // This would need proper path-to-ID mapping in a real migration
-    throw new Error('updateObjectInTree is deprecated - use updateFile with file ID')
-  }
-
-  async getTreeEntry(refName, path) {
-    console.warn('getTreeEntry is deprecated, use getFile instead')
-    throw new Error('getTreeEntry is deprecated - use getFile with file ID')
-  }
-
-  async removeObjectInTree(refName, path) {
-    console.warn('removeObjectInTree is deprecated, use deleteFile instead')
-    throw new Error('removeObjectInTree is deprecated - use deleteFile with file ID')
-  }
-
-  async cloneObjectInTree(refName, sourcePath, targetPath) {
-    console.warn('cloneObjectInTree is deprecated')
-    throw new Error('cloneObjectInTree is deprecated - create new file/collection instead')
-  }
 
   // ======================
   // GEOREFERENCING OPERATIONS
   // ======================
 
-  /**
-   * Get georeferencing status for a file
-   * @param {string} fileId - The file ID
-   * @returns {Promise<Object>} Georeferencing status
-   */
-  async getGeoreferencingStatus(fileId) {
-    return await this.request(`/files/${fileId}/georeferencing-status`)
-  }
 
-  /**
-   * Create a preview image for a file
-   * @param {string} fileId - The file ID
-   * @param {number} maxWidth - Maximum width
-   * @param {number} maxHeight - Maximum height
-   * @returns {Promise<Blob>} Preview image blob
-   */
-  async createFilePreview(fileId, maxWidth = 512, maxHeight = 512) {
-    const response = await fetch(`${this.baseUrl}/files/${fileId}/create-preview?max_width=${maxWidth}&max_height=${maxHeight}`, {
-      method: 'POST'
-    })
-    
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
-      throw new Error(errorData.detail || `Preview creation failed! status: ${response.status}`)
-    }
-    
-    return await response.blob()
-  }
 
   /**
    * Validate control points

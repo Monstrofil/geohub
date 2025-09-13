@@ -86,40 +86,6 @@ class GeoreferencingService:
             print(f"Error checking georeferencing: {e}")
             return False
     
-    def get_image_info(self, file_path: str) -> Dict[str, Any]:
-        """
-        Get basic information about a raster image
-        
-        Args:
-            file_path: Path to the raster file
-            
-        Returns:
-            dict: Image information including dimensions and data type
-        """
-        try:
-            dataset = gdal.Open(file_path)
-            if dataset is None:
-                raise ValueError("Cannot open image file")
-            
-            info = {
-                'width': dataset.RasterXSize,
-                'height': dataset.RasterYSize,
-                'bands': dataset.RasterCount,
-                'driver': dataset.GetDriver().ShortName,
-                'georeferenced': self.is_georeferenced(file_path)
-            }
-            
-            # Get data type from first band
-            if dataset.RasterCount > 0:
-                band = dataset.GetRasterBand(1)
-                info['data_type'] = gdal.GetDataTypeName(band.DataType)
-            
-            dataset = None
-            return info
-            
-        except Exception as e:
-            raise ValueError(f"Error reading image info: {e}")
-    
     def calculate_transform_from_control_points(self, control_points: List[ControlPoint]) -> Optional[List[float]]:
         """
         Calculate geotransform coefficients from control points using polynomial transformation
@@ -323,61 +289,6 @@ class GeoreferencingService:
         
         return str(output_path)
             
-    
-    def create_preview_image(self, file_path: str, max_size: Tuple[int, int] = (512, 512)) -> str:
-        """
-        Create a preview image for display in the web interface
-        
-        Args:
-            file_path: Path to the source image
-            max_size: Maximum dimensions for the preview
-            
-        Returns:
-            str: Path to the preview image
-        """
-        try:
-            # Create output path
-            input_file = Path(file_path)
-            output_path = self.temp_dir / f"preview_{uuid.uuid4().hex[:8]}_{input_file.stem}.png"
-            
-            # Open input dataset
-            src_ds = gdal.Open(file_path)
-            if src_ds is None:
-                raise ValueError("Cannot open input file")
-            
-            # Calculate preview dimensions
-            src_width = src_ds.RasterXSize
-            src_height = src_ds.RasterYSize
-            
-            # Calculate scale to fit within max_size while maintaining aspect ratio
-            scale_x = max_size[0] / src_width
-            scale_y = max_size[1] / src_height
-            scale = min(scale_x, scale_y)
-            
-            preview_width = int(src_width * scale)
-            preview_height = int(src_height * scale)
-            
-            # Create preview using GDAL translate
-            translate_options = gdal.TranslateOptions(
-                format='PNG',
-                width=preview_width,
-                height=preview_height,
-                resampleAlg=gdal.GRA_Bilinear
-            )
-            
-            preview_ds = gdal.Translate(str(output_path), src_ds, options=translate_options)
-            
-            if preview_ds is None:
-                raise ValueError("Preview creation failed")
-            
-            # Close datasets
-            src_ds = None
-            preview_ds = None
-            
-            return str(output_path)
-            
-        except Exception as e:
-            raise ValueError(f"Error creating preview: {e}")
     
     def validate_control_points(self, control_points: List[ControlPoint]) -> Dict[str, Any]:
         """
