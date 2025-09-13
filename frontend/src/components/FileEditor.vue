@@ -9,18 +9,6 @@
         </svg>
         Назад до списку
       </button>
-      <div class="file-info" v-if="file">
-        <div class="file-icon" v-html="fileIcon"></div>
-        <div class="file-details">
-          <h2 class="file-name">{{ file.value?.name }}</h2>
-          <div class="file-meta">
-            <span class="file-type">{{ fileTypeLabel }}</span>
-            <span class="file-id">ID: {{ file.id }}</span>
-          </div>
-        </div>
-      </div>
-      <div v-else-if="loading" class="file-details">Завантаження...</div>
-      <div v-else-if="error" class="file-details">Помилка: {{ error }}</div>
     </div>
 
     <!-- Main content area with editor and tags -->
@@ -127,14 +115,14 @@
         <div class="editor-main">
           <!-- Interactive Map for GeoTIFF files -->
           <InteractiveMap 
-            v-if="isGeoTiff && file && isFileGeoreferenced"
+            v-if="file && isFileGeoreferenced"
             :fileId="file.id"
             :filename="file.name"
             class="interactive-map-container"
           />
           
           <!-- Georeferencing needed for raster files -->
-          <div v-else-if="isGeoTiff && file && !isFileGeoreferenced" class="georeferencing-needed">
+          <div v-else-if="!isCollection && file && !isFileGeoreferenced" class="georeferencing-needed">
             <div class="georef-header">
               <div class="georef-icon">
                 <svg width="64" height="64" viewBox="0 0 64 64">
@@ -171,7 +159,7 @@
           <!-- Collection view -->
           <div v-else-if="isCollection && file" class="collection-view">
             <div class="collection-header">
-              <div class="collection-icon" v-html="fileIcon"></div>
+              <div class="collection-icon" v-html="selectedType?.icon || ''"></div>
               <div class="collection-info">
                 <h3>Колекція: {{ file.name }}</h3>
                 <p>Кількість елементів: {{ file.entries?.length || 0 }}</p>
@@ -329,70 +317,12 @@ const selectedFields = computed(() => {
 
 // File type detection and icon
 const fileType = computed(() => {
-  // Check if this is a collection first
-  if (file.value?.object_type === 'collection') {
-    return 'collection'
-  }
-  return file.value?.object_type || 'raw'
+
+  return file.value?.object_type
 })
 
-const fileTypeLabel = computed(() => {
-  const labels = {
-    'raster': 'Геоприв\'язане растрове зображення',
-    'vector': 'Геоприв\'язаний векторний файл', 
-    'raw': 'Звичайний файл',
-    'collection': 'Колекція файлів',
-  }
-  return labels[fileType.value] || 'Невідомий тип'
-})
 
-const fileIcon = computed(() => {
-  switch (fileType.value) {
-    case 'raster':
-      return `<svg width="32" height="32" viewBox="0 0 32 32">
-        <rect x="2" y="6" width="28" height="20" rx="3" fill="#e0e7ef" stroke="#7faaff" stroke-width="1.5"/>
-        <circle cx="11" cy="19" r="3" fill="#7faaff"/>
-        <rect x="16" y="13" width="10" height="6" fill="#b3d1ff"/>
-        <path d="M4 4l4 4M8 4l4 4M12 4l4 4" stroke="#7faaff" stroke-width="1" fill="none"/>
-      </svg>`
-    case 'vector':
-      return `<svg width="32" height="32" viewBox="0 0 32 32">
-        <rect x="2" y="6" width="28" height="20" rx="3" fill="#e0f7e7" stroke="#2ecc71" stroke-width="1.5"/>
-        <circle cx="10" cy="22" r="2.5" fill="#2ecc71"/>
-        <circle cx="22" cy="11" r="2.5" fill="#2ecc71"/>
-        <line x1="10" y1="22" x2="22" y2="11" stroke="#27ae60" stroke-width="1.5"/>
-        <path d="M4 4l4 4M8 4l4 4M12 4l4 4" stroke="#2ecc71" stroke-width="1" fill="none"/>
-      </svg>`
-    case 'raw':
-      return `<svg width="32" height="32" viewBox="0 0 32 32">
-        <rect x="4" y="6" width="24" height="20" rx="3" fill="#f7f7e7" stroke="#6c757d" stroke-width="1.5"/>
-        <rect x="9" y="13" width="14" height="1.5" fill="#6c757d"/>
-        <rect x="9" y="18" width="8" height="1.5" fill="#6c757d"/>
-        <rect x="9" y="23" width="12" height="1.5" fill="#6c757d"/>
-      </svg>`
-    case 'collection':
-      return `<svg width="32" height="32" viewBox="0 0 32 32">
-        <rect x="3" y="8" width="26" height="18" rx="3" fill="#ffe082" stroke="#ffb300" stroke-width="1.5"/>
-        <path d="M3 8l4-6h12l4 6" fill="#ffe082" stroke="#ffb300" stroke-width="1.5"/>
-        <rect x="8" y="14" width="4" height="2" fill="#ffb300"/>
-        <rect x="14" y="14" width="4" height="2" fill="#ffb300"/>
-        <rect x="20" y="14" width="4" height="2" fill="#ffb300"/>
-        <rect x="8" y="18" width="4" height="2" fill="#ffb300"/>
-        <rect x="14" y="18" width="4" height="2" fill="#ffb300"/>
-        <rect x="20" y="18" width="4" height="2" fill="#ffb300"/>
-      </svg>`
-    default:
-      return `<svg width="32" height="32" viewBox="0 0 32 32">
-        <rect x="6" y="6" width="20" height="20" rx="5" fill="#f8f9fa" stroke="#dee2e6" stroke-width="1.5"/>
-        <path d="M12 12h8M12 16h6M12 20h4" stroke="#6c757d" stroke-width="1.5" fill="none"/>
-      </svg>`
-  }
-})
 
-// Check if file is a GeoTIFF (raster type)
-const isGeoTiff = computed(() => {
-  return fileType.value === 'raster'
-})
 
 // Check if object is a collection
 const isCollection = computed(() => {
@@ -608,36 +538,6 @@ function onGeoreferencingCompleted(result) {
   color: #007bff;
 }
 
-.file-info {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  flex: 1;
-}
-
-.file-details {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.file-name {
-  margin: 0;
-  font-size: 1.5rem;
-  font-weight: 600;
-  color: #333;
-}
-
-.file-meta {
-  display: flex;
-  gap: 1rem;
-  font-size: 0.9rem;
-  color: #666;
-}
-
-.file-type {
-  font-weight: 500;
-}
 
 .editor-content {
   display: flex;
