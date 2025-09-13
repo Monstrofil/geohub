@@ -3,5 +3,6 @@
   "fields": ["name"],
   "object_type": ["geo_raster_file"],
   "tags": {},
-  "name": "Generic Raster Graphic"
+  "name": "Generic Raster Graphic",
+  "matchScore": 0.1
 } 
