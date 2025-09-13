@@ -16,7 +16,21 @@
     <div v-else-if="collection" class="collection-content">
       <!-- Unified Object Type and Properties section -->
       <div v-if="selectedType || (collection.tags && Object.keys(collection.tags).length > 0)" class="unified-properties-section">
-        <h3>Collection Information</h3>
+        <div class="section-header">
+          <h3>Collection Information</h3>
+          <button 
+            v-if="collection.id" 
+            class="edit-btn" 
+            @click="editCollection"
+            title="Edit collection"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16">
+              <path d="M11 1L15 5L5 15H1V11L11 1Z" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M8 4L12 8" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            Edit
+          </button>
+        </div>
         
         <!-- Object type display -->
         <div v-if="selectedType" class="object-type-display">
@@ -105,6 +119,7 @@
 
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { matchTagsToPreset } from '../utils/tagMatcher.js'
 import { loadFieldDefinitions, resolveFields } from '../utils/fieldResolver.js'
 import apiService from '../services/api.js'
@@ -119,6 +134,9 @@ const props = defineProps({
     default: () => []
   }
 })
+
+// Router instance
+const router = useRouter()
 
 // State
 const collection = ref(null)
@@ -237,39 +255,8 @@ async function loadCollection() {
     if (foundCollection) {
       collection.value = foundCollection
       
-      // Match preset based on object_type first, then tags (same logic as ObjectTypeSelector)
-      let matchedPreset = null
-      
-      // First try object_type matching (collections have object_type = 'tree' or 'collection')
-      const collectionObjectType = collection.value.object_type || collection.value.type || 'collection'
-      
-      matchedPreset = allPresets.value.find(preset => 
-        preset.object_type && (
-          preset.object_type.includes(collectionObjectType) ||
-          (collectionObjectType === 'tree' && preset.object_type.includes('collection')) ||
-          (collectionObjectType === 'collection' && preset.object_type.includes('tree'))
-        )
-      )
-      
-      // If no object_type match, try tag matching
-      if (!matchedPreset && collection.value.tags) {
-        // Ensure collection has type="collection" tag for preset matching
-        if (!collection.value.tags.type) {
-          collection.value.tags.type = 'collection'
-        }
-        matchedPreset = matchTagsToPreset(collection.value.tags, allPresets.value, collection.value.object_type)
-      }
-      
-      // If still no match and no tags, create default collection tags and try again
-      if (!matchedPreset) {
-        if (!collection.value.tags) {
-          collection.value.tags = {}
-        }
-        collection.value.tags.type = 'collection'
-        matchedPreset = matchTagsToPreset(collection.value.tags, allPresets.value, collection.value.object_type)
-      }
-      
-      selectedType.value = matchedPreset
+      selectedType.value = matchTagsToPreset(
+        collection.value.tags, allPresets.value, collection.value.object_type)
     } else {
       collection.value = null
       selectedType.value = null
@@ -281,6 +268,16 @@ async function loadCollection() {
     collection.value = null
   } finally {
     loading.value = false
+  }
+}
+
+// Navigation methods
+function editCollection() {
+  if (collection.value?.id) {
+    router.push({
+      name: 'FileEditor',
+      query: { id: collection.value.id }
+    })
   }
 }
 
@@ -355,10 +352,40 @@ watch(() => props.treePath, () => {
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
 .unified-properties-section h3 {
-  margin: 0 0 1rem 0;
+  margin: 0;
   font-size: 1.2rem;
   color: #333;
+}
+
+.edit-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: #007bff;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.edit-btn:hover {
+  background: #0056b3;
+}
+
+.edit-btn svg {
+  width: 16px;
+  height: 16px;
 }
 
 .object-type-display {
