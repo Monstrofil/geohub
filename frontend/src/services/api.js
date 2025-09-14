@@ -1,5 +1,8 @@
 const API_BASE_URL = 'http://localhost:8000/api/v1'
 
+// Constants
+const ROOT_COLLECTION_ID = '00000000-0000-0000-0000-000000000000'
+
 class ApiService {
   constructor() {
     this.baseUrl = API_BASE_URL
@@ -246,19 +249,20 @@ class ApiService {
    * @returns {Promise<Object>} Collection contents response
    */
   async getCollectionContents(collectionId, skip = 0, limit = 100) {
-    const response = await this.getTreeItemContents(collectionId, skip, limit)
+    const response = await this.listTreeItemContents(collectionId, skip, limit)
     
     // Transform unified response to legacy format for backward compatibility
     return {
       files: response.items?.filter(item => item.type === 'file') || [],
       collections: response.items?.filter(item => item.type === 'collection') || [],
       total_files: response.items?.filter(item => item.type === 'file').length || 0,
-      total_collections: response.items?.filter(item => item.type === 'collection').length || 0
+      total_collections: response.items?.filter(item => item.type === 'collection').length || 0,
+      leaf: response.leaf 
     }
   }
 
   /**
-   * Get contents of the root (files and collections without parent)
+   * Get contents of the root (files and collections without parent) using unified endpoint
    * @param {number} skip - Number of items to skip
    * @param {number} limit - Number of items to return
    * @returns {Promise<Object>} Root contents response
@@ -267,15 +271,17 @@ class ApiService {
     const params = new URLSearchParams()
     params.append('skip', skip.toString())
     params.append('limit', limit.toString())
+    params.append('collection_path', 'root')
 
-    const response = await this.request(`/root/contents?${params.toString()}`)
+    const response = await this.request(`/tree-items?${params.toString()}`)
     
     // Transform new unified response to legacy format for backward compatibility
     return {
       files: response.items?.filter(item => item.type === 'file') || [],
       collections: response.items?.filter(item => item.type === 'collection') || [],
       total_files: response.items?.filter(item => item.type === 'file').length || 0,
-      total_collections: response.items?.filter(item => item.type === 'collection').length || 0
+      total_collections: response.items?.filter(item => item.type === 'collection').length || 0,
+      leaf: response.leaf || null
     }
   }
 
@@ -417,20 +423,25 @@ class ApiService {
     return await this.request(`/tree-items/${itemId}`)
   }
 
-  /**
-   * Get contents of a tree item (collection)
-   * @param {string} itemId - The item ID
+   /**
+   * Get contents of a tree item (collection) using the unified tree-items endpoint
+   * @param {string} path - The path to the collection
    * @param {number} skip - Number of items to skip
    * @param {number} limit - Number of items to return
    * @returns {Promise<Object>} Tree item contents response
    */
-  async getTreeItemContents(itemId, skip = 0, limit = 100) {
+   async listTreeItemContents(path, skip = 0, limit = 100) {
     const params = new URLSearchParams()
     params.append('skip', skip.toString())
     params.append('limit', limit.toString())
+    if (path !== '') {
+      params.append('collection_path', path)
+    }
+    
 
-    return await this.request(`/tree-items/${itemId}/contents?${params.toString()}`)
+    return await this.request(`/tree-items?${params.toString()}`)
   }
+
 
   // Health check
   async healthCheck() {
@@ -548,4 +559,6 @@ class ApiService {
   }
 }
 
-export default new ApiService()
+const apiService = new ApiService()
+export default apiService
+export { ROOT_COLLECTION_ID }

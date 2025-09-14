@@ -147,6 +147,8 @@ async def require_permission(
     Raises:
         HTTPException: If permission is denied
     """
+    print("User %s requires permission %s on tree item %s" % (user, permission, tree_item))
+
     if permission == Permission.READ:
         has_permission = await tree_item.can_read(user)
     elif permission == Permission.WRITE:

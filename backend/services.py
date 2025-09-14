@@ -8,9 +8,13 @@ from fastapi import UploadFile, HTTPException
 from datetime import datetime
 import json
 
+# Constants
+ROOT_COLLECTION_ID = "00000000-0000-0000-0000-000000000000"
+
 
 
 class CollectionsService:
+    
     @classmethod
     async def create_collection(cls, name: str, tags: dict, parent_path: str = "root"):
         """Create a new collection"""
@@ -49,39 +53,6 @@ class CollectionsService:
         return await TreeItem.get_or_none(path=path, object_type="collection")
     
     @classmethod
-    async def update_collection(cls, collection_id: str, name: str = None, tags: dict = None, new_parent_path: str = None):
-        """Update collection"""
-        collection = await TreeItem.get_or_none(id=collection_id, object_type="collection")
-        if not collection:
-            return None
-        
-        old_path = collection.path
-        
-        if name is not None:
-            collection.name = name
-        if tags is not None:
-            collection.tags = tags
-        
-        if new_parent_path is not None:
-            # Update the collection's path and all its descendants
-            path_parts = old_path.split('.')
-            collection_segment = path_parts[-1]  # Keep the same collection ID segment
-            
-            if new_parent_path == "root":
-                new_path = f"root.{collection_segment}"
-            else:
-                new_path = f"{new_parent_path}.{collection_segment}"
-            
-            # Update this collection's path
-            collection.path = new_path
-            
-            # Update all descendants (files and subcollections)
-            await cls._update_descendant_paths(old_path, new_path)
-            
-        await collection.save()
-        return collection
-    
-    @classmethod
     async def _update_descendant_paths(cls, old_path: str, new_path: str):
         """Update paths of all descendants when a collection is moved"""
         # Update all tree items that have paths starting with old_path
@@ -97,7 +68,11 @@ class CollectionsService:
     @classmethod
     async def delete_collection(cls, collection_id: str, force: bool = False):
         """Delete collection and optionally its contents"""
-        collection = await TreeItem.get_or_none(id=collection_id, type="collection")
+        # Prevent deletion of root collection
+        if collection_id == ROOT_COLLECTION_ID:
+            raise ValueError("Cannot delete the root collection")
+            
+        collection = await TreeItem.get_or_none(id=collection_id, object_type="collection")
         if not collection:
             return False
         
@@ -298,7 +273,7 @@ class FileService:
                 object_type="geo_raster_file",
                 object_id=geo_raster.id,
                 path=file_ltree_path,
-                tags=georef_tags
+                tags=clean_tags
             )
         else:
             # Create as RawFile (not georeferenced or not a raster)
@@ -538,39 +513,6 @@ class FileService:
     async def get_file(cls, file_id: str) -> Optional[TreeItem]:
         """Get file by ID"""
         return await TreeItem.get_or_none(id=file_id, object_type__in=["raw_file", "geo_raster_file"])
-    
-    @classmethod
-    async def update_file(cls, file_id: str, tags: Dict[str, str] = None, new_parent_path: str = None) -> Optional[TreeItem]:
-        """Update file metadata"""
-        file_obj = await TreeItem.get_or_none(id=file_id, object_type__in=["raw_file", "geo_raster_file"])
-        if not file_obj:
-            return None
-        
-        if tags is not None:
-            # Update only user-editable tags (don't modify system metadata)
-            clean_tags = file_obj.tags.copy()
-            
-            # Filter out system keys that shouldn't be updated via tags
-            system_keys = ['original_name', 'file_path', 'file_size', 'mime_type', 'base_file_type']
-            user_tags = {k: v for k, v in tags.items() if k not in system_keys}
-            
-            clean_tags.update(user_tags)
-            file_obj.tags = clean_tags
-        
-        if new_parent_path is not None:
-            # Update the file's path
-            path_parts = file_obj.path.split('.')
-            file_segment = path_parts[-1]  # Keep the same file ID segment
-            
-            if new_parent_path == "root":
-                new_path = f"root.{file_segment}"
-            else:
-                new_path = f"{new_parent_path}.{file_segment}"
-            
-            file_obj.path = new_path
-            
-        await file_obj.save()
-        return file_obj
     
     @classmethod
     async def delete_file(cls, file_id: str) -> bool:

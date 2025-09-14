@@ -30,6 +30,81 @@
           :change-tracker="changeTracker"
           @tags-updated="handleTagsUpdated"
         />
+
+        <!-- Permissions Editor -->
+        <div v-if="!menuOpen && file" class="permissions-editor-section">
+          <h3>Permissions</h3>
+          <div class="permissions-editor">
+            <table class="permissions-edit-table">
+              <thead>
+                <tr>
+                  <th>Role</th>
+                  <th>Read</th>
+                  <th>Write</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="role-label">Owner</td>
+                  <td>
+                    <input 
+                      type="checkbox" 
+                      :checked="hasPermission(file.permissions, 'owner', 'read')"
+                      @change="togglePermission('owner', 'read', $event.target.checked)"
+                      class="permission-checkbox"
+                    />
+                  </td>
+                  <td>
+                    <input 
+                      type="checkbox" 
+                      :checked="hasPermission(file.permissions, 'owner', 'write')"
+                      @change="togglePermission('owner', 'write', $event.target.checked)"
+                      class="permission-checkbox"
+                    />
+                  </td>
+                </tr>
+                <tr>
+                  <td class="role-label">Group</td>
+                  <td>
+                    <input 
+                      type="checkbox" 
+                      :checked="hasPermission(file.permissions, 'group', 'read')"
+                      @change="togglePermission('group', 'read', $event.target.checked)"
+                      class="permission-checkbox"
+                    />
+                  </td>
+                  <td>
+                    <input 
+                      type="checkbox" 
+                      :checked="hasPermission(file.permissions, 'group', 'write')"
+                      @change="togglePermission('group', 'write', $event.target.checked)"
+                      class="permission-checkbox"
+                    />
+                  </td>
+                </tr>
+                <tr>
+                  <td class="role-label">Others</td>
+                  <td>
+                    <input 
+                      type="checkbox" 
+                      :checked="hasPermission(file.permissions, 'others', 'read')"
+                      @change="togglePermission('others', 'read', $event.target.checked)"
+                      class="permission-checkbox"
+                    />
+                  </td>
+                  <td>
+                    <input 
+                      type="checkbox" 
+                      :checked="hasPermission(file.permissions, 'others', 'write')"
+                      @change="togglePermission('others', 'write', $event.target.checked)"
+                      class="permission-checkbox"
+                    />
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
         
         <!-- File upload section moved to left panel -->
         <div class="upload-section" v-if="!isCollection">
@@ -380,6 +455,51 @@ function handleTagsUpdated(newTags) {
   file.value.tags = { ...newTags }
 }
 
+// Permission management functions
+function hasPermission(permissions, role, type) {
+  if (!permissions) return false
+  
+  let bit
+  if (role === 'owner' && type === 'read') bit = 0o400
+  else if (role === 'owner' && type === 'write') bit = 0o200
+  else if (role === 'group' && type === 'read') bit = 0o040
+  else if (role === 'group' && type === 'write') bit = 0o020
+  else if (role === 'others' && type === 'read') bit = 0o004
+  else if (role === 'others' && type === 'write') bit = 0o002
+  
+  return Boolean(permissions & bit)
+}
+
+function togglePermission(role, type, enabled) {
+  if (!file.value) return
+  
+  let bit
+  if (role === 'owner' && type === 'read') bit = 0o400
+  else if (role === 'owner' && type === 'write') bit = 0o200
+  else if (role === 'group' && type === 'read') bit = 0o040
+  else if (role === 'group' && type === 'write') bit = 0o020
+  else if (role === 'others' && type === 'read') bit = 0o004
+  else if (role === 'others' && type === 'write') bit = 0o002
+  
+  let newPermissions = file.value.permissions || 0
+  
+  if (enabled) {
+    newPermissions |= bit  // Set the bit
+  } else {
+    newPermissions &= ~bit  // Clear the bit
+  }
+  
+  // Update the file object immediately for UI responsiveness
+  file.value.permissions = newPermissions
+  
+  // Add change to tracker for later commit
+  props.changeTracker.addChange({
+    type: 'permissions',
+    fileId: file.value.id,
+    data: newPermissions
+  })
+}
+
 // File upload handlers
 function handleDragOver(event) {
   event.preventDefault()
@@ -449,10 +569,16 @@ function triggerFileSelect() {
 async function handleCommit() {
   const result = await props.changeTracker.commitChanges(async (change) => {
     if (change.type === 'tags') {
-              const updatedEntry = await apiService.updateTreeItem(file.value.id, { tags: change.data })
+      const updatedEntry = await apiService.updateTreeItem(file.value.id, { tags: change.data })
       // Update the local file object with the response
       if (updatedEntry && updatedEntry.object && file.value) {
         Object.assign(file.value, updatedEntry.object)
+      }
+    } else if (change.type === 'permissions') {
+      const updatedEntry = await apiService.updateTreeItem(file.value.id, { permissions: change.data })
+      // Update the local file object with the response
+      if (updatedEntry && file.value) {
+        file.value.permissions = change.data
       }
     }
   })
@@ -553,6 +679,69 @@ function onGeoreferencingCompleted(result) {
 
 .left-panel.collapsed {
   width: 60px;
+}
+
+/* Permissions Editor Styles */
+.permissions-editor-section {
+  background: white;
+  border-radius: 8px;
+  margin: 1rem;
+  padding: 1rem;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  border: 1px solid #e9ecef;
+}
+
+.permissions-editor-section h3 {
+  margin: 0 0 1rem 0;
+  font-size: 1rem;
+  color: #333;
+  font-weight: 600;
+}
+
+.permissions-edit-table {
+  width: 100%;
+  border-collapse: collapse;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid #e9ecef;
+}
+
+.permissions-edit-table th {
+  background: #f8f9fa;
+  padding: 0.5rem;
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: #495057;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.permissions-edit-table td {
+  padding: 0.5rem;
+  border-bottom: 1px solid #f1f3f4;
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.permissions-edit-table .role-label {
+  text-align: left;
+  font-weight: 500;
+  color: #495057;
+}
+
+.permissions-edit-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.permission-checkbox {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: #007bff;
+}
+
+.permission-checkbox:hover {
+  transform: scale(1.1);
 }
 
 .right-panel {

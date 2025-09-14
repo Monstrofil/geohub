@@ -78,6 +78,65 @@
         </div>
       </div>
 
+      <!-- Permissions and Ownership section -->
+      <div class="permissions-section">
+        <h3>Permissions & Ownership</h3>
+        
+        <!-- Permissions Table -->
+        <div class="permissions-table-container">
+          <table class="permissions-table">
+            <thead>
+              <tr>
+                <th>Role</th>
+                <th>Read</th>
+                <th>Write</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="role-label">Owner</td>
+                <td :class="getPermissionClass(collection.permissions, 'owner', 'read')">
+                  {{ getPermissionText(collection.permissions, 'owner', 'read') }}
+                </td>
+                <td :class="getPermissionClass(collection.permissions, 'owner', 'write')">
+                  {{ getPermissionText(collection.permissions, 'owner', 'write') }}
+                </td>
+              </tr>
+              <tr>
+                <td class="role-label">Group</td>
+                <td :class="getPermissionClass(collection.permissions, 'group', 'read')">
+                  {{ getPermissionText(collection.permissions, 'group', 'read') }}
+                </td>
+                <td :class="getPermissionClass(collection.permissions, 'group', 'write')">
+                  {{ getPermissionText(collection.permissions, 'group', 'write') }}
+                </td>
+              </tr>
+              <tr>
+                <td class="role-label">Others</td>
+                <td :class="getPermissionClass(collection.permissions, 'others', 'read')">
+                  {{ getPermissionText(collection.permissions, 'others', 'read') }}
+                </td>
+                <td :class="getPermissionClass(collection.permissions, 'others', 'write')">
+                  {{ getPermissionText(collection.permissions, 'others', 'write') }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Ownership Info -->
+        <div class="ownership-info">
+          <div class="ownership-item" v-if="collection.owner_user_id">
+            <span class="ownership-label">Owner:</span>
+            <span class="ownership-value">{{ formatOwner(collection.owner_user_id) }}</span>
+          </div>
+          <div class="ownership-item" v-if="collection.owner_group_id">
+            <span class="ownership-label">Group:</span>
+            <span class="ownership-value">{{ formatGroup(collection.owner_group_id) }}</span>
+          </div>
+        </div>
+      </div>
+
       <!-- Collection Statistics section -->
       <div class="collection-stats-section">
         <h3>Collection Statistics</h3>
@@ -125,9 +184,9 @@ import { loadFieldDefinitions, resolveFields } from '../utils/fieldResolver.js'
 import apiService from '../services/api.js'
 
 const props = defineProps({
-  treePath: {
-    type: String,
-    default: ''
+  item: {
+    type: Object,
+    default: {}
   },
   files: {
     type: Array,
@@ -199,6 +258,46 @@ function formatDate(dateString) {
   return new Date(dateString).toLocaleDateString()
 }
 
+function getPermissionText(permissions, role, type) {
+  if (!permissions) return '✗'
+  
+  let bit
+  if (role === 'owner' && type === 'read') bit = 0o400
+  else if (role === 'owner' && type === 'write') bit = 0o200
+  else if (role === 'group' && type === 'read') bit = 0o040
+  else if (role === 'group' && type === 'write') bit = 0o020
+  else if (role === 'others' && type === 'read') bit = 0o004
+  else if (role === 'others' && type === 'write') bit = 0o002
+  
+  return (permissions & bit) ? '✓' : '✗'
+}
+
+function getPermissionClass(permissions, role, type) {
+  if (!permissions) return 'permission-denied'
+  
+  let bit
+  if (role === 'owner' && type === 'read') bit = 0o400
+  else if (role === 'owner' && type === 'write') bit = 0o200
+  else if (role === 'group' && type === 'read') bit = 0o040
+  else if (role === 'group' && type === 'write') bit = 0o020
+  else if (role === 'others' && type === 'read') bit = 0o004
+  else if (role === 'others' && type === 'write') bit = 0o002
+  
+  return (permissions & bit) ? 'permission-granted' : 'permission-denied'
+}
+
+function formatOwner(ownerId) {
+  if (!ownerId) return 'No owner'
+  // For now, just show the ID. In the future, we could lookup user info
+  return ownerId
+}
+
+function formatGroup(groupId) {
+  if (!groupId) return 'No group'
+  // For now, just show the ID. In the future, we could lookup group info  
+  return groupId
+}
+
 function formatFieldValue(field, value) {
   if (value === null || value === undefined || value === '') {
     return 'Not set'
@@ -234,41 +333,6 @@ function getFieldDisplayClass(field) {
   }
 }
 
-async function loadCollection() {
-  // If no tree path, we're at root - no collection to load
-  if (!props.treePath || props.treePath === '' || props.treePath === 'root') {
-    collection.value = null
-    selectedType.value = null
-    loading.value = false
-    return
-  }
-
-  loading.value = true
-  error.value = null
-  
-  try {
-    // Find the collection by path
-    const foundCollection = await apiService.findCollectionByPath(props.treePath)
-    
-    if (foundCollection) {
-      collection.value = foundCollection
-      
-      selectedType.value = matchTagsToPreset(
-        collection.value.tags, allPresets.value, collection.value.object_type)
-    } else {
-      collection.value = null
-      selectedType.value = null
-      error.value = `Collection not found: ${props.treePath}`
-    }
-  } catch (err) {
-    console.error('Failed to load collection:', err)
-    error.value = err.message || 'Failed to load collection'
-    collection.value = null
-  } finally {
-    loading.value = false
-  }
-}
-
 // Navigation methods
 function editCollection() {
   if (collection.value?.id) {
@@ -284,13 +348,9 @@ onMounted(async () => {
   // Load all field definitions and presets using centralized loading
   allPresets.value = getAllPresets()
   allFieldDefinitions.value = await loadFieldDefinitions()
-  await loadCollection()
+  collection.value = props.item
 })
 
-// Watch for path changes
-watch(() => props.treePath, () => {
-  loadCollection()
-})
 </script>
 
 <style scoped>
@@ -540,6 +600,105 @@ watch(() => props.treePath, () => {
   word-break: break-word;
   text-align: right;
   max-width: 150px;
+}
+
+/* Permissions section */
+.permissions-section {
+  background: white;
+  border-radius: 8px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.permissions-section h3 {
+  margin: 0 0 1rem 0;
+  font-size: 1.2rem;
+  color: #333;
+}
+
+/* Permissions table */
+.permissions-table-container {
+  margin-bottom: 1.5rem;
+}
+
+.permissions-table {
+  width: 100%;
+  border-collapse: collapse;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid #e9ecef;
+}
+
+.permissions-table th {
+  background: #f8f9fa;
+  padding: 0.75rem;
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: #495057;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.permissions-table td {
+  padding: 0.75rem;
+  border-bottom: 1px solid #f1f3f4;
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+.permissions-table .role-label {
+  text-align: left;
+  font-weight: 500;
+  color: #495057;
+}
+
+.permissions-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* Permission status styling */
+.permission-granted {
+  background-color: #d4edda;
+  color: #155724;
+  font-weight: bold;
+  border-radius: 4px;
+}
+
+.permission-denied {
+  background-color: #f8d7da;
+  color: #721c24;
+  font-weight: bold;
+  border-radius: 4px;
+}
+
+/* Ownership info */
+.ownership-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.ownership-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  background: #f8f9fa;
+  border-radius: 6px;
+  border: 1px solid #e9ecef;
+}
+
+.ownership-label {
+  font-size: 0.9rem;
+  color: #495057;
+  font-weight: 500;
+}
+
+.ownership-value {
+  font-size: 0.9rem;
+  color: #212529;
+  font-weight: 600;
+  font-family: 'Courier New', monospace;
 }
 
 /* Collection statistics section */

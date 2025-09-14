@@ -52,7 +52,7 @@
         <br>Створіть нову колекцію або завантажте файл, щоб почати роботу.
       </p>
       <p v-else>
-        У папці "{{ pathSegments[pathSegments.length - 1].name }}" поки немає файлів.
+        У папці "" поки немає файлів.
         <br>Перейдіть до батьківської папки або створіть новий вміст.
       </p>
       <div class="empty-actions">
@@ -91,7 +91,7 @@
         <!-- Collection details sidebar -->
         <div class="file-list-sidebar">
           <CollectionDetails 
-            :tree-path="treePathString"
+            :item="leaf"
             :files="files"
           />
         </div>
@@ -132,6 +132,7 @@ const router = useRouter()
 const route = useRoute()
 
 const files = ref([])
+const leaf = ref({})
 const loading = ref(false)
 const error = ref(null)
 
@@ -173,25 +174,7 @@ async function loadFiles() {
   loading.value = true
   error.value = null
   try {
-    let response
-    
-    if (!treePathString.value || treePathString.value === '' || treePathString.value === 'root') {
-      // Load root contents
-      response = await apiService.getRootContents(0, 100)
-    } else {
-      // We have a collection path - find the collection and get its contents
-      const collection = await apiService.findCollectionByPath(treePathString.value)
-      
-      if (collection) {
-        // Found the collection, get its contents
-        response = await apiService.getCollectionContents(collection.id, 0, 100)
-      } else {
-        // Collection not found, show empty state with error
-        console.warn('Collection not found for path:', treePathString.value)
-        response = { files: [], collections: [], total_files: 0, total_collections: 0 }
-        error.value = `Колекція за шляхом "${treePathString.value}" не знайдена`
-      }
-    }
+    let response = await apiService.getCollectionContents(treePathString.value, 0, 100)
     
     // Transform response to match expected format
     const objects = []
@@ -221,6 +204,7 @@ async function loadFiles() {
     }
     
     files.value = objects
+    leaf.value = response.leaf
     emit('files-loaded', files.value)
   } catch (err) {
     console.error('Failed to load files:', err)

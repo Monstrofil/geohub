@@ -50,6 +50,7 @@ class TreeItemListResponse(BaseModel):
     total: int
     skip: int
     limit: int
+    leaf: TreeItemResponse
 
 
 class TreeItemContentsResponse(BaseModel):
@@ -63,6 +64,7 @@ class TreeItemUpdateRequest(BaseModel):
     name: Optional[str] = None
     tags: Optional[Dict[str, Any]] = None
     parent_path: Optional[str] = None
+    permissions: Optional[int] = None
 
 
 class TreeItemCreateRequest(BaseModel):
@@ -100,18 +102,7 @@ class GeoreferencingApplyRequest(BaseModel):
     metadata: Optional[Dict[str, Any]] = None
 
 
-
-
-
-
-# Helper functions
-async def validate_parent_path(parent_path: str) -> None:
-    """Validate that parent path exists"""
-    if parent_path and parent_path != "root":
-        collection = await CollectionsService.get_collection_by_path(parent_path)
-        if not collection:
-            raise HTTPException(status_code=404, detail="Parent collection not found")
-
+ROOT_COLLECTION_ID = "00000000-0000-0000-0000-000000000000"
 
 # ======================
 # UNIFIED TREE ITEM ENDPOINTS
@@ -121,56 +112,27 @@ async def validate_parent_path(parent_path: str) -> None:
 async def list_tree_items(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
-    type: Optional[str] = Query(None, regex="^(file|collection)$"),
-    tags: Optional[str] = Query(None),
-    base_type: Optional[str] = Query(None),
-    collection_path: Optional[str] = Query(None)
+    collection_path: Optional[str] = Query("root"),
+    current_user: Optional[User] = Depends(get_current_user_optional)
 ):
     """List tree items with optional filters"""
-    filter_tags = {}
-    if tags:
-        try:
-            filter_tags = json.loads(tags)
-        except json.JSONDecodeError:
-            raise HTTPException(status_code=400, detail="Invalid tags format")
+    collection = await CollectionsService.get_collection_by_path(collection_path)
+    if not collection:
+        raise HTTPException(status_code=404, detail="Collection not found")
+    
+    await require_permission(collection, current_user, Permission.READ)
 
-    # Route to appropriate service based on type
-    if type == "file":
-        result = await FileService.search_files(
-            tags=filter_tags if filter_tags else None,
-            base_type=base_type,
-            collection_path=collection_path,
-            skip=skip,
-            limit=limit
-        )
-        items = [TreeItemResponse.model_validate(f) for f in result["files"]]
-        total = result["total"]
-    elif type == "collection":
-        collections_query = models.TreeItem.filter(object_type="collection")
-        if collection_path:
-            collections_query = collections_query.filter(path__contains=collection_path)
-        if filter_tags:
-            for key, value in filter_tags.items():
-                collections_query = collections_query.filter(tags__contains={key: value})
-        
-        total = await collections_query.count()
-        collections = await collections_query.offset(skip).limit(limit).order_by('created_at').all()
-        items = [TreeItemResponse.model_validate(c) for c in collections]
-    else:
-        # Get both files and collections
-        if not collection_path or collection_path == "root":
-            result_items = await CollectionsService.list_collection_contents("root", skip, limit)
-        else:
-            result_items = await CollectionsService.list_collection_contents(collection_path, skip, limit)
-        
-        items = [TreeItemResponse.model_validate(item) for item in result_items]
-        total = len(items)  # Since we don't have total counters anymore, use actual count
+    result_items = await CollectionsService.list_collection_contents(collection_path, skip, limit)
+    
+    items = [TreeItemResponse.model_validate(item) for item in result_items]
+    total = len(items)  # Since we don't have total counters anymore, use actual count
 
     return TreeItemListResponse(
         items=items,
         total=total,
         skip=skip,
-        limit=limit
+        limit=limit,
+        leaf=TreeItemResponse.model_validate(collection)
     )
 
 
@@ -211,33 +173,52 @@ async def update_tree_item(
     current_user: Optional[User] = Depends(get_current_user_optional)
 ):
     """Update tree item metadata"""
-    await validate_parent_path(request.parent_path or "root")
+    collection = await CollectionsService.get_collection_by_path(request.parent_path or "root")
+    if not collection:
+        raise HTTPException(status_code=404, detail="Collection not found")
+
+    await require_permission(collection, current_user, Permission.WRITE)
 
     # First check if item exists and user has write permission
     item = await models.TreeItem.filter(id=str(item_id)).first()
     if not item:
         raise HTTPException(status_code=404, detail="Tree item not found")
     
-    # Check write permission
     await require_permission(item, current_user, Permission.WRITE)
-
-    # Try to update as file first, then as collection
-    item = await FileService.update_file(
-        str(item_id),
-        tags=request.tags,
-        new_parent_path=request.parent_path
-    )
     
-    if not item:
-        item = await CollectionsService.update_collection(
-            str(item_id),
-            name=request.name,
-            tags=request.tags,
-            new_parent_path=request.parent_path
+    if request.permissions is not None:
+        item.permissions = request.permissions
+    
+    if request.name is not None:
+        item.name = request.name
+    
+    if request.tags is not None:
+        item.tags = request.tags
+    
+    if request.parent_path is not None:
+        # Update the item's path based on the new parent
+        old_path = item.path
+        path_parts = old_path.split('.')
+        item_segment = path_parts[-1]  # Keep the same item ID segment
+        
+        if request.parent_path == "root":
+            new_path = f"root.{item_segment}"
+        else:
+            new_path = f"{request.parent_path}.{item_segment}"
+        
+        item.path = new_path
+        
+        # update all descendant paths
+        from tortoise import connections
+        connection = connections.get("default")
+        
+        # Update all tree items (both files and collections) that are descendants
+        await connection.execute_query(
+            "UPDATE tree_items SET path = $1 || subpath(path, nlevel($2)) WHERE path <@ $2 AND path != $2",
+            [new_path, old_path]
         )
     
-    if not item:
-        raise HTTPException(status_code=404, detail="Tree item not found")
+    await item.save()
     
     return TreeItemResponse.model_validate(item)
 
@@ -272,45 +253,17 @@ async def delete_tree_item(
     return {"message": "Tree item deleted successfully"}
 
 
-@router.get("/tree-items/{collection_id}/contents", response_model=TreeItemContentsResponse)
-async def get_tree_item_contents(
-    collection_id: uuid.UUID,
-    skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=1000)
-):
-    """Get contents of a collection tree item"""
-    # Special case for root
-    if str(collection_id) == "root":
-        result_items = await CollectionsService.list_collection_contents("root", skip, limit)
-    else:
-        # Verify collection exists and get its path
-        collection = await CollectionsService.get_collection(str(collection_id))
-        if not collection:
-            raise HTTPException(status_code=404, detail="Collection not found")
-
-        await require_permission(collection, current_user, Permission.READ)
-        result_items = await CollectionsService.list_collection_contents(collection.path, skip, limit)
-    
-    items = [TreeItemResponse.model_validate(item) for item in result_items]
-    
-    return TreeItemContentsResponse(
-        items=items,
-        total=len(items),  # Since we don't have total counters anymore, use actual count
-        skip=skip,
-        limit=limit
-    )
-
-
 @router.post("/tree-items", response_model=TreeItemResponse)
-async def create_tree_item(request: TreeItemCreateRequest):
+async def create_tree_item(request: TreeItemCreateRequest, current_user: Optional[User] = Depends(get_current_user_optional)):
     """Create a new tree item (collection only - files must be uploaded via /files)"""
     if request.type != "collection":
         raise HTTPException(status_code=400, detail="Only collections can be created via this endpoint. Use /files for file uploads.")
     
-    await validate_parent_path(request.parent_path or "root")
+    collection = await CollectionsService.get_collection_by_path(request.parent_path or "root")
+    if not collection:
+        raise HTTPException(status_code=404, detail="Collection not found")
 
-    # TODO: Uncomment this when we have a way to get the current user
-    # await require_permission(collection, current_user, Permission.WRITE)
+    await require_permission(collection, current_user, Permission.WRITE)
 
     collection_obj = await CollectionsService.create_collection(
         request.name,
@@ -321,23 +274,6 @@ async def create_tree_item(request: TreeItemCreateRequest):
     return TreeItemResponse.model_validate(collection_obj)
 
 
-# Special endpoint for root contents
-@router.get("/root/contents", response_model=TreeItemContentsResponse)
-async def get_root_contents(
-    skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=1000)
-):
-    """Get contents of the root"""
-    result_items = await CollectionsService.list_collection_contents("root", skip, limit)
-    
-    items = [TreeItemResponse.model_validate(item) for item in result_items]
-    
-    return TreeItemContentsResponse(
-        items=items,
-        total=len(items),  # Since we don't have total counters anymore, use actual count
-        skip=skip,
-        limit=limit
-    )
 
 
 # ======================
@@ -364,7 +300,12 @@ async def upload_file(
         except json.JSONDecodeError:
             raise HTTPException(status_code=400, detail="Invalid tags format")
 
-    await validate_parent_path(parent_path or "root")
+    collection = await CollectionsService.get_collection_by_path(parent_path or "root")
+    if not collection:
+        raise HTTPException(status_code=404, detail="Collection not found")
+
+    await require_permission(collection, current_user, Permission.WRITE)
+
     file_obj = await FileService.create_file(file, file_tags, parent_path=parent_path or "root")
     
     # Set ownership if user is authenticated
@@ -378,26 +319,41 @@ async def upload_file(
 
 
 @router.post("/tree-items/{item_id}/probe")
-async def probe_tree_item(item_id: uuid.UUID):
+async def probe_tree_item(item_id: uuid.UUID, current_user: Optional[User] = Depends(get_current_user_optional)):
     """Probe a tree item to check if it can be georeferenced with GDAL"""
+    tree_item = await TreeItem.get_or_none(id=item_id)
+    if not tree_item:
+        raise HTTPException(status_code=404, detail="TreeItem not found")
+
+    await require_permission(tree_item, current_user, Permission.READ)
+
     result = await FileService.probe_tree_item(str(item_id))
     return result
 
 
 @router.post("/tree-items/{item_id}/convert-to-geo-raster", response_model=TreeItemResponse)
-async def convert_to_geo_raster(item_id: uuid.UUID):
+async def convert_to_geo_raster(item_id: uuid.UUID, current_user: Optional[User] = Depends(get_current_user_optional)):
     """Convert a RawFile to GeoRasterFile for georeferencing"""
+    tree_item = await TreeItem.get_or_none(id=item_id)
+    if not tree_item:
+        raise HTTPException(status_code=404, detail="TreeItem not found")
+
+    await require_permission(tree_item, current_user, Permission.WRITE)
+
     file_obj = await FileService.convert_to_geo_raster(str(item_id))
     return TreeItemResponse.model_validate(file_obj)
 
 
 @router.get("/files/{file_id}/download")
-async def download_file(file_id: uuid.UUID):
+async def download_file(
+    file_id: uuid.UUID, 
+    current_user: Optional[User] = Depends(get_current_user_optional)):
     """Download a file"""
-    # Look for TreeItem by ID
     tree_item = await TreeItem.get_or_none(id=file_id)
     if not tree_item:
         raise HTTPException(status_code=404, detail="TreeItem not found")
+
+    await require_permission(tree_item, current_user, Permission.READ)
     
     # Get object of that tree item
     try:
@@ -486,8 +442,6 @@ async def get_file_preview(file_id: uuid.UUID):
 # ======================
 
 
-
-
 @router.post("/files/{file_id}/validate-control-points")
 async def validate_control_points(file_id: uuid.UUID, request: ControlPointsRequest):
     """Validate control points and return accuracy statistics"""
@@ -553,12 +507,13 @@ async def apply_georeferencing(file_id: uuid.UUID, request: GeoreferencingApplyR
         
         # Update user metadata if provided
         user_metadata = request.metadata or {}
-        updated_file = await FileService.update_file(str(file_id), tags=user_metadata)
+        tree_obj.tags = tree_obj
+        await tree_obj.save()
         
         
         return {
             "message": "Georeferencing applied successfully",
-            "file": TreeItemResponse.model_validate(updated_file),
+            "file": TreeItemResponse.model_validate(tree_obj),
             "validation_results": validation_results
         }
         
