@@ -9,12 +9,20 @@
         Назад до списку
       </button>
       <div class="header-actions">
-        <router-link :to="{name: 'FileEditor', query: { id: props.treeItemId }}" class="edit-btn">
+        <router-link v-if="isAuthenticated" :to="{name: 'FileEditor', query: { id: props.treeItemId }}" class="edit-btn">
           <svg width="16" height="16" viewBox="0 0 16 16">
             <path d="M11 1L15 5L5 15H1V11L11 1Z" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
             <path d="M8 4L12 8" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
           Редагувати
+        </router-link>
+        <router-link v-else :to="loginUrl" class="login-btn">
+          <svg width="16" height="16" viewBox="0 0 16 16">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <polyline points="16,17 21,12 16,7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <line x1="21" y1="12" x2="9" y2="12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          Увійти щоб редагувати
         </router-link>
       </div>
     </div>
@@ -347,6 +355,7 @@ import { useRoute, useRouter } from 'vue-router'
 import InteractiveMap from './InteractiveMap.vue'
 import CollectionFilesList from './CollectionFilesList.vue'
 import GeoreferencingModal from './GeoreferencingModal.vue'
+import { isAuthenticated } from '../stores/auth.js'
 import { matchTagsToPreset, getAllPresets } from '../utils/tagMatcher.js'
 import { loadFieldDefinitions, resolveFields } from '../utils/fieldResolver.js'
 import apiService from '../services/api.js'
@@ -354,6 +363,12 @@ import { getFileSize, getBaseFileType, getMimeType, getOriginalName, getDisplayN
 
 const route = useRoute()
 const router = useRouter()
+
+// Create login URL with current path as redirect
+const loginUrl = computed(() => {
+  const redirectParam = encodeURIComponent(route.fullPath)
+  return `/login?redirect=${redirectParam}`
+})
 
 // State
 const file = ref(null)
@@ -729,6 +744,24 @@ watch(() => props.treeItemId, () => {
 
 .edit-btn:hover {
   background: #0056b3;
+}
+
+.login-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  text-decoration: none;
+  font-size: 0.9rem;
+  transition: all 0.15s;
+  background: #7b1fa2;
+  color: white;
+  border: none;
+}
+
+.login-btn:hover {
+  background: #4a148c;
 }
 
 

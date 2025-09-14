@@ -6,7 +6,7 @@
         <div class="file-name">{{ name }}</div>
       </div>
     </router-link>
-    <router-link :to="{name: 'FileEditor', query: { id: file.id }}">
+    <router-link v-if="isAuthenticated" :to="{name: 'FileEditor', query: { id: file.id }}">
       <button 
         class="edit-btn" 
         title="Edit file"
@@ -18,6 +18,7 @@
       </button>
     </router-link>
     <button 
+      v-if="isAuthenticated"
       class="remove-btn" 
       @click.stop="handleRemove"
       title="Remove file"
@@ -34,6 +35,7 @@ import { computed } from 'vue'
 import apiService from '../services/api.js'
 import { getBaseFileType } from '../utils/fileHelpers.js'
 import { matchTagsToPreset } from '../utils/tagMatcher.js'
+import { isAuthenticated } from '../stores/auth.js'
 
 const props = defineProps({
   name: { type: String, required: true },

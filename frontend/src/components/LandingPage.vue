@@ -14,6 +14,10 @@
             <i class="icon">🗂️</i>
             Переглянути колекцію
           </button>
+          <router-link v-if="!isAuthenticated" :to="loginUrl" class="btn btn-secondary">
+            <i class="icon">🔐</i>
+            Увійти
+          </router-link>
         </div>
       </div>
       <div class="hero-visual">
@@ -206,11 +210,18 @@
     <section class="cta">
       <div class="container">
         <h2>Готові почати?</h2>
-        <p>Перегляньте нашу колекцію геопросторової документації</p>
-        <button @click="navigateToFileList" class="btn btn-primary btn-large">
-          <i class="icon">🗂️</i>
-          Переглянути колекцію
-        </button>
+        <p v-if="isAuthenticated">Перегляньте нашу колекцію геопросторової документації</p>
+        <p v-else>Увійдіть в систему для доступу до повної колекції геопросторової документації</p>
+        <div class="cta-actions">
+          <button v-if="isAuthenticated" @click="navigateToFileList" class="btn btn-primary btn-large">
+            <i class="icon">🗂️</i>
+            Переглянути колекцію
+          </button>
+          <router-link v-else :to="loginUrl" class="btn btn-primary btn-large">
+            <i class="icon">🔐</i>
+            Увійти в систему
+          </router-link>
+        </div>
       </div>
     </section>
 
@@ -224,9 +235,18 @@
 </template>
 
 <script setup>
-import { useRouter } from 'vue-router'
+import { computed } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
+import { isAuthenticated } from '../stores/auth.js'
 
 const router = useRouter()
+const route = useRoute()
+
+// Create login URL with current path as redirect
+const loginUrl = computed(() => {
+  const redirectParam = encodeURIComponent(route.fullPath)
+  return `/login?redirect=${redirectParam}`
+})
 
 function navigateToFileList() {
   // Navigate directly to FileList
@@ -625,6 +645,12 @@ function navigateToCollection(collectionType) {
   color: white;
   padding: 5rem 2rem;
   text-align: center;
+}
+
+.cta-actions {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
 }
 
 .cta h2 {

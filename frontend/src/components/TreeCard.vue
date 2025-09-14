@@ -12,7 +12,7 @@
         <div class="tree-name">{{ name }}</div>
       </div>
     </router-link>
-    <router-link :to="{name: 'FileEditor', query: { id: props.file.id }}" v-if="props.file?.id">
+    <router-link v-if="isAuthenticated && props.file?.id" :to="{name: 'FileEditor', query: { id: props.file.id }}">
       <button 
         class="edit-btn" 
         title="Edit collection"
@@ -25,6 +25,7 @@
     </router-link>
     
     <button 
+      v-if="isAuthenticated"
       class="remove-btn" 
       @click.stop="handleRemove"
       title="Remove collection"
@@ -40,6 +41,7 @@
 import { computed } from 'vue'
 import apiService from '../services/api.js'
 import { matchTagsToPreset } from '../utils/tagMatcher.js'
+import { isAuthenticated } from '../stores/auth.js'
 
 const props = defineProps({
   name: { type: String, required: true },

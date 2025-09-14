@@ -15,7 +15,7 @@
     <!-- Collection details -->
     <div v-else-if="collection" class="collection-content">
       <!-- Unified Object Type and Properties section -->
-      <div v-if="selectedType || (collection.tags && Object.keys(collection.tags).length > 0)" class="unified-properties-section">
+      <div class="unified-properties-section">
         <div class="section-header">
           <h3>Collection Information</h3>
           <button 

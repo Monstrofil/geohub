@@ -1,5 +1,9 @@
 <template>
   <div class="pure-g app-grid">
+    <!-- Top Toolbar with Auth -->
+    <div class="pure-u-1">
+      <TopToolbar />
+    </div>
     <!-- File List View -->
     <div class="pure-u-1">
       <RouterView 
@@ -13,6 +17,7 @@
 import { ref, onMounted } from 'vue'
 import { useChangeTracker } from '../composables/useChangeTracker.js'
 import { loadFieldDefinitions } from '../utils/fieldResolver.js'
+import TopToolbar from './TopToolbar.vue'
 
 const allFieldDefinitions = ref({})
 

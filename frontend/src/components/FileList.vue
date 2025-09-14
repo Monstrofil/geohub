@@ -11,13 +11,21 @@
           </svg>
           Оновити
         </button>
-        <button @click="startUpload" class="action-btn upload-btn" title="Завантажити новий файл або створити колекцію">
+        <button v-if="isAuthenticated" @click="startUpload" class="action-btn upload-btn" title="Завантажити новий файл або створити колекцію">
           <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
             <path d="M10 15V5M10 5L6 9M10 5l4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
             <rect x="4" y="15" width="12" height="2" rx="1" fill="currentColor"/>
           </svg>
           Додати
         </button>
+        <router-link v-else :to="loginUrl" class="action-btn login-btn" title="Увійти щоб завантажувати файли">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <polyline points="16,17 21,12 16,7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <line x1="21" y1="12" x2="9" y2="12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          Увійти
+        </router-link>
       </div>
     </h3>
     
@@ -56,13 +64,21 @@
         <br>Перейдіть до батьківської папки або створіть новий вміст.
       </p>
       <div class="empty-actions">
-        <button @click="startUpload" class="action-btn upload-btn" title="Додати файл або колекцію">
+        <button v-if="isAuthenticated" @click="startUpload" class="action-btn upload-btn" title="Додати файл або колекцію">
           <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
             <path d="M10 15V5M10 5L6 9M10 5l4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
             <rect x="4" y="15" width="12" height="2" rx="1" fill="currentColor"/>
           </svg>
           Додати файл
         </button>
+        <router-link v-else :to="loginUrl" class="action-btn login-btn" title="Увійти щоб завантажувати файли">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <polyline points="16,17 21,12 16,7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <line x1="21" y1="12" x2="9" y2="12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          Увійти щоб додати файли
+        </router-link>
       </div>
     </div>
     <div v-else class="disclosure-wrap disclosure-wrap-feature_list">
@@ -119,6 +135,7 @@ import UploadModal from './UploadModal.vue'
 import CollectionDetails from './CollectionDetails.vue'
 import apiService from '../services/api.js'
 import { getDisplayName } from '../utils/fileHelpers.js'
+import { isAuthenticated } from '../stores/auth.js'
 
 const props = defineProps({
   treePath: {type: [String, Array], required: false},
@@ -130,6 +147,12 @@ const emit = defineEmits(['refresh', 'select-file', 'file-selected', 'files-load
 
 const router = useRouter()
 const route = useRoute()
+
+// Create login URL with current path as redirect
+const loginUrl = computed(() => {
+  const redirectParam = encodeURIComponent(route.fullPath)
+  return `/login?redirect=${redirectParam}`
+})
 
 const files = ref([])
 const leaf = ref({})
@@ -347,6 +370,16 @@ watch(() => props.treePath, loadFiles)
   background: #bbdefb;
   color: #0d47a1;
   box-shadow: 0 4px 16px rgba(25,118,210,0.08);
+}
+.login-btn {
+  background: #f3e5f5;
+  color: #7b1fa2;
+  text-decoration: none;
+}
+.login-btn:hover:not(:disabled) {
+  background: #e1bee7;
+  color: #4a148c;
+  box-shadow: 0 4px 16px rgba(123,31,162,0.08);
 }
 .action-btn svg {
   display: inline-block;

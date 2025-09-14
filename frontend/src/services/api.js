@@ -6,6 +6,20 @@ const ROOT_COLLECTION_ID = '00000000-0000-0000-0000-000000000000'
 class ApiService {
   constructor() {
     this.baseUrl = API_BASE_URL
+    this.token = localStorage.getItem('auth_token')
+  }
+
+  setToken(token) {
+    this.token = token
+    if (token) {
+      localStorage.setItem('auth_token', token)
+    } else {
+      localStorage.removeItem('auth_token')
+    }
+  }
+
+  getToken() {
+    return this.token || localStorage.getItem('auth_token')
   }
 
   async request(endpoint, options = {}) {
@@ -16,6 +30,12 @@ class ApiService {
         ...options.headers,
       },
       ...options,
+    }
+
+    // Add auth header if token exists
+    const token = this.getToken()
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`
     }
 
     try {
@@ -446,6 +466,53 @@ class ApiService {
   // Health check
   async healthCheck() {
     return await fetch('http://localhost:8000/health').then(res => res.json())
+  }
+
+  // ======================
+  // AUTHENTICATION OPERATIONS
+  // ======================
+
+  /**
+   * Login with username and password
+   * @param {string} username - Username
+   * @param {string} password - Password
+   * @returns {Promise<Object>} Login response with token and user info
+   */
+  async login(username, password) {
+    const response = await this.request('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ username, password })
+    })
+    
+    // Store the token
+    if (response.access_token) {
+      this.setToken(response.access_token)
+    }
+    
+    return response
+  }
+
+  /**
+   * Logout current user
+   */
+  logout() {
+    this.setToken(null)
+  }
+
+  /**
+   * Get current user information
+   * @returns {Promise<Object>} Current user object
+   */
+  async getCurrentUser() {
+    return await this.request('/auth/me')
+  }
+
+  /**
+   * Check if user is currently authenticated
+   * @returns {boolean} True if token exists
+   */
+  isAuthenticated() {
+    return !!this.getToken()
   }
 
 
