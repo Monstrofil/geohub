@@ -99,7 +99,6 @@ class ControlPointsRequest(BaseModel):
 class GeoreferencingApplyRequest(BaseModel):
     control_points: List[ControlPointModel]
     control_points_srs: str = "EPSG:4326"
-    metadata: Optional[Dict[str, Any]] = None
 
 
 ROOT_COLLECTION_ID = "00000000-0000-0000-0000-000000000000"
@@ -483,51 +482,33 @@ async def apply_georeferencing(file_id: uuid.UUID, request: GeoreferencingApplyR
         ControlPoint(cp.image_x, cp.image_y, cp.world_x, cp.world_y)
         for cp in request.control_points
     ]
-        
     
-    try:
-        # Validate control points
-        validation_results = georeferencing_service.validate_control_points(control_points)
-        
-        if not validation_results['valid']:
-            raise HTTPException(status_code=400, detail=f"Invalid control points: {validation_results['errors']}")
-        
-        # Create the final georeferenced file
-        georeferenced_path = georeferencing_service.warp_image_with_control_points(
-            file_path,
-            control_points,
-            request.control_points_srs
-        )
-        
-        # Replace with georeferenced
-        os.rename(georeferenced_path, file_path) 
-        
-        geo_raster_file.file_path = file_path
-        await geo_raster_file.save()
-        
-        # Update user metadata if provided
-        user_metadata = request.metadata or {}
-        tree_obj.tags = tree_obj
-        await tree_obj.save()
-        
-        
-        return {
-            "message": "Georeferencing applied successfully",
-            "file": TreeItemResponse.model_validate(tree_obj),
-            "validation_results": validation_results
-        }
-        
-    except Exception as e:
-        # If something went wrong, try to restore the backup
-        try:
-            file_path = await file_obj.get_file_path()
-            backup_path = file_path + ".backup"
-            if os.path.exists(backup_path):
-                shutil.move(backup_path, file_path)
-        except:
-            pass
-        
-        raise HTTPException(status_code=500, detail=f"Error applying georeferencing: {str(e)}")
+    # Validate control points
+    validation_results = georeferencing_service.validate_control_points(control_points)
+    
+    if not validation_results['valid']:
+        raise HTTPException(status_code=400, detail=f"Invalid control points: {validation_results['errors']}")
+    
+    # Create the final georeferenced file
+    georeferenced_path = georeferencing_service.warp_image_with_control_points(
+        file_path,
+        control_points,
+        request.control_points_srs
+    )
+    
+    # Replace with georeferenced
+    os.rename(georeferenced_path, file_path) 
+    
+    geo_raster_file.file_path = file_path
+    await geo_raster_file.save()
+    
+    
+    return {
+        "message": "Georeferencing applied successfully",
+        "file": TreeItemResponse.model_validate(tree_obj),
+        "validation_results": validation_results
+    }
+    
 
 
 @router.post("/georeferencing/cleanup")

@@ -1,3 +1,5 @@
+import axios from 'axios'
+
 const API_BASE_URL = 'http://localhost:8000/api/v1'
 
 // Constants
@@ -7,6 +9,42 @@ class ApiService {
   constructor() {
     this.baseUrl = API_BASE_URL
     this.token = localStorage.getItem('auth_token')
+    
+    // Create axios instance
+    this.axios = axios.create({
+      baseURL: API_BASE_URL,
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    })
+    
+    // Add request interceptor to automatically include auth token
+    this.axios.interceptors.request.use(
+      (config) => {
+        const token = this.getToken()
+        if (token) {
+          config.headers.Authorization = `Bearer ${token}`
+        }
+        return config
+      },
+      (error) => {
+        return Promise.reject(error)
+      }
+    )
+    
+    // Add response interceptor for error handling
+    this.axios.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        if (error.response?.status === 401) {
+          // Token expired or invalid, clear it
+          this.setToken(null)
+        }
+        
+        const message = error.response?.data?.detail || error.message || 'Request failed'
+        throw new Error(message)
+      }
+    )
   }
 
   setToken(token) {
@@ -23,36 +61,33 @@ class ApiService {
   }
 
   async request(endpoint, options = {}) {
-    const url = `${this.baseUrl}${endpoint}`
-    const config = {
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
-      ...options,
-    }
-
-    // Add auth header if token exists
-    const token = this.getToken()
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`
-    }
-
     try {
-      const response = await fetch(url, config)
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.detail || `HTTP error! status: ${response.status}`)
-      }
-
-      // Handle empty responses
-      const contentType = response.headers.get('content-type')
-      if (contentType && contentType.includes('application/json')) {
-        return await response.json()
+      // Convert old fetch-style options to axios format
+      const axiosConfig = {
+        url: endpoint,
+        method: options.method || 'GET',
+        headers: options.headers || {},
+        ...options
       }
       
-      return await response.text()
+      // Handle body -> data conversion for axios
+      if (options.body) {
+        // If body is a JSON string, parse it back to object for axios
+        if (typeof options.body === 'string') {
+          try {
+            axiosConfig.data = JSON.parse(options.body)
+          } catch (e) {
+            // If not valid JSON, use as-is
+            axiosConfig.data = options.body
+          }
+        } else {
+          axiosConfig.data = options.body
+        }
+        delete axiosConfig.body
+      }
+      
+      const response = await this.axios.request(axiosConfig)
+      return response.data
     } catch (error) {
       console.error('API request failed:', error)
       throw error
@@ -76,17 +111,13 @@ class ApiService {
     formData.append('tags', JSON.stringify(tags))
     formData.append('parent_path', parentPath)
 
-    const response = await fetch(`${this.baseUrl}/files`, {
-      method: 'POST',
-      body: formData,
+    const response = await this.axios.post('/files', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
     })
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
-      throw new Error(errorData.detail || `Upload failed! status: ${response.status}`)
-    }
-
-    return await response.json()
+    return response.data
   }
 
   /**
@@ -147,10 +178,9 @@ class ApiService {
    * @returns {Promise<Response>} File download response
    */
   async downloadFile(fileId) {
-    const response = await fetch(`${this.baseUrl}/files/${fileId}/download`)
-    if (!response.ok) {
-      throw new Error(`Download failed! status: ${response.status}`)
-    }
+    const response = await this.axios.get(`/files/${fileId}/download`, {
+      responseType: 'blob'
+    })
     return response
   }
 
@@ -465,7 +495,8 @@ class ApiService {
 
   // Health check
   async healthCheck() {
-    return await fetch('http://localhost:8000/health').then(res => res.json())
+    const response = await this.axios.get('http://localhost:8000/health')
+    return response.data
   }
 
   // ======================
@@ -555,41 +586,19 @@ class ApiService {
    * @returns {Promise<Object>} Upload result
    */
   async uploadFileWithProgress(formData, onProgress) {
-    return new Promise((resolve, reject) => {
-      const xhr = new XMLHttpRequest()
-      
-      xhr.upload.addEventListener('progress', (event) => {
-        if (event.lengthComputable) {
-          const progress = event.loaded / event.total
+    const response = await this.axios.post('/files', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      },
+      onUploadProgress: (progressEvent) => {
+        if (progressEvent.lengthComputable) {
+          const progress = progressEvent.loaded / progressEvent.total
           onProgress(progress)
         }
-      })
-      
-      xhr.addEventListener('load', () => {
-        if (xhr.status >= 200 && xhr.status < 300) {
-          try {
-            const response = JSON.parse(xhr.responseText)
-            resolve(response)
-          } catch (error) {
-            reject(new Error('Failed to parse response'))
-          }
-        } else {
-          try {
-            const errorData = JSON.parse(xhr.responseText)
-            reject(new Error(errorData.detail || `Upload failed! status: ${xhr.status}`))
-          } catch (error) {
-            reject(new Error(`Upload failed! status: ${xhr.status}`))
-          }
-        }
-      })
-      
-      xhr.addEventListener('error', () => {
-        reject(new Error('Network error occurred'))
-      })
-      
-      xhr.open('POST', `${this.baseUrl}/files`)
-      xhr.send(formData)
+      }
     })
+    
+    return response.data
   }
 
   /**

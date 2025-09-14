@@ -131,8 +131,13 @@
         <button class="btn btn-outline" @click="clearAllPoints" :disabled="controlPoints.length === 0">
           Clear All
         </button>
-        <button class="btn btn-primary" @click="applyGeoreferencing" :disabled="!canApply">
-          Apply Georeferencing
+        <button class="btn btn-primary apply-btn" @click="applyGeoreferencing" :disabled="!canApply || isApplyingGeoreferencing">
+          <div v-if="isApplyingGeoreferencing" class="spinner"></div>
+          <svg v-else width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M8 2v4M8 10v4M2 8h4M10 8h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            <circle cx="8" cy="8" r="2" fill="currentColor"/>
+          </svg>
+          {{ isApplyingGeoreferencing ? 'Applying Georeferencing...' : 'Apply Georeferencing' }}
         </button>
       </div>
     </div>
@@ -176,6 +181,9 @@ const selectedMapLayer = ref('osm')
 
 // Validation
 const validationResults = ref(null)
+
+// Apply georeferencing loading state
+const isApplyingGeoreferencing = ref(false)
 
 // Computed
 const imageTransform = computed(() => {
@@ -585,7 +593,9 @@ async function validateControlPoints() {
 }
 
 async function applyGeoreferencing() {
-  if (!canApply.value) return
+  if (!canApply.value || isApplyingGeoreferencing.value) return
+  
+  isApplyingGeoreferencing.value = true
   
   try {
     const response = await apiService.applyGeoreferencing(props.fileId, {
@@ -601,6 +611,8 @@ async function applyGeoreferencing() {
   } catch (error) {
     console.error('Apply georeferencing failed:', error)
     alert('Failed to apply georeferencing: ' + error.message)
+  } finally {
+    isApplyingGeoreferencing.value = false
   }
 }
 
@@ -1105,5 +1117,28 @@ onUnmounted(() => {
 .btn-outline:hover:not(:disabled) {
   background: #007bff;
   color: white;
+}
+
+/* Apply button layout */
+.apply-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Spinner animation for apply button */
+.spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top: 2px solid white;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 </style>
