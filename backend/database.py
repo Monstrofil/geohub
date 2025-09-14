@@ -21,7 +21,7 @@ TORTOISE_ORM = {
 async def init_db():
     await Tortoise.init(
         db_url=TORTOISE_ORM["connections"]["default"],
-        modules=TORTOISE_ORM["apps"]["models"]["models"]
+        modules={"models": TORTOISE_ORM["apps"]["models"]["models"]}
     )
 
 

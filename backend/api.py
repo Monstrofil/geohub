@@ -13,7 +13,7 @@ from models import TreeItem, User
 from services import FileService, CollectionsService
 from mapserver_service import MapServerService
 from georeferencing_service import GeoreferencingService, ControlPoint
-from auth import get_current_user, require_permission
+from auth import get_current_user, get_current_user_optional, require_permission, Permission
 
 
 router = APIRouter(tags=["files"])
@@ -36,6 +36,10 @@ class TreeItemResponse(BaseModel):
     created_at: datetime.datetime
     updated_at: datetime.datetime
     path: str
+
+    permissions: int
+    owner_user_id: uuid.UUID | None
+    owner_group_id: uuid.UUID | None
 
 class TreeItemDetails(TreeItemResponse):
     object_details: models.KnownTreeItemTypes | None = None
@@ -173,7 +177,7 @@ async def list_tree_items(
 @router.get("/tree-items/{item_id}", response_model=TreeItemDetails)
 async def get_tree_item(
     item_id: uuid.UUID,
-    current_user: Optional[User] = Depends(get_current_user)
+    current_user: Optional[User] = Depends(get_current_user_optional)
 ):
     """Get tree item by ID"""
     # Try to get as file first, then as collection
@@ -182,8 +186,7 @@ async def get_tree_item(
     if not item:
         raise HTTPException(status_code=404, detail="Tree item not found")
     
-    # Check read permission
-    await require_permission(item, current_user, "read")
+    await require_permission(item, current_user, Permission.READ)
     
     response = TreeItemDetails.model_validate(item)
     
@@ -205,7 +208,7 @@ async def get_tree_item(
 async def update_tree_item(
     item_id: uuid.UUID,
     request: TreeItemUpdateRequest,
-    current_user: Optional[User] = Depends(get_current_user)
+    current_user: Optional[User] = Depends(get_current_user_optional)
 ):
     """Update tree item metadata"""
     await validate_parent_path(request.parent_path or "root")
@@ -216,7 +219,7 @@ async def update_tree_item(
         raise HTTPException(status_code=404, detail="Tree item not found")
     
     # Check write permission
-    await require_permission(item, current_user, "write")
+    await require_permission(item, current_user, Permission.WRITE)
 
     # Try to update as file first, then as collection
     item = await FileService.update_file(
@@ -252,7 +255,7 @@ async def delete_tree_item(
         raise HTTPException(status_code=404, detail="Tree item not found")
     
     # Check write permission
-    await require_permission(item, current_user, "write")
+    await require_permission(item, current_user, Permission.WRITE)
     
     # Try to delete as file first, then as collection
     success = await FileService.delete_file(str(item_id))
@@ -285,6 +288,7 @@ async def get_tree_item_contents(
         if not collection:
             raise HTTPException(status_code=404, detail="Collection not found")
 
+        await require_permission(collection, current_user, Permission.READ)
         result_items = await CollectionsService.list_collection_contents(collection.path, skip, limit)
     
     items = [TreeItemResponse.model_validate(item) for item in result_items]
@@ -304,6 +308,9 @@ async def create_tree_item(request: TreeItemCreateRequest):
         raise HTTPException(status_code=400, detail="Only collections can be created via this endpoint. Use /files for file uploads.")
     
     await validate_parent_path(request.parent_path or "root")
+
+    # TODO: Uncomment this when we have a way to get the current user
+    # await require_permission(collection, current_user, Permission.WRITE)
 
     collection_obj = await CollectionsService.create_collection(
         request.name,
@@ -343,7 +350,7 @@ async def upload_file(
     file: UploadFile = File(...),
     tags: Optional[str] = Form(None),
     parent_path: Optional[str] = Form("root"),
-    current_user: Optional[User] = Depends(get_current_user)
+    current_user: Optional[User] = Depends(get_current_user_optional)
 ):
     """Upload a new file with automatic georeferencing detection
     

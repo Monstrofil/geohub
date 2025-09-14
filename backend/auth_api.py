@@ -7,7 +7,7 @@ from pydantic import BaseModel
 
 import models
 from models import User
-from auth import get_current_user, require_admin, AuthService
+from auth import get_current_user, require_admin, AuthService, ACCESS_TOKEN_EXPIRE_MINUTES
 
 
 router = APIRouter(tags=["authentication"])
@@ -20,8 +20,10 @@ class LoginRequest(BaseModel):
 
 
 class LoginResponse(BaseModel):
+    access_token: str
+    token_type: str
     user: models.User_Pydantic
-    message: str
+    expires_in: int  # seconds
 
 
 class CreateUserRequest(BaseModel):
@@ -48,15 +50,26 @@ class PermissionsUpdateRequest(BaseModel):
 
 @router.post("/auth/login", response_model=LoginResponse)
 async def login(request: LoginRequest):
-    """Authenticate user with username and password"""
+    """Authenticate user with username and password and return JWT token"""
     user = await AuthService.authenticate_user(request.username, request.password)
     if not user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
     
+    # Create JWT token
+    access_token = AuthService.create_access_token(data={"sub": str(user.id)})
+    
     return LoginResponse(
+        access_token=access_token,
+        token_type="bearer",
         user=models.User_Pydantic.model_validate(user),
-        message="Login successful"
+        expires_in=ACCESS_TOKEN_EXPIRE_MINUTES * 60  # convert to seconds
     )
+
+
+@router.get("/auth/me", response_model=models.User_Pydantic)
+async def get_current_user_info(current_user: User = Depends(get_current_user)):
+    """Get current user information (requires valid JWT token)"""
+    return models.User_Pydantic.model_validate(current_user)
 
 
 @router.post("/auth/users", response_model=models.User_Pydantic)
