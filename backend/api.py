@@ -11,10 +11,9 @@ from pydantic import BaseModel, ConfigDict
 import models
 import models_factory
 from models import TreeItem, User
-from services import FileService, CollectionsService
+from services import FileService, CollectionsService, georeference
 from services.geo import analyze_raster_file
 from mapserver_service import MapServerService
-from georeferencing_service import GeoreferencingService, ControlPoint
 from auth import get_current_user, get_current_user_optional, require_permission, Permission
 
 
@@ -22,8 +21,6 @@ router = APIRouter(tags=["files"])
 
 # Initialize services
 mapserver_service = MapServerService()
-# Use uploads directory for temp files to ensure MapServer can access them
-georeferencing_service = GeoreferencingService(uploads_dir="./uploads", temp_dir="./uploads")
 
 
 # Unified Pydantic models
@@ -498,12 +495,12 @@ async def validate_control_points(file_id: uuid.UUID, request: ControlPointsRequ
     try:
         # Convert Pydantic models to ControlPoint objects
         control_points = [
-            ControlPoint(cp.image_x, cp.image_y, cp.world_x, cp.world_y)
+            georeference.ControlPoint(cp.image_x, cp.image_y, cp.world_x, cp.world_y)
             for cp in request.control_points
         ]
         
         # Validate control points
-        validation_results = georeferencing_service.validate_control_points(control_points)
+        validation_results = georeference.validate_control_points(control_points)
         
         return validation_results
         
@@ -526,18 +523,18 @@ async def apply_georeferencing(file_id: uuid.UUID, request: GeoreferencingApplyR
     
     # Convert Pydantic models to ControlPoint objects
     control_points = [
-        ControlPoint(cp.image_x, cp.image_y, cp.world_x, cp.world_y)
+        georeference.ControlPoint(cp.image_x, cp.image_y, cp.world_x, cp.world_y)
         for cp in request.control_points
     ]
     
     # Validate control points
-    validation_results = georeferencing_service.validate_control_points(control_points)
+    validation_results = georeference.validate_control_points(control_points)
     
     if not validation_results['valid']:
         raise HTTPException(status_code=400, detail=f"Invalid control points: {validation_results['errors']}")
     
     # Create the final georeferenced file
-    georeferenced_path = georeferencing_service.warp_image_with_control_points(
+    georeferenced_path = georeference.warp_image_with_control_points(
         file_path,
         control_points,
         request.control_points_srs
@@ -563,13 +560,3 @@ async def apply_georeferencing(file_id: uuid.UUID, request: GeoreferencingApplyR
         "validation_results": validation_results
     }
     
-
-
-@router.post("/georeferencing/cleanup")
-async def cleanup_georeferencing_temp_files(max_age_hours: int = 24):
-    """Clean up temporary georeferencing files"""
-    try:
-        georeferencing_service.cleanup_temp_files(max_age_hours)
-        return {"message": f"Cleaned up georeferencing temp files older than {max_age_hours} hours"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Cleanup failed: {str(e)}")
