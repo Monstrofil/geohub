@@ -2,6 +2,7 @@ from tortoise import fields, models
 from tortoise.contrib.pydantic import pydantic_model_creator
 import hashlib
 import secrets
+import os
 
 from datetime import datetime
 from typing import Dict, Any, Optional, Union
@@ -88,6 +89,7 @@ class GeoRasterFile(models.Model):
     original_name = fields.CharField(max_length=500)
     file_path = fields.CharField(max_length=1000)  # Current file path (may be georeferenced version)
     original_file_path = fields.CharField(max_length=1000, null=True)  # Original before georeferencing
+    map_config_path = fields.CharField(max_length=1000, null=True)  # MapServer config file path
     file_size = fields.BigIntField()
     mime_type = fields.CharField(max_length=200)
     created_at = fields.DatetimeField(auto_now_add=True)

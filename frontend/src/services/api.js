@@ -2,9 +2,6 @@ import axios from 'axios'
 
 const API_BASE_URL = 'http://localhost:8000/api/v1'
 
-// Constants
-const ROOT_COLLECTION_ID = '00000000-0000-0000-0000-000000000000'
-
 class ApiService {
   constructor() {
     this.baseUrl = API_BASE_URL
@@ -637,4 +634,3 @@ class ApiService {
 
 const apiService = new ApiService()
 export default apiService
-export { ROOT_COLLECTION_ID }

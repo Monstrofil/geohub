@@ -12,35 +12,21 @@ class MapServerService:
         # Ensure shared directory exists
         self.shared_mapserver_dir.mkdir(parents=True, exist_ok=True)
         
-    def get_map_url(self, filename):
+    
+    def get_map_url_from_config(self, config_path):
         """
-        Generate a MapServer URL for a GeoTIFF file
+        Generate a MapServer URL using an existing config file path
         """
-        if not filename:
+        if not config_path:
             return None
             
-        # Check in uploads directory first, then temp directory
-        file_path = self.uploads_dir / filename
-        
-        if not file_path.exists():
-            # Try temp directory (for georeferencing temp files)
-            temp_dir = Path("./temp")
-            file_path = temp_dir / filename
-            
-        if not file_path.exists():
-            print(f"File not found: {file_path}")
+        # Check if config file exists
+        if not os.path.exists(config_path):
+            print(f"Config file not found: {config_path}")
             return None
             
-        # Check if it's a GeoTIFF file or raster file
-        if not self._is_geotiff(filename) and not filename.endswith(('.tif', '.tiff', '.pdf')):
-            print(f"File is not a raster: {filename}")
-            return None
-            
-        # Create a MapServer configuration for this specific file
-        map_config_path = self._create_map_config(filename)
-        
         # Return the MapServer URL
-        return f"{self.mapserver_url}/mapserver?map={map_config_path}"
+        return f"{self.mapserver_url}/mapserver?map={config_path}"
     
     def _is_geotiff(self, filename):
         """
@@ -48,13 +34,6 @@ class MapServerService:
         """
         geotiff_extensions = {'.tif', '.tiff', '.geotiff', '.pdf'}
         return Path(filename).suffix.lower() in geotiff_extensions
-    
-    def _get_file_data_path(self, filename):
-        """
-        Get the correct data path for a file - all files are now in the main directory
-        """
-        # All files (including warped files) are now in the uploads directory
-        return filename
     
     def _validate_gdal(self):
         """
@@ -68,7 +47,7 @@ class MapServerService:
             print(f"GDAL validation failed: {e}")
             return False
     
-    def _get_gdal_info(self, filename):
+    def _get_gdal_info(self, filepath):
         """
         Extract extent and projection information from a georeferenced file using GDAL
         """
@@ -76,16 +55,13 @@ class MapServerService:
         if not self._validate_gdal():
             print("GDAL validation failed, cannot extract geospatial information")
             return None, None
-            
-        # All files are in the uploads directory
-        file_path = self.uploads_dir / filename
         
         try:
-            print(f"File path: {file_path}")
+            print(f"File path: {filepath}")
             # Open the dataset
-            dataset = gdal.Open(str(file_path))
+            dataset = gdal.Open(str(filepath))
             if dataset is None:
-                print(f"Could not open file with GDAL: {file_path}")
+                print(f"Could not open file with GDAL: {filepath}")
                 return None, None
             
             # Get the extent from the dataset
@@ -104,7 +80,7 @@ class MapServerService:
             
             # Get the projection
             projection = dataset.GetProjection()
-            print(f"Raw projection from file: '{projection}' '{str(file_path)}'")
+            print(f"Raw projection from file: '{projection}' '{str(filepath)}'")
             print(f"Projection length: {len(projection) if projection else 0}")
             
             if projection and len(projection.strip()) > 0:
@@ -141,19 +117,19 @@ class MapServerService:
             return extent, projection_str
             
         except Exception as e:
-            print(f"Error extracting GDAL info from {file_path}: {e}")
+            print(f"Error extracting GDAL info from {filepath}: {e}")
             return None, None
     
-    def _create_map_config(self, filename):
+    def _create_map_config(self, filepath):
         """
         Create a MapServer configuration file for a specific GeoTIFF in the shared directory
         """
-        # Generate a unique config filename
-        config_filename = f"map_{uuid.uuid4().hex[:8]}_{Path(filename).stem}.map"
+        # Generate a unique config filepath
+        config_filename = f"map_{uuid.uuid4().hex[:8]}_{Path(filepath).stem}.map"
         config_path = self.shared_mapserver_dir / config_filename
         
         # Get extent and projection from the file using GDAL
-        extent, projection = self._get_gdal_info(filename)
+        extent, projection = self._get_gdal_info(filepath)
         
         # Use extracted values or fallback to defaults
         if extent:
@@ -172,12 +148,9 @@ class MapServerService:
             projection_str = '"init=epsg:4326"'
             print(f"Using default projection: {projection_str}")
         
-        # Determine the correct data path for the file
-        data_path = self._get_file_data_path(filename)
-        
         config_content = f"""
 MAP
-  NAME "Tagger MapServer - {filename}"
+  NAME "Tagger MapServer - {Path(filepath).name}"
   STATUS ON
   SIZE 800 600
   EXTENT {extent_str}
@@ -202,7 +175,7 @@ MAP
     NAME "geotiff_layer"
     TYPE RASTER
     STATUS ON
-    DATA "/opt/mapserver/{data_path}"
+    DATA "/opt/mapserver/{filepath}"
 
     PROJECTION
         {projection_str}

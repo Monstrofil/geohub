@@ -50,42 +50,6 @@ class GeoreferencingService:
         # Enable GDAL exceptions
         gdal.UseExceptions()
     
-    def is_georeferenced(self, file_path: str) -> bool:
-        """
-        Check if a raster file is already georeferenced
-        
-        Args:
-            file_path: Path to the raster file
-            
-        Returns:
-            bool: True if file is georeferenced, False otherwise
-        """
-        try:
-            dataset = gdal.Open(file_path)
-            if dataset is None:
-                return False
-            
-            # Check if it has a valid geotransform
-            geotransform = dataset.GetGeoTransform()
-            
-            # Default geotransform is (0.0, 1.0, 0.0, 0.0, 0.0, 1.0)
-            # If it's different, the file is probably georeferenced
-            default_gt = (0.0, 1.0, 0.0, 0.0, 0.0, 1.0)
-            
-            if geotransform == default_gt:
-                return False
-            
-            # Also check if it has a spatial reference system
-            projection = dataset.GetProjection()
-            
-            dataset = None  # Close dataset
-            
-            return projection is not None and projection != ""
-            
-        except Exception as e:
-            print(f"Error checking georeferencing: {e}")
-            return False
-    
     def calculate_transform_from_control_points(self, control_points: List[ControlPoint]) -> Optional[List[float]]:
         """
         Calculate geotransform coefficients from control points using polynomial transformation
@@ -162,7 +126,10 @@ class GeoreferencingService:
         
         # Create output path
         input_file = Path(input_path)
-        output_path = self.temp_dir / f"warped_{uuid.uuid4().hex[:8]}_{input_file.name}"
+        if not input_file.exists():
+            raise ValueError("Input file does not exist")
+
+        output_path = input_file.parent / f"warped_{uuid.uuid4().hex[:8]}.{input_file.suffix}"
         
         # Open input dataset
         src_ds = gdal.Open(input_path)
@@ -241,15 +208,7 @@ class GeoreferencingService:
         print(f"Attempting to warp image to: {output_path}")
         print(f"Input file exists: {os.path.exists(input_path)}")
         print(f"Input file path: {input_path}")
-        print(f"Temp directory path: {self.temp_dir}")
-        print(f"Temp directory exists: {self.temp_dir.exists()}")
-        print(f"Temp directory is writable: {os.access(str(self.temp_dir), os.W_OK)}")
         print(f"Current working directory: {os.getcwd()}")
-        
-        # List files in temp directory before warping
-        if self.temp_dir.exists():
-            temp_files = list(self.temp_dir.glob('*'))
-            print(f"Files in temp directory before warping: {temp_files}")
         
         warped_ds = gdal.Warp(str(output_path), tmp_vrt, options=warp_options)
         if warped_ds is None:
@@ -265,27 +224,9 @@ class GeoreferencingService:
         src_ds = None
         warped_ds = None
         
-        # List files in temp directory after warping
-        if self.temp_dir.exists():
-            temp_files = list(self.temp_dir.glob('*'))
-            print(f"Files in temp directory after warping: {temp_files}")
-        
         # Verify the output file was created
         if not os.path.exists(str(output_path)):
-            print(f"ERROR: Warped file was not created at expected location: {output_path}")
-            # Try to find the file elsewhere
-            potential_locations = [
-                f"./warped_{output_path.name}",
-                f"/app/warped_{output_path.name}",
-                f"/opt/shared/temp/{output_path.name}"
-            ]
-            for location in potential_locations:
-                if os.path.exists(location):
-                    print(f"Found warped file at unexpected location: {location}")
             raise ValueError(f"Warped file was not created at: {output_path}")
-        
-        file_size = os.path.getsize(str(output_path))
-        print(f"Warped file created successfully: {output_path} (size: {file_size} bytes)")
         
         return str(output_path)
             
@@ -365,25 +306,6 @@ class GeoreferencingService:
         
         return result
     
-    
-    def load_control_points(self, file_path: str) -> List[ControlPoint]:
-        """
-        Load control points from a JSON file
-        
-        Args:
-            file_path: Path to the control points file
-            
-        Returns:
-            list: List of control points
-        """
-        try:
-            with open(file_path, 'r') as f:
-                data = json.load(f)
-            
-            return [ControlPoint.from_dict(cp_data) for cp_data in data['control_points']]
-            
-        except Exception as e:
-            raise ValueError(f"Error loading control points: {e}")
     
     def cleanup_temp_files(self, max_age_hours: int = 24):
         """

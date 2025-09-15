@@ -9,8 +9,10 @@ import shutil
 from pydantic import BaseModel, ConfigDict
 
 import models
+import models_factory
 from models import TreeItem, User
 from services import FileService, CollectionsService
+from services.geo import analyze_raster_file
 from mapserver_service import MapServerService
 from georeferencing_service import GeoreferencingService, ControlPoint
 from auth import get_current_user, get_current_user_optional, require_permission, Permission
@@ -99,9 +101,6 @@ class ControlPointsRequest(BaseModel):
 class GeoreferencingApplyRequest(BaseModel):
     control_points: List[ControlPointModel]
     control_points_srs: str = "EPSG:4326"
-
-
-ROOT_COLLECTION_ID = "00000000-0000-0000-0000-000000000000"
 
 # ======================
 # UNIFIED TREE ITEM ENDPOINTS
@@ -273,8 +272,6 @@ async def create_tree_item(request: TreeItemCreateRequest, current_user: Optiona
     return TreeItemResponse.model_validate(collection_obj)
 
 
-
-
 # ======================
 # SPECIALIZED ENDPOINTS
 # ======================
@@ -285,7 +282,7 @@ async def upload_file(
     file: UploadFile = File(...),
     tags: Optional[str] = Form(None),
     parent_path: Optional[str] = Form("root"),
-    current_user: Optional[User] = Depends(get_current_user_optional)
+    current_user: Optional[User] = Depends(get_current_user)
 ):
     """Upload a new file with automatic georeferencing detection
     
@@ -305,14 +302,22 @@ async def upload_file(
 
     await require_permission(collection, current_user, Permission.WRITE)
 
-    file_obj = await FileService.create_file(file, file_tags, parent_path=parent_path or "root")
+    file_info = await FileService.save_uploaded_file(file)
+
+    analysis = analyze_raster_file(file_info["file_path"])
+    is_georeferenced = analysis.get("is_georeferenced", False)
+
+    if is_georeferenced:
+        file_obj = await models_factory.create_geo_file(
+            file_info, file_tags, parent_path=parent_path or "root")
+    else:
+        file_obj = await models_factory.create_file(
+            file_info, file_tags, parent_path=parent_path or "root")
     
-    # Set ownership if user is authenticated
-    if current_user:
-        file_obj.owner_user_id = current_user.id
-        # Default permissions: owner can read/write, group can read, others can read
-        file_obj.permissions = 0o644
-        await file_obj.save()
+
+    file_obj.owner_user_id = current_user.id
+    file_obj.permissions = 0o644
+    await file_obj.save()
     
     return TreeItemResponse.model_validate(file_obj)
 
@@ -326,7 +331,39 @@ async def probe_tree_item(item_id: uuid.UUID, current_user: Optional[User] = Dep
 
     await require_permission(tree_item, current_user, Permission.READ)
 
-    result = await FileService.probe_tree_item(str(item_id))
+    # Only files can be georeferenced
+    if not tree_item.is_file:
+        return {
+            "can_georeference": False,
+            "gdal_compatible": False,
+            "error": "Only files can be georeferenced"
+        }
+    
+    file_obj = await tree_item.get_object()
+    file_path = file_obj.file_path
+    
+    # Analyze the raster file
+    analysis = analyze_raster_file(file_path)
+    
+    if not analysis.get("gdal_compatible", False):
+        return {
+            "can_georeference": False,
+            "gdal_compatible": False,
+            "error": analysis.get("error", "File cannot be opened by GDAL")
+        }
+    
+    return {
+        "can_georeference": True,
+        "gdal_compatible": True,
+        "is_already_georeferenced": analysis.get("is_georeferenced", False),
+        "image_info": {
+            "width": analysis.get("width"),
+            "height": analysis.get("height"),
+            "bands": analysis.get("bands"),
+            "has_projection": analysis.get("has_projection", False),
+            "has_geotransform": analysis.get("has_geotransform", False)
+        }
+    }
     return result
 
 
@@ -339,8 +376,18 @@ async def convert_to_geo_raster(item_id: uuid.UUID, current_user: Optional[User]
 
     await require_permission(tree_item, current_user, Permission.WRITE)
 
-    file_obj = await FileService.convert_to_geo_raster(str(item_id))
-    return TreeItemResponse.model_validate(file_obj)
+    raw_file = await tree_item.get_object()
+    if not raw_file:
+        raise HTTPException(status_code=404, detail="Raw file not found")
+
+    geo_raster_file_obj = await models_factory.convert_to_geo_raster(raw_file, "uploads")
+
+    # Update TreeItem to point to GeoRasterFile
+    tree_item.object_type = "geo_raster_file"
+    tree_item.object_id = geo_raster_file_obj.id
+    await tree_item.save()
+
+    return TreeItemResponse.model_validate(tree_item)
 
 
 @router.get("/files/{file_id}/download")
@@ -385,17 +432,20 @@ async def get_file_map(file_id: uuid.UUID):
     if not file_obj:
         raise HTTPException(status_code=404, detail="File not found")
     
-    # Use the actual file path (which may be georeferenced version) instead of just the name
-    file_path = await file_obj.get_file_path()
-    if not file_path:
-        raise HTTPException(status_code=400, detail="File path not found")
-    
-    # Extract filename from the full path
-    filename = os.path.basename(file_path)
-    
-    map_url = mapserver_service.get_map_url(filename)
-    if not map_url:
+    # Check if this is a geo raster file
+    if file_obj.object_type != "geo_raster_file":
         raise HTTPException(status_code=400, detail="File type not supported for mapping")
+    
+    # Get the actual geo raster file object
+    geo_raster_file = await file_obj.get_object()
+    
+    # Use stored config path
+    if not geo_raster_file.map_config_path:
+        raise HTTPException(status_code=400, detail="No map configuration available")
+    
+    map_url = mapserver_service.get_map_url_from_config(geo_raster_file.map_config_path)
+    if not map_url:
+        raise HTTPException(status_code=400, detail="Failed to generate map URL")
     
     return {"map_url": map_url}
 
@@ -412,10 +462,7 @@ async def get_file_extent(file_id: uuid.UUID):
     if not file_path:
         raise HTTPException(status_code=400, detail="File path not found")
     
-    # Extract filename from the full path
-    filename = os.path.basename(file_path)
-    
-    extent = mapserver_service.get_file_extent(filename)
+    extent = mapserver_service.get_file_extent(file_path)
     if not extent:
         raise HTTPException(status_code=400, detail="File type not supported for extent calculation")
     
@@ -496,11 +543,18 @@ async def apply_georeferencing(file_id: uuid.UUID, request: GeoreferencingApplyR
         request.control_points_srs
     )
     
-    # Replace with georeferenced
-    os.rename(georeferenced_path, file_path) 
+    # save old file path
+    old_file_path = file_path
+
+    # regenerate map config to clear cache on mapserver
+    map_config_path = mapserver_service._create_map_config(georeferenced_path)
+    geo_raster_file.map_config_path = map_config_path
+    geo_raster_file.file_path = georeferenced_path
     
-    geo_raster_file.file_path = file_path
     await geo_raster_file.save()
+
+    if os.path.exists(old_file_path):
+        os.remove(old_file_path)
     
     
     return {

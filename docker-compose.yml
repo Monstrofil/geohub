@@ -43,7 +43,7 @@ services:
     ports:
       - "8082:80"
     volumes:
-      - ./backend/uploads:/opt/mapserver
+      - ./backend/uploads:/opt/mapserver/uploads
       - ./backend/temp:/opt/mapserver/temp
       - mapserver_configs:/opt/shared/mapserver
       - ./mapserver/mapserver.conf:/usr/local/etc/mapserver.conf
