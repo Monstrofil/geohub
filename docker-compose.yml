@@ -18,10 +18,11 @@ services:
     volumes:
       - ./backend:/app
       - ./backend/uploads:/opt/shared/uploads
-      - ./backend/temp:/opt/shared/temp
       - mapserver_configs:/opt/shared/mapserver
     environment:
-      DATABASE_URL: ${DATABASE_URL:-postgres://tagger_user:tagger_password@postgres:5432/tagger_db}
+      DB_NAME: ${POSTGRES_DB:-tagger_db}
+      DB_USER: ${POSTGRES_USER:-tagger_user}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-tagger_password}
       MAPSERVER_URL: ${MAPSERVER_URL:-http://mapserver}
       MAPSERVER_SHARED_DIR: ${MAPSERVER_SHARED_DIR:-/opt/shared/mapserver}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-your-secret-key-change-this-in-production}
@@ -52,7 +53,6 @@ services:
     container_name: tagger_mapserver
     volumes:
       - ./backend/uploads:/opt/mapserver/uploads
-      - ./backend/temp:/opt/mapserver/temp
       - mapserver_configs:/opt/shared/mapserver
       - ./mapserver/mapserver.conf:/usr/local/etc/mapserver.conf
     depends_on:
