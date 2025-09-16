@@ -233,6 +233,8 @@ async def delete_tree_item(
     # Check write permission
     await require_permission(item, current_user, Permission.WRITE)
     
+    # TODO: delete only tree item and keep objects as orphans
+    #       but this requires implementation of check "is_deletable"
     # Try to delete as file first, then as collection
     success = await FileService.delete_file(str(item_id))
     

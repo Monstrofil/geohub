@@ -2,9 +2,9 @@ services:
   postgres:
     image: postgres:15
     environment:
-      POSTGRES_DB: tagger_db
-      POSTGRES_USER: tagger_user
-      POSTGRES_PASSWORD: tagger_password
+      POSTGRES_DB: ${POSTGRES_DB:-tagger_db}
+      POSTGRES_USER: ${POSTGRES_USER:-tagger_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-tagger_password}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -15,33 +15,41 @@ services:
 
   backend:
     build: ./backend
-    ports:
-      - "8000:8000"
     volumes:
       - ./backend:/app
       - ./backend/uploads:/opt/shared/uploads
       - ./backend/temp:/opt/shared/temp
       - mapserver_configs:/opt/shared/mapserver
     environment:
-      DATABASE_URL: postgres://tagger_user:tagger_password@postgres:5432/tagger_db
+      DATABASE_URL: ${DATABASE_URL:-postgres://tagger_user:tagger_password@postgres:5432/tagger_db}
+      MAPSERVER_URL: ${MAPSERVER_URL:-http://mapserver}
+      MAPSERVER_SHARED_DIR: ${MAPSERVER_SHARED_DIR:-/opt/shared/mapserver}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-your-secret-key-change-this-in-production}
+      JWT_EXPIRE_MINUTES: ${JWT_EXPIRE_MINUTES:-30}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8080,http://127.0.0.1:8080,http://localhost:5173}
+      UVICORN_WORKERS: ${UVICORN_WORKERS:-1}
+      DEBUG: ${DEBUG:-false}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    env_file:
+      - .env
     depends_on:
       postgres:
         condition: service_healthy
 
   frontend:
     build: ./frontend
-    ports:
-      - "8080:8080"
     volumes:
       - ./frontend:/app
+    environment:
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000/api/v1}
+    env_file:
+      - .env
 
   mapserver:
     build: 
       context: ./mapserver
       dockerfile: Dockerfile.mapserver
     container_name: tagger_mapserver
-    ports:
-      - "8082:80"
     volumes:
       - ./backend/uploads:/opt/mapserver/uploads
       - ./backend/temp:/opt/mapserver/temp

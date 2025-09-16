@@ -4,10 +4,12 @@ import uuid
 from osgeo import gdal, osr
 
 class MapServerService:
-    def __init__(self, uploads_dir="./uploads", mapserver_url="http://localhost:8082", shared_mapserver_dir="/opt/shared/mapserver"):
-        self.uploads_dir = Path(uploads_dir)
-        self.mapserver_url = mapserver_url
-        self.shared_mapserver_dir = Path(shared_mapserver_dir)
+    def __init__(self, 
+        mapserver_url=None, 
+        shared_mapserver_dir=None):
+        # Get configuration from environment variables with fallback defaults
+        self.mapserver_url = mapserver_url or os.getenv("MAPSERVER_URL", "http://localhost:8082")
+        self.shared_mapserver_dir = Path(shared_mapserver_dir or os.getenv("MAPSERVER_SHARED_DIR", "/opt/shared/mapserver"))
         
         # Ensure shared directory exists
         self.shared_mapserver_dir.mkdir(parents=True, exist_ok=True)
@@ -152,7 +154,7 @@ class MapServerService:
 MAP
   NAME "Tagger MapServer - {Path(filepath).name}"
   STATUS ON
-  SIZE 800 600
+  SIZE 800 800
   EXTENT {extent_str}
   UNITS DD
   IMAGETYPE PNG
@@ -290,20 +292,3 @@ END"""
             print(f"Error transforming extent to WGS84: {e}")
             # Return original extent if transformation fails
             return extent
-    
-    def cleanup_old_configs(self, max_age_hours=24):
-        """
-        Clean up old MapServer configuration files
-        """
-        import time
-        current_time = time.time()
-        max_age_seconds = max_age_hours * 3600
-        
-        for config_file in self.shared_mapserver_dir.glob("map_*.map"):
-            try:
-                file_age = current_time - config_file.stat().st_mtime
-                if file_age > max_age_seconds:
-                    config_file.unlink()
-                    print(f"Cleaned up old config: {config_file}")
-            except Exception as e:
-                print(f"Error cleaning up {config_file}: {e}") 

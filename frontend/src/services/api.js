@@ -1,6 +1,6 @@
 import axios from 'axios'
 
-const API_BASE_URL = 'http://localhost:8000/api/v1'
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1'
 
 class ApiService {
   constructor() {
@@ -492,7 +492,8 @@ class ApiService {
 
   // Health check
   async healthCheck() {
-    const response = await this.axios.get('http://localhost:8000/health')
+    const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+    const response = await this.axios.get(`${baseUrl.replace('/api/v1', '')}/health`)
     return response.data
   }
 

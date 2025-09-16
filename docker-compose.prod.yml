@@ -1,0 +1,61 @@
+# Docker Compose override for PRODUCTION environment with Traefik
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.prod.yml up
+
+services:
+  backend:
+    container_name: tagger_backend
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.tagger-backend.rule=Host(`${BACKEND_DOMAIN:-api.yourdomain.com}`)"
+      - "traefik.http.routers.tagger-backend.entrypoints=web,websecure"
+      - "traefik.http.routers.tagger-backend.tls.certresolver=letsencrypt"
+      - "traefik.http.services.tagger-backend.loadbalancer.server.port=8000"
+      - "traefik.http.middlewares.tagger-backend-cors.headers.accesscontrolalloworiginlist=${FRONTEND_DOMAIN:-yourdomain.com}"
+      - "traefik.http.middlewares.tagger-backend-cors.headers.accesscontrolallowmethods=GET,POST,PUT,DELETE,OPTIONS"
+      - "traefik.http.middlewares.tagger-backend-cors.headers.accesscontrolallowheaders=Content-Type,Authorization"
+      - "traefik.http.middlewares.tagger-backend-cors.headers.addvaryheader=true"
+      - "traefik.http.routers.tagger-backend.middlewares=tagger-backend-cors"
+      - "containers.group=${COMPOSE_PROJECT_NAME:-tagger}"
+    environment:
+      DEBUG: false
+      LOG_LEVEL: warning
+      UVICORN_WORKERS: ${UVICORN_WORKERS:-4}
+    restart: unless-stopped
+
+  frontend:
+    container_name: tagger_frontend
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.tagger-frontend.rule=Host(`${FRONTEND_DOMAIN:-yourdomain.com}`)"
+      - "traefik.http.routers.tagger-frontend.entrypoints=web,websecure"
+      - "traefik.http.routers.tagger-frontend.tls.certresolver=letsencrypt"
+      - "traefik.http.services.tagger-frontend.loadbalancer.server.port=8080"
+      - "traefik.http.middlewares.tagger-frontend-headers.headers.customrequestheaders.X-Forwarded-Proto=https"
+      - "traefik.http.routers.tagger-frontend.middlewares=tagger-frontend-headers"
+      - "containers.group=${COMPOSE_PROJECT_NAME:-tagger}"
+    restart: unless-stopped
+
+  mapserver:
+    container_name: tagger_mapserver
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.tagger-mapserver.rule=Host(`${MAPSERVER_DOMAIN:-mapserver.yourdomain.com}`) || PathPrefix(`/mapserver`)"
+      - "traefik.http.routers.tagger-mapserver.entrypoints=web,websecure"
+      - "traefik.http.routers.tagger-mapserver.tls.certresolver=letsencrypt"
+      - "traefik.http.services.tagger-mapserver.loadbalancer.server.port=80"
+      - "traefik.http.middlewares.tagger-mapserver-cors.headers.accesscontrolalloworiginlist=${FRONTEND_DOMAIN:-yourdomain.com}"
+      - "traefik.http.middlewares.tagger-mapserver-cors.headers.addvaryheader=true"
+      - "traefik.http.routers.tagger-mapserver.middlewares=tagger-mapserver-cors"
+      - "containers.group=${COMPOSE_PROJECT_NAME:-tagger}"
+    restart: unless-stopped
+
+  postgres:
+    container_name: tagger_postgres
+    labels:
+      - "containers.group=${COMPOSE_PROJECT_NAME:-tagger}"
+    restart: unless-stopped
+
+networks:
+  default:
+    external: true
+    name: ${TRAEFIK_NETWORK:-traefik}
