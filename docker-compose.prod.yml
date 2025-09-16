@@ -6,9 +6,8 @@ services:
     container_name: tagger_backend
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.tagger-backend.rule=Host(`${BACKEND_DOMAIN:-api.yourdomain.com}`)"
-      - "traefik.http.routers.tagger-backend.entrypoints=web,websecure"
-      - "traefik.http.routers.tagger-backend.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.tagger-backend.rule=PathPrefix(`/api`)"
+      - "traefik.http.routers.tagger-backend.entrypoints=web"
       - "traefik.http.services.tagger-backend.loadbalancer.server.port=8000"
       - "traefik.http.middlewares.tagger-backend-cors.headers.accesscontrolalloworiginlist=${FRONTEND_DOMAIN:-yourdomain.com}"
       - "traefik.http.middlewares.tagger-backend-cors.headers.accesscontrolallowmethods=GET,POST,PUT,DELETE,OPTIONS"
@@ -22,32 +21,31 @@ services:
       UVICORN_WORKERS: ${UVICORN_WORKERS:-4}
     restart: unless-stopped
 
-  frontend:
-    container_name: tagger_frontend
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.tagger-frontend.rule=Host(`${FRONTEND_DOMAIN:-yourdomain.com}`)"
-      - "traefik.http.routers.tagger-frontend.entrypoints=web,websecure"
-      - "traefik.http.routers.tagger-frontend.tls.certresolver=letsencrypt"
-      - "traefik.http.services.tagger-frontend.loadbalancer.server.port=8080"
-      - "traefik.http.middlewares.tagger-frontend-headers.headers.customrequestheaders.X-Forwarded-Proto=https"
-      - "traefik.http.routers.tagger-frontend.middlewares=tagger-frontend-headers"
-      - "containers.group=${COMPOSE_PROJECT_NAME:-tagger}"
-    restart: unless-stopped
-
   mapserver:
     container_name: tagger_mapserver
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.tagger-mapserver.rule=Host(`${MAPSERVER_DOMAIN:-mapserver.yourdomain.com}`) || PathPrefix(`/mapserver`)"
-      - "traefik.http.routers.tagger-mapserver.entrypoints=web,websecure"
-      - "traefik.http.routers.tagger-mapserver.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.tagger-mapserver.rule=PathPrefix(`/mapserver`)"
+      - "traefik.http.routers.tagger-mapserver.entrypoints=web"
       - "traefik.http.services.tagger-mapserver.loadbalancer.server.port=80"
       - "traefik.http.middlewares.tagger-mapserver-cors.headers.accesscontrolalloworiginlist=${FRONTEND_DOMAIN:-yourdomain.com}"
       - "traefik.http.middlewares.tagger-mapserver-cors.headers.addvaryheader=true"
       - "traefik.http.routers.tagger-mapserver.middlewares=tagger-mapserver-cors"
       - "containers.group=${COMPOSE_PROJECT_NAME:-tagger}"
     restart: unless-stopped
+
+  frontend:
+    container_name: tagger_frontend
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.tagger-frontend.rule=PathPrefix(`/`)"
+      - "traefik.http.routers.tagger-frontend.entrypoints=web"
+      - "traefik.http.services.tagger-frontend.loadbalancer.server.port=80"
+      - "traefik.http.middlewares.tagger-frontend-headers.headers.customrequestheaders.X-Forwarded-Proto=https"
+      - "traefik.http.routers.tagger-frontend.middlewares=tagger-frontend-headers"
+      - "containers.group=${COMPOSE_PROJECT_NAME:-tagger}"
+    restart: unless-stopped
+
 
   postgres:
     container_name: tagger_postgres
@@ -67,8 +65,8 @@ services:
       - "--providers.docker.exposedbydefault=false"
       - "--providers.docker.constraints=Label(`containers.group`,`${COMPOSE_PROJECT_NAME:-tagger}`)"
       - "--entrypoints.web.address=:80"
-      - "--entrypoints.websecure.address=:443"
-      - "--entrypoints.websecure.http.tls=true"
+      #- "--entrypoints.websecure.address=:443"
+      #- "--entrypoints.websecure.http.tls=true"
       - "--entryPoints.web.forwardedHeaders.insecure"
     ports:
       - "127.0.0.1:13080:80"
@@ -79,19 +77,10 @@ services:
       - "traefik.http.routers.traefik.rule=PathPrefix(`/traefik/admin`) || PathPrefix(`/traefik/api`)|| HeadersRegexp(`Referer`, `.*/traefik/.*`)"
       - "traefik.http.routers.traefik.service=api@internal"
       - "traefik.http.routers.traefik.middlewares=admin-stripprefix"
-      - "traefik.http.routers.traefik.entrypoints=web,websecure"
+      - "traefik.http.routers.traefik.entrypoints=web"
       - "traefik.http.routers.traefik.priority=9999"
       - "traefik.http.middlewares.admin-stripprefix.stripPrefix.prefixes=/traefik/admin,/traefik/]"
       - "traefik.http.middlewares.admin-stripprefix.stripPrefix.forceSlash=true"
       - "containers.group=${COMPOSE_PROJECT_NAME:-tagger}"
-    depends_on:
-      - nginx
-      - webserver
-      - tiles
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
-
-networks:
-  default:
-    external: true
-    name: ${TRAEFIK_NETWORK:-traefik}
