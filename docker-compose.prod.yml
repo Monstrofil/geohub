@@ -35,7 +35,14 @@ services:
     restart: unless-stopped
 
   frontend:
-    container_name: tagger_frontend
+    build: 
+      context: ./frontend
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000/api/v1}
+    volumes:
+      - ./frontend:/app
+    env_file:
+      - .env
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.tagger-frontend.rule=PathPrefix(`/`)"

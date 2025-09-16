@@ -49,15 +49,6 @@ services:
     depends_on:
       - backend
 
-  frontend:
-    build: ./frontend
-    volumes:
-      - ./frontend:/app
-    environment:
-      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000/api/v1}
-    env_file:
-      - .env
-
 
 volumes:
   postgres_data:

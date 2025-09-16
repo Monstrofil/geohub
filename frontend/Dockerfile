@@ -1,4 +1,5 @@
 FROM node:18-alpine as build-stage
+ARG VITE_API_BASE_URL
 WORKDIR /app
 COPY package*.json ./
 RUN npm install
