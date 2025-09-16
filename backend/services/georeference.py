@@ -186,13 +186,24 @@ def warp_image_with_control_points(input_path: str,
         outputSRS='EPSG:4326'
     )
     
-    # Create warping options
+    # Create warping options with transparency support
     warp_options = gdal.WarpOptions(
         format='GTiff',
         dstSRS='EPSG:3857',
         resampleAlg=gdal.GRA_Bilinear,
         errorThreshold=0.125,
-        creationOptions=['COMPRESS=LZW', 'TILED=YES']
+        dstAlpha=True,  # Add alpha band for transparency
+        creationOptions=[
+            'COMPRESS=LZW', 
+            'TILED=YES',
+            'interleave=pixel',
+            'tiled=True',
+            'blockxsize=256',
+            'blockysize=256',
+            'ZLEVEL=1',
+            'BIGTIFF=IF_SAFER',
+            'PHOTOMETRIC=RGB',  # Ensure proper color interpretation
+        ]
     )
     
     # Perform warping

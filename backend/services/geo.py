@@ -53,8 +53,18 @@ def analyze_raster_file(file_path: str) -> Dict[str, Any]:
         }
 
 
-def create_dummy_georeferenced_file(original_file_path: str, upload_dir: str) -> str:
-    """Create a dummy georeferenced GeoTIFF for MapServer compatibility"""
+def create_dummy_georeferenced_file(original_file_path: str, upload_dir: str, dpi: int = 300) -> str:
+    """Create a dummy georeferenced GeoTIFF for MapServer compatibility
+    
+    Args:
+        original_file_path: Path to the original file
+        upload_dir: Upload directory (kept for compatibility)
+        dpi: DPI setting for PDF conversion (default: 300)
+    """
+    
+    # Set GDAL PDF DPI configuration option
+    # TODO: not very thread safe
+    gdal.SetConfigOption('GDAL_PDF_DPI', str(dpi))
     
     # Generate unique filename for georeferenced version
     file_extension = os.path.splitext(original_file_path)[1]
@@ -121,8 +131,18 @@ def create_dummy_georeferenced_file(original_file_path: str, upload_dir: str) ->
     data_type = src_ds.GetRasterBand(1).DataType
     
     try:
-        # Create new dataset
-        dst_ds = driver.Create(georef_path, width, height, bands, data_type)
+        # Create new dataset with optimized creation options
+        creation_options = [
+            'COMPRESS=LZW', 
+            'TILED=YES',
+            'INTERLEAVE=PIXEL',
+            'TILED=TRUE',
+            'BLOCKXSIZE=256',
+            'BLOCKYSIZE=256',
+            'ZLEVEL=1',
+            'BIGTIFF=IF_SAFER'
+        ]
+        dst_ds = driver.Create(georef_path, width, height, bands, data_type, options=creation_options)
         
         # Copy all raster data using GDAL's internal methods (avoid ReadAsArray)
         for band_idx in range(1, bands + 1):
@@ -169,3 +189,5 @@ def create_dummy_georeferenced_file(original_file_path: str, upload_dir: str) ->
         # Return original file path as fallback instead of raising
         print(f"Falling back to original file path: {original_file_path}")
         return original_file_path
+    finally:
+        gdal.SetConfigOption('GDAL_PDF_DPI', None)
