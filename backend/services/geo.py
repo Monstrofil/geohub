@@ -60,7 +60,10 @@ def create_dummy_georeferenced_file(original_file_path: str, upload_dir: str) ->
     file_extension = os.path.splitext(original_file_path)[1]
     base_name = os.path.splitext(os.path.basename(original_file_path))[0]
     georef_filename = f"{base_name}_georef_{uuid.uuid4().hex[:8]}.tif"
-    georef_path = os.path.join(upload_dir, georef_filename)
+    
+    # Place the georeferenced file in the same directory as the original file
+    original_dir = os.path.dirname(original_file_path)
+    georef_path = os.path.join(original_dir, georef_filename)
     
 
     # Open the original file
