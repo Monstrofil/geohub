@@ -55,6 +55,42 @@ services:
       - "containers.group=${COMPOSE_PROJECT_NAME:-tagger}"
     restart: unless-stopped
 
+  traefik:
+    image: "traefik:v2.11"
+    restart: unless-stopped
+    command:
+      - "--api=true"
+      # - "--metrics.prometheus=true"
+      # - "--metrics.prometheus.entryPoint=metrics"
+      # - "--entrypoints.metrics.address=:8082"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.constraints=Label(`containers.group`,`${COMPOSE_PROJECT_NAME:-tagger}`)"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--entrypoints.websecure.http.tls=true"
+      - "--entryPoints.web.forwardedHeaders.insecure"
+    ports:
+      - "127.0.0.1:13080:80"
+      - "127.0.0.1:13443:443"
+      # - "127.0.0.1:18082:8082"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.traefik.rule=PathPrefix(`/traefik/admin`) || PathPrefix(`/traefik/api`)|| HeadersRegexp(`Referer`, `.*/traefik/.*`)"
+      - "traefik.http.routers.traefik.service=api@internal"
+      - "traefik.http.routers.traefik.middlewares=admin-stripprefix"
+      - "traefik.http.routers.traefik.entrypoints=web,websecure"
+      - "traefik.http.routers.traefik.priority=9999"
+      - "traefik.http.middlewares.admin-stripprefix.stripPrefix.prefixes=/traefik/admin,/traefik/]"
+      - "traefik.http.middlewares.admin-stripprefix.stripPrefix.forceSlash=true"
+      - "containers.group=${COMPOSE_PROJECT_NAME:-tagger}"
+    depends_on:
+      - nginx
+      - webserver
+      - tiles
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+
 networks:
   default:
     external: true
