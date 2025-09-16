@@ -17,7 +17,7 @@ register_tortoise(
     app,
     db_url=TORTOISE_ORM["connections"]["default"],
     modules={"models": TORTOISE_ORM["apps"]["models"]["models"]},
-    generate_schemas=True,
+    generate_schemas=False,
     add_exception_handlers=True,
 )
 

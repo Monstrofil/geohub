@@ -28,7 +28,7 @@ COMMENT ON TABLE "groups" IS 'Group model for organizing users and permissions';
 COMMENT ON TABLE "users" IS 'User model for authentication and permissions';
         ALTER TABLE "tree_items" ADD CONSTRAINT "fk_tree_ite_groups_546a3879" FOREIGN KEY ("owner_group_id") REFERENCES "groups" ("id") ON DELETE CASCADE;
         ALTER TABLE "tree_items" ADD CONSTRAINT "fk_tree_ite_users_ed2c5b95" FOREIGN KEY ("owner_user_id") REFERENCES "users" ("id") ON DELETE CASCADE;
-        CREATE TABLE "user_groups" (
+CREATE TABLE "user_groups" (
     "groups_id" UUID NOT NULL REFERENCES "groups" ("id") ON DELETE CASCADE,
     "user_id" UUID NOT NULL REFERENCES "users" ("id") ON DELETE CASCADE
 );"""
