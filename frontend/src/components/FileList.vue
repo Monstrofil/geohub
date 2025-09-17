@@ -34,9 +34,17 @@
       <button 
         @click="navigateToRoot" 
         class="breadcrumb-item"
-        :class="{ active: treePathString === '' }"
+        :class="{ active: treePathString === '', 'drop-target': isRootDropTarget, 'moving': isMovingToRoot }"
+        @dragover="handleRootDragOver"
+        @drop="handleRootDrop"
+        @dragenter="handleRootDragEnter"
+        @dragleave="handleRootDragLeave"
       >
-        Корінь
+        <span v-if="isMovingToRoot" class="loading-text">
+          <div class="spinner-small"></div>
+          Moving to Root...
+        </span>
+        <span v-else>Корінь</span>
       </button>
       <template v-for="(segment, index) in pathSegments" :key="index">
         <span class="breadcrumb-separator">/</span>
@@ -84,7 +92,14 @@
     <div v-else class="disclosure-wrap disclosure-wrap-feature_list">
       <div class="file-list-layout">
         <!-- Main content area -->
-        <div class="file-list-main">
+        <div 
+          class="file-list-main"
+          @dragover="handleMainDragOver"
+          @drop="handleMainDrop"
+          @dragenter="handleMainDragEnter"
+          @dragleave="handleMainDragLeave"
+          :class="{ 'drop-zone-active': isMainDropZone, 'moving': isMovingToMain }"
+        >
           <div class="feature-list">
             <component 
               :is="entry.object_type === 'file' ? FileCard : TreeCard"
@@ -96,10 +111,14 @@
               :tree-path="treePathString"
               :ref-name="entry.object?.name || entry.id"
               :selected="selectedEntry && selectedEntry.object && selectedEntry.object.id === entry.object?.id"
+              :move-blocked="isMoveInProgress"
               @click="selectFile(entry.object)"
               @file-selected="handleFileSelected"
               @removed="handleObjectRemoved"
               @cloned="handleObjectCloned"
+              @move-start="handleMoveStart"
+              @move-end="handleMoveEnd"
+              @item-moved="handleItemMoved"
             />
           </div>
         </div>
@@ -161,6 +180,15 @@ const error = ref(null)
 
 // Upload modal state
 const showUploadModal = ref(false)
+
+// Drag and drop state
+const isMainDropZone = ref(false)
+const mainDragCounter = ref(0)
+const isRootDropTarget = ref(false)
+const rootDragCounter = ref(0)
+const isMovingToMain = ref(false)
+const isMovingToRoot = ref(false)
+const isMoveInProgress = ref(false)
 
 // Convert treePath array to string for API calls
 const treePathString = computed(() => {
@@ -281,6 +309,148 @@ function handleObjectCloned(cloneData) {
   emit('object-cloned', cloneData)
   // Optionally refresh the file list to show the new clone
   // loadFiles()
+}
+
+// Drag and drop handlers
+function handleMoveStart(item) {
+  // Optionally provide visual feedback when drag starts
+  console.log('Move started for:', item.name)
+}
+
+function handleMoveEnd(item) {
+  // Optionally provide visual feedback when drag ends
+  console.log('Move ended for:', item.name)
+}
+
+function handleItemMoved(moveData) {
+  // Set global move block during TreeCard operations
+  isMoveInProgress.value = true
+  
+  // Refresh the file list to reflect the changes
+  loadFiles().finally(() => {
+    // Unblock operations after refresh completes
+    isMoveInProgress.value = false
+  })
+  
+  console.log('Item moved:', moveData)
+}
+
+// Main drop zone handlers
+function handleMainDragOver(event) {
+  if (!isAuthenticated.value || isMoveInProgress.value) return
+  
+  event.preventDefault()
+  event.dataTransfer.dropEffect = 'move'
+}
+
+function handleMainDragEnter(event) {
+  if (!isAuthenticated.value || isMoveInProgress.value) return
+  
+  event.preventDefault()
+  mainDragCounter.value++
+  isMainDropZone.value = true
+}
+
+function handleMainDragLeave(event) {
+  if (!isAuthenticated.value || isMoveInProgress.value) return
+  
+  event.preventDefault()
+  mainDragCounter.value--
+  if (mainDragCounter.value === 0) {
+    isMainDropZone.value = false
+  }
+}
+
+async function handleMainDrop(event) {
+  if (!isAuthenticated.value || isMoveInProgress.value) return
+  
+  event.preventDefault()
+  isMainDropZone.value = false
+  mainDragCounter.value = 0
+  
+  try {
+    const dragData = JSON.parse(event.dataTransfer.getData('application/json'))
+    
+    // Show loading state and block other operations
+    isMovingToMain.value = true
+    isMoveInProgress.value = true
+    
+    // Move the item to this collection (current collection)
+    await apiService.updateTreeItem(dragData.id, {
+      parent_path: treePathString.value || 'root'
+    })
+    
+    // Refresh the file list to show the moved item
+    loadFiles()
+    
+  } catch (error) {
+    console.error('Failed to move item:', error)
+    alert(`Failed to move item: ${error.message}`)
+  } finally {
+    // Hide loading state and unblock operations
+    isMovingToMain.value = false
+    isMoveInProgress.value = false
+  }
+}
+
+// Root breadcrumb drop handlers
+function handleRootDragOver(event) {
+  if (!isAuthenticated.value || isMoveInProgress.value) return
+  
+  event.preventDefault()
+  event.dataTransfer.dropEffect = 'move'
+}
+
+function handleRootDragEnter(event) {
+  if (!isAuthenticated.value || isMoveInProgress.value) return
+  
+  event.preventDefault()
+  rootDragCounter.value++
+  isRootDropTarget.value = true
+}
+
+function handleRootDragLeave(event) {
+  if (!isAuthenticated.value || isMoveInProgress.value) return
+  
+  event.preventDefault()
+  rootDragCounter.value--
+  if (rootDragCounter.value === 0) {
+    isRootDropTarget.value = false
+  }
+}
+
+async function handleRootDrop(event) {
+  if (!isAuthenticated.value || isMoveInProgress.value) return
+  
+  event.preventDefault()
+  isRootDropTarget.value = false
+  rootDragCounter.value = 0
+  
+  try {
+    const dragData = JSON.parse(event.dataTransfer.getData('application/json'))
+    
+    // Show loading state and block other operations
+    isMovingToRoot.value = true
+    isMoveInProgress.value = true
+    
+    // Move the item to root
+    await apiService.updateTreeItem(dragData.id, {
+      parent_path: 'root'
+    })
+    
+    // If we're currently in root, refresh the list
+    if (!treePathString.value || treePathString.value === 'root') {
+      loadFiles()
+    }
+    
+  } catch (error) {
+    console.error('Failed to move item to root:', error)
+    alert(`Failed to move item to root: ${error.message}`)
+  } finally {
+    // Hide loading state and unblock operations
+    isMovingToRoot.value = false
+    isMoveInProgress.value = false
+  }
 }
 
 // Upload modal functions
@@ -459,6 +629,48 @@ watch(() => props.treePath, loadFiles)
   font-weight: 500;
 }
 
+.breadcrumb-item.drop-target {
+  background: #e8f5e8;
+  border: 2px dashed #4caf50;
+  border-radius: 4px;
+  color: #4caf50;
+}
+
+.breadcrumb-item.moving {
+  background: #e3f2fd;
+  color: #2196f3;
+  pointer-events: none;
+}
+
+.loading-text {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+}
+
+.spinner-small {
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(33, 150, 243, 0.3);
+  border-top: 2px solid #2196f3;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+.file-list-main.moving {
+  background: linear-gradient(135deg, #e3f2fd 0%, #f1f8e9 100%);
+  border: 2px dashed #2196f3;
+  border-radius: 12px;
+  opacity: 0.8;
+  pointer-events: none;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
 .breadcrumb-separator {
   color: #666;
   margin: 0 0.25rem;
@@ -477,6 +689,19 @@ watch(() => props.treePath, loadFiles)
   align-items: center;
   justify-content: center;
 }
+
+/* Drag and drop styles */
+.file-list-main {
+  position: relative;
+  transition: all 0.2s ease;
+}
+
+.file-list-main.drop-zone-active {
+  background: linear-gradient(135deg, #e8f5e8 0%, #f1f8e9 100%);
+  border: 2px dashed #4caf50;
+  border-radius: 12px;
+}
+
 
 .empty-icon {
   font-size: 4rem;

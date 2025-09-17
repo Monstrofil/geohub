@@ -1,7 +1,17 @@
 <template>
-  <div class="tree-card-container">
+  <div 
+    class="tree-card-container"
+    :draggable="isAuthenticated && !props.moveBlocked"
+    @dragstart="handleDragStart"
+    @dragend="handleDragEnd"
+    @dragover="handleDragOver"
+    @drop="handleDrop"
+    @dragenter="handleDragEnter"
+    @dragleave="handleDragLeave"
+    :class="{ 'move-blocked': props.moveBlocked }"
+  >
     <router-link :to="{name: 'FileList', query: { treePath: fullPath }}">
-      <div class="tree-card" :class="{ 'selected': selected }">
+      <div class="tree-card" :class="{ 'selected': selected, 'dragging': isDragging, 'drop-target': isDropTarget, 'moving': isMoving }">
         <div class="directory-badge">
           <svg width="12" height="12" viewBox="0 0 12 12">
             <path d="M2 2h8v8H2z" fill="none" stroke="#ffb300" stroke-width="1.2"/>
@@ -10,6 +20,11 @@
         </div>
         <div class="tree-icon" v-html="icon"></div>
         <div class="tree-name">{{ name }}</div>
+        <div v-if="isDropTarget && !isMoving" class="drop-indicator">Drop here to move</div>
+        <div v-if="isMoving" class="move-indicator">
+          <div class="spinner"></div>
+          <span>Moving...</span>
+        </div>
       </div>
     </router-link>
     <router-link v-if="isAuthenticated && props.file?.id" :to="{name: 'FileEditor', query: { id: props.file.id }}">
@@ -38,7 +53,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import apiService from '../services/api.js'
 import { matchTagsToPreset } from '../utils/tagMatcher.js'
 import { isAuthenticated } from '../stores/auth.js'
@@ -48,10 +63,17 @@ const props = defineProps({
   selected: { type: Boolean, default: false },
   path: { type: String, required: true },
   treePath: { type: [String, Array], required: false },
-  file: { type: Object, required: false } // Add file prop to access collection object
+  file: { type: Object, required: false }, // Add file prop to access collection object
+  moveBlocked: { type: Boolean, default: false }
 })
 
-const emit = defineEmits(['edit', 'removed'])
+const emit = defineEmits(['edit', 'removed', 'move-start', 'move-end', 'item-moved'])
+
+// Drag state
+const isDragging = ref(false)
+const isDropTarget = ref(false)
+const dragCounter = ref(0)
+const isMoving = ref(false)
 
 // Get matched preset based on collection tags using centralized presets
 const matchedPreset = computed(() => {
@@ -112,6 +134,109 @@ const handleRemove = async () => {
   }
 }
 
+// Drag and drop handlers
+const handleDragStart = (event) => {
+  if (!isAuthenticated.value || !props.file?.id || props.moveBlocked) {
+    event.preventDefault()
+    return
+  }
+  
+  isDragging.value = true
+  
+  // Set the drag data
+  event.dataTransfer.effectAllowed = 'move'
+  event.dataTransfer.setData('application/json', JSON.stringify({
+    type: 'collection',
+    id: props.file.id,
+    name: props.name,
+    path: props.path,
+    currentParentPath: props.treePath
+  }))
+  
+  // Visual feedback
+  event.dataTransfer.setDragImage(event.target, 50, 50)
+  
+  emit('move-start', props.file)
+}
+
+const handleDragEnd = () => {
+  isDragging.value = false
+  emit('move-end', props.file)
+}
+
+const handleDragOver = (event) => {
+  if (!isAuthenticated.value || props.moveBlocked) return
+  
+  event.preventDefault()
+  event.stopPropagation()
+  event.dataTransfer.dropEffect = 'move'
+}
+
+const handleDragEnter = (event) => {
+  if (!isAuthenticated.value || props.moveBlocked) return
+  
+  event.preventDefault()
+  event.stopPropagation()
+  dragCounter.value++
+  isDropTarget.value = true
+}
+
+const handleDragLeave = (event) => {
+  if (!isAuthenticated.value || props.moveBlocked) return
+  
+  event.preventDefault()
+  event.stopPropagation()
+  dragCounter.value--
+  if (dragCounter.value === 0) {
+    isDropTarget.value = false
+  }
+}
+
+const handleDrop = async (event) => {
+  if (!isAuthenticated.value || props.moveBlocked) return
+  
+  event.preventDefault()
+  event.stopPropagation() // Prevent event bubbling to parent components
+  isDropTarget.value = false
+  dragCounter.value = 0
+  
+  try {
+    const dragData = JSON.parse(event.dataTransfer.getData('application/json'))
+    
+    // Don't allow dropping on self
+    if (dragData.id === props.file?.id) {
+      return
+    }
+    
+    // Don't allow dropping a collection on its own descendant
+    if (dragData.type === 'collection' && props.path.startsWith(dragData.path + '.')) {
+      alert('Cannot move a collection into its own descendant')
+      return
+    }
+    
+    // Show loading state and emit to parent to block other operations
+    isMoving.value = true
+    
+    // Move the item to this collection
+    await apiService.updateTreeItem(dragData.id, {
+      parent_path: props.path
+    })
+    
+    emit('item-moved', {
+      item: dragData,
+      newParent: props.file,
+      newParentPath: props.path
+    })
+    
+  } catch (error) {
+    console.error('Failed to move item:', error)
+    alert(`Failed to move item: ${error.message}`)
+  } finally {
+    // Hide loading state
+    isMoving.value = false
+  }
+}
+
 </script>
 
 <style scoped>
@@ -137,6 +262,80 @@ const handleRemove = async () => {
   cursor: pointer;
   position: relative;
   overflow: hidden;
+}
+
+.tree-card.dragging {
+  opacity: 0.5;
+  transform: scale(0.95);
+  z-index: 1000;
+}
+
+.tree-card.drop-target {
+  border-color: #4caf50;
+  background: linear-gradient(135deg, #e8f5e8 0%, #c8e6c9 100%);
+  box-shadow: 0 6px 20px rgba(76, 175, 80, 0.3);
+  transform: scale(1.05);
+}
+
+.drop-indicator {
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #4caf50;
+  color: white;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  white-space: nowrap;
+  z-index: 10;
+}
+
+.move-indicator {
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #2196f3;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  white-space: nowrap;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top: 2px solid white;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.tree-card.moving {
+  opacity: 0.8;
+  pointer-events: none;
+}
+
+.tree-card-container.move-blocked {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.tree-card-container.move-blocked .tree-card {
+  pointer-events: none;
 }
 .tree-card:hover {
   box-shadow: 0 6px 20px rgba(255, 193, 7, 0.25);

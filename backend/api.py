@@ -196,10 +196,7 @@ async def update_tree_item(
         path_parts = old_path.split('.')
         item_segment = path_parts[-1]  # Keep the same item ID segment
         
-        if request.parent_path == "root":
-            new_path = f"root.{item_segment}"
-        else:
-            new_path = f"{request.parent_path}.{item_segment}"
+        new_path = f"{request.parent_path}.{item_segment}"
         
         item.path = new_path
         

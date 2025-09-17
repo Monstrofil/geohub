@@ -1,7 +1,13 @@
 <template>
-  <div class="file-card-container">
+  <div 
+    class="file-card-container"
+    :draggable="isAuthenticated && !props.moveBlocked"
+    @dragstart="handleDragStart"
+    @dragend="handleDragEnd"
+    :class="{ 'move-blocked': props.moveBlocked }"
+  >
     <router-link :to="{name: 'FileViewer', query: { id: file.id }}">
-      <div class="file-card" :class="{ 'selected': selected }">
+      <div class="file-card" :class="{ 'selected': selected, 'dragging': isDragging }">
         <div class="file-icon" v-html="icon"></div>
         <div class="file-name">{{ name }}</div>
       </div>
@@ -31,7 +37,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import apiService from '../services/api.js'
 import { getBaseFileType } from '../utils/fileHelpers.js'
 import { matchTagsToPreset } from '../utils/tagMatcher.js'
@@ -43,10 +49,14 @@ const props = defineProps({
   path: { type: String, required: true },
   treePath: { type: [String, Array], required: false },
   file: { type: Object, required: true },
-  refName: { type: String, required: true }
+  refName: { type: String, required: true },
+  moveBlocked: { type: Boolean, default: false }
 })
 
-const emit = defineEmits(['click', 'file-selected', 'removed'])
+const emit = defineEmits(['click', 'file-selected', 'removed', 'move-start', 'move-end'])
+
+// Drag state
+const isDragging = ref(false)
 
 const fileType = computed(() => {
   return getBaseFileType(props.file)
@@ -121,6 +131,36 @@ const handleRemove = async () => {
   }
 }
 
+// Drag and drop handlers
+const handleDragStart = (event) => {
+  if (!isAuthenticated.value || props.moveBlocked) {
+    event.preventDefault()
+    return
+  }
+  
+  isDragging.value = true
+  
+  // Set the drag data
+  event.dataTransfer.effectAllowed = 'move'
+  event.dataTransfer.setData('application/json', JSON.stringify({
+    type: 'file',
+    id: props.file.id,
+    name: props.name,
+    path: props.path,
+    currentParentPath: props.treePath
+  }))
+  
+  // Visual feedback
+  event.dataTransfer.setDragImage(event.target, 50, 50)
+  
+  emit('move-start', props.file)
+}
+
+const handleDragEnd = () => {
+  isDragging.value = false
+  emit('move-end', props.file)
+}
+
 </script>
 
 <style scoped>
@@ -146,6 +186,21 @@ const handleRemove = async () => {
   cursor: pointer;
   position: relative;
   overflow: hidden;
+}
+
+.file-card.dragging {
+  opacity: 0.5;
+  transform: scale(0.95);
+  z-index: 1000;
+}
+
+.file-card-container.move-blocked {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.file-card-container.move-blocked .file-card {
+  pointer-events: none;
 }
 .file-card:hover {
   box-shadow: 0 4px 16px rgba(0,0,0,0.10);
