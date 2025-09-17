@@ -10,10 +10,6 @@ services:
       LOG_LEVEL: debug
       UVICORN_WORKERS: 1
 
-  frontend:
-    ports:
-      - "8080:8080"
-
   mapserver:
     ports:
       - "8082:80"

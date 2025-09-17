@@ -100,12 +100,94 @@
             
             <!-- File viewer -->
             <div v-else class="file-viewer">
+              <!-- Layer controls filter block - for GeoTIFF files -->
+              <div v-if="isGeoTiff && file && isFileGeoreferenced" class="layer-filter-block">
+                <div class="filter-header" @click="toggleLayerPanel">
+                  <div class="filter-title">
+                    <svg width="20" height="20" viewBox="0 0 24 24" class="filter-icon">
+                      <path d="M12 16l-6-6h12l-6 6z" fill="currentColor"/>
+                      <path d="M12 10l-6-6h12l-6 6z" fill="currentColor" opacity="0.6"/>
+                      <path d="M12 4l-6-6h12l-6 6z" fill="currentColor" opacity="0.3"/>
+                    </svg>
+                    <span>Map Layers</span>
+                  </div>
+                  <button class="filter-toggle" :class="{ 'expanded': layerPanelOpen }">
+                    <svg width="16" height="16" viewBox="0 0 24 24">
+                      <path d="M6 9l6 6 6-6" fill="currentColor"/>
+                    </svg>
+                  </button>
+                </div>
+                
+                <div v-show="layerPanelOpen" class="filter-content">
+                  <div class="layer-controls-grid">
+                    <!-- Base Map Layer -->
+                    <div class="layer-filter-item">
+                      <label class="layer-filter-label">
+                        <input 
+                          type="checkbox" 
+                          v-model="layers.baseMap.visible"
+                          @change="toggleLayer('osm-tiles', layers.baseMap.visible)"
+                          class="layer-filter-checkbox"
+                        />
+                        <span class="layer-filter-name">Base Map</span>
+                      </label>
+                      <div class="layer-description">OpenStreetMap background tiles</div>
+                      
+                      <!-- Opacity slider for Base Map layer -->
+                      <div class="layer-opacity-section">
+                        <label class="opacity-section-label">Opacity: {{ Math.round(layers.baseMap.opacity * 100) }}%</label>
+                        <input 
+                          type="range" 
+                          min="0" 
+                          max="1" 
+                          step="0.1"
+                          v-model="layers.baseMap.opacity"
+                          @input="updateLayerOpacity('osm-tiles', layers.baseMap.opacity)"
+                          class="layer-filter-opacity-slider"
+                          :disabled="!layers.baseMap.visible"
+                        />
+                      </div>
+                    </div>
+                    
+                    <!-- GeoTIFF Layer -->
+                    <div class="layer-filter-item">
+                      <label class="layer-filter-label">
+                        <input 
+                          type="checkbox" 
+                          v-model="layers.geotiff.visible"
+                          @change="toggleLayer('geotiff-layer', layers.geotiff.visible)"
+                          class="layer-filter-checkbox"
+                        />
+                        <span class="layer-filter-name">{{ file.name || 'Georeferenced File' }}</span>
+                      </label>
+                      <div class="layer-description">Uploaded georeferenced overlay</div>
+                      
+                      <!-- Opacity slider for GeoTIFF layer -->
+                      <div class="layer-opacity-section">
+                        <label class="opacity-section-label">Opacity: {{ Math.round(layers.geotiff.opacity * 100) }}%</label>
+                        <input 
+                          type="range" 
+                          min="0" 
+                          max="1" 
+                          step="0.1"
+                          v-model="layers.geotiff.opacity"
+                          @input="updateLayerOpacity('geotiff-layer', layers.geotiff.opacity)"
+                          class="layer-filter-opacity-slider"
+                          :disabled="!layers.geotiff.visible"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
               <!-- Interactive Map for GeoTIFF files -->
               <InteractiveMap 
                 v-if="isGeoTiff && file && isFileGeoreferenced"
                 :fileId="file.id"
                 :filename="file.name"
                 class="interactive-map-container"
+                ref="interactiveMapRef"
               />
               
               <!-- Georeferencing needed for raster files -->
@@ -387,6 +469,20 @@ const probeError = ref(null)
 // Conversion state
 const isConverting = ref(false)
 
+// Layer controls state
+const layerPanelOpen = ref(true)
+const layers = ref({
+  baseMap: {
+    visible: true,
+    opacity: 1.0
+  },
+  geotiff: {
+    visible: true,
+    opacity: 0.8
+  }
+})
+const interactiveMapRef = ref(null)
+
 // Field definitions and presets (reused from FileEditor)
 const allPresets = ref([])
 const allFieldDefinitions = ref({})
@@ -633,6 +729,33 @@ async function convertToGeoRaster() {
     alert(`Failed to convert file: ${err.message}`)
   } finally {
     isConverting.value = false
+  }
+}
+
+// Layer control functions
+function toggleLayerPanel() {
+  layerPanelOpen.value = !layerPanelOpen.value
+}
+
+function toggleLayer(layerId, visible) {
+  if (interactiveMapRef.value && interactiveMapRef.value.map) {
+    const map = interactiveMapRef.value.map
+    if (visible) {
+      map.setLayoutProperty(layerId, 'visibility', 'visible')
+    } else {
+      map.setLayoutProperty(layerId, 'visibility', 'none')
+    }
+  }
+}
+
+function updateLayerOpacity(layerId, opacity) {
+  if (interactiveMapRef.value && interactiveMapRef.value.map) {
+    const map = interactiveMapRef.value.map
+    if (layerId === 'geotiff-layer') {
+      map.setPaintProperty(layerId, 'raster-opacity', parseFloat(opacity))
+    } else if (layerId === 'osm-tiles') {
+      map.setPaintProperty(layerId, 'raster-opacity', parseFloat(opacity))
+    }
   }
 }
 
@@ -1332,5 +1455,214 @@ watch(() => props.treeItemId, () => {
   display: flex;
   flex-direction: column;
   align-items: center;
+}
+
+/* Layer Filter Block */
+.layer-filter-block {
+  background: white;
+  border-bottom: 1px solid #e0e0e0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  margin-bottom: 1rem;
+  border-radius: 8px;
+}
+
+.filter-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  cursor: pointer;
+  background: #f8f9fa;
+  border-bottom: 1px solid #e0e0e0;
+  border-radius: 8px 8px 0 0;
+  transition: background-color 0.2s ease;
+}
+
+.filter-header:hover {
+  background: #e9ecef;
+}
+
+.filter-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  color: #333;
+  font-size: 14px;
+}
+
+.filter-icon {
+  color: #666;
+}
+
+.filter-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  color: #666;
+}
+
+.filter-toggle:hover {
+  background: rgba(0, 0, 0, 0.05);
+  color: #333;
+}
+
+.filter-toggle.expanded svg {
+  transform: rotate(180deg);
+}
+
+.filter-toggle svg {
+  transition: transform 0.2s ease;
+}
+
+.filter-content {
+  padding: 16px;
+  background: white;
+  max-height: 200px;
+  overflow-y: auto;
+  border-radius: 0 0 8px 8px;
+}
+
+.layer-controls-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 16px;
+}
+
+.layer-filter-item {
+  padding: 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  background: #f8f9fa;
+  transition: all 0.2s ease;
+}
+
+.layer-filter-item:hover {
+  border-color: #007bff;
+  background: #f0f7ff;
+}
+
+.layer-filter-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+  margin-bottom: 4px;
+}
+
+.layer-filter-checkbox {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  cursor: pointer;
+  accent-color: #007bff;
+}
+
+.layer-filter-name {
+  font-weight: 600;
+  color: #333;
+  font-size: 14px;
+}
+
+.layer-description {
+  font-size: 12px;
+  color: #666;
+  margin-left: 24px;
+  margin-bottom: 8px;
+}
+
+.layer-opacity-section {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #e0e0e0;
+}
+
+.opacity-section-label {
+  display: block;
+  font-size: 12px;
+  color: #666;
+  font-weight: 500;
+  margin-bottom: 6px;
+}
+
+.layer-filter-opacity-slider {
+  width: 100%;
+  height: 4px;
+  border-radius: 2px;
+  background: #e0e0e0;
+  outline: none;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.layer-filter-opacity-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #007bff;
+  cursor: pointer;
+  border: 2px solid white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.layer-filter-opacity-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #007bff;
+  cursor: pointer;
+  border: 2px solid white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.layer-filter-opacity-slider:disabled {
+  background: #f8f9fa;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.layer-filter-opacity-slider:disabled::-webkit-slider-thumb {
+  background: #6c757d;
+  cursor: not-allowed;
+}
+
+.layer-filter-opacity-slider:disabled::-moz-range-thumb {
+  background: #6c757d;
+  cursor: not-allowed;
+}
+
+.layer-opacity-section .opacity-section-label {
+  color: #333;
+}
+
+.layer-filter-item:has(.layer-filter-opacity-slider:disabled) .opacity-section-label {
+  color: #6c757d;
+  opacity: 0.7;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .layer-controls-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .filter-content {
+    max-height: 150px;
+  }
+  
+  .filter-header {
+    padding: 10px 12px;
+  }
 }
 </style> 

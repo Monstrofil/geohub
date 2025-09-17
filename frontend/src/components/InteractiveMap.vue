@@ -44,6 +44,7 @@
       </div>
     </div>
     
+    
     <!-- Map info panel - only show when map is loaded -->
     <div v-if="!loading && !error" class="map-info">
       <div class="info-item">
@@ -88,6 +89,7 @@ export default {
     const map = ref(null)
     const zoomLevel = ref(0)
     const centerCoords = ref('0, 0')
+    
     
     const loadMap = async () => {
       if (!props.fileId) return
@@ -289,6 +291,7 @@ export default {
       }
     }
     
+    
     onMounted(async () => {
       await nextTick()
       loadMap()
@@ -318,7 +321,8 @@ export default {
       zoomIn,
       zoomOut,
       resetView,
-      fullscreen
+      fullscreen,
+      map
     }
   }
 }
@@ -489,4 +493,5 @@ export default {
   padding: 4px 8px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 }
+
 </style> 
