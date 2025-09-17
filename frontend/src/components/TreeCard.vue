@@ -40,6 +40,18 @@
     </router-link>
     
     <button 
+      v-if="isAuthenticated && props.file?.id"
+      class="move-btn" 
+      @click.stop="handleMove"
+      title="Move collection"
+    >
+      <svg width="16" height="16" viewBox="0 0 16 16">
+        <path d="M8 2L12 6H10V10H6V6H4L8 2Z" fill="#ff9800"/>
+        <path d="M2 14H14" stroke="#ff9800" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+    </button>
+    
+    <button 
       v-if="isAuthenticated"
       class="remove-btn" 
       @click.stop="handleRemove"
@@ -49,6 +61,17 @@
         <path d="M2 2l12 12M14 2l-12 12" stroke="#dc3545" stroke-width="2" fill="none" stroke-linecap="round"/>
       </svg>
     </button>
+    
+    <!-- Move Modal -->
+    <MoveModal
+      :show="showMoveModal"
+      :item-id="file?.id"
+      :item-name="name"
+      :item-type="'collection'"
+      :current-path="path"
+      @close="showMoveModal = false"
+      @moved="handleMoved"
+    />
   </div>
 </template>
 
@@ -57,6 +80,7 @@ import { computed, ref } from 'vue'
 import apiService from '../services/api.js'
 import { matchTagsToPreset } from '../utils/tagMatcher.js'
 import { isAuthenticated } from '../stores/auth.js'
+import MoveModal from './MoveModal.vue'
 
 const props = defineProps({
   name: { type: String, required: true },
@@ -67,13 +91,16 @@ const props = defineProps({
   moveBlocked: { type: Boolean, default: false }
 })
 
-const emit = defineEmits(['edit', 'removed', 'move-start', 'move-end', 'item-moved'])
+const emit = defineEmits(['edit', 'removed', 'move-start', 'move-end', 'item-moved', 'moved'])
 
 // Drag state
 const isDragging = ref(false)
 const isDropTarget = ref(false)
 const dragCounter = ref(0)
 const isMoving = ref(false)
+
+// Move modal state
+const showMoveModal = ref(false)
 
 // Get matched preset based on collection tags using centralized presets
 const matchedPreset = computed(() => {
@@ -237,6 +264,16 @@ const handleDrop = async (event) => {
   }
 }
 
+// Move modal handlers
+const handleMove = () => {
+  showMoveModal.value = true
+}
+
+const handleMoved = (moveData) => {
+  showMoveModal.value = false
+  emit('moved', moveData)
+}
+
 </script>
 
 <style scoped>
@@ -387,7 +424,7 @@ const handleDrop = async (event) => {
 .edit-btn {
   position: absolute;
   top: 6px;
-  right: 28px;
+  right: 50px;
   background: rgba(255, 255, 255, 0.95);
   border: 1px solid #007bff;
   border-radius: 50%;
@@ -413,6 +450,42 @@ const handleDrop = async (event) => {
 }
 
 .edit-btn:hover svg path {
+  stroke: white;
+}
+
+.move-btn {
+  position: absolute;
+  top: 6px;
+  right: 28px;
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid #ff9800;
+  border-radius: 50%;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s, background-color 0.2s, transform 0.1s;
+  z-index: 10;
+  backdrop-filter: blur(4px);
+}
+
+.tree-card-container:hover .move-btn {
+  opacity: 1;
+}
+
+.move-btn:hover {
+  background: #ff9800;
+  transform: scale(1.05);
+}
+
+.move-btn:hover svg path {
+  fill: white;
+}
+
+.move-btn:hover svg path[stroke] {
   stroke: white;
 }
 

@@ -119,6 +119,7 @@
               @move-start="handleMoveStart"
               @move-end="handleMoveEnd"
               @item-moved="handleItemMoved"
+              @moved="handleModalMoved"
             />
           </div>
         </div>
@@ -333,6 +334,13 @@ function handleItemMoved(moveData) {
   })
   
   console.log('Item moved:', moveData)
+}
+
+function handleModalMoved(moveData) {
+  // Handle moves from the move modal
+  console.log('Item moved via modal:', moveData)
+  // Refresh the file list to reflect the changes
+  loadFiles()
 }
 
 // Main drop zone handlers
