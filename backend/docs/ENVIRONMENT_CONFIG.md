@@ -37,8 +37,11 @@ This document describes how to configure the Tagger application for different en
   - Default: `your-secret-key-change-this-in-production`
   - **CRITICAL**: Must be changed in production to a strong, random key
 
-- **JWT_EXPIRE_MINUTES**: JWT token expiration time in minutes
+- **JWT_EXPIRE_MINUTES**: JWT access token expiration time in minutes
   - Default: `30`
+
+- **JWT_REFRESH_EXPIRE_DAYS**: JWT refresh token expiration time in days
+  - Default: `7`
 
 - **CORS_ORIGINS**: Comma-separated list of allowed CORS origins
   - Default: `http://localhost:8080,http://127.0.0.1:8080,http://localhost:5173`

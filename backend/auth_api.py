@@ -21,6 +21,7 @@ class LoginRequest(BaseModel):
 
 class LoginResponse(BaseModel):
     access_token: str
+    refresh_token: str
     token_type: str
     user: models.User_Pydantic
     expires_in: int  # seconds
@@ -38,6 +39,10 @@ class CreateGroupRequest(BaseModel):
     description: Optional[str] = None
 
 
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str
+
+
 class PermissionsUpdateRequest(BaseModel):
     owner_user_id: Optional[uuid.UUID] = None
     owner_group_id: Optional[uuid.UUID] = None
@@ -50,16 +55,49 @@ class PermissionsUpdateRequest(BaseModel):
 
 @router.post("/auth/login", response_model=LoginResponse)
 async def login(request: LoginRequest):
-    """Authenticate user with username and password and return JWT token"""
+    """Authenticate user with username and password and return JWT tokens"""
     user = await AuthService.authenticate_user(request.username, request.password)
     if not user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
     
-    # Create JWT token
+    # Create JWT tokens
     access_token = AuthService.create_access_token(data={"sub": str(user.id)})
+    refresh_token = AuthService.create_refresh_token(data={"sub": str(user.id)})
     
     return LoginResponse(
         access_token=access_token,
+        refresh_token=refresh_token,
+        token_type="bearer",
+        user=models.User_Pydantic.model_validate(user),
+        expires_in=ACCESS_TOKEN_EXPIRE_MINUTES * 60  # convert to seconds
+    )
+
+
+@router.post("/auth/refresh", response_model=LoginResponse)
+async def refresh_token(request: RefreshTokenRequest):
+    """Refresh access token using a valid refresh token"""
+    # Verify refresh token
+    payload = AuthService.verify_token(request.refresh_token, token_type="refresh")
+    if not payload:
+        raise HTTPException(status_code=401, detail="Invalid refresh token")
+    
+    # Get user ID from token
+    user_id = payload.get("sub")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid refresh token")
+    
+    # Get user from database
+    user = await AuthService.get_user_by_id(user_id)
+    if not user or not user.is_active:
+        raise HTTPException(status_code=401, detail="User not found or inactive")
+    
+    # Create new tokens
+    access_token = AuthService.create_access_token(data={"sub": str(user.id)})
+    refresh_token = AuthService.create_refresh_token(data={"sub": str(user.id)})
+    
+    return LoginResponse(
+        access_token=access_token,
+        refresh_token=refresh_token,
         token_type="bearer",
         user=models.User_Pydantic.model_validate(user),
         expires_in=ACCESS_TOKEN_EXPIRE_MINUTES * 60  # convert to seconds

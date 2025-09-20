@@ -6,6 +6,9 @@ class ApiService {
   constructor() {
     this.baseUrl = API_BASE_URL
     this.token = localStorage.getItem('auth_token')
+    this.refreshToken = localStorage.getItem('refresh_token')
+    this.isRefreshing = false
+    this.failedQueue = []
     
     // Create axios instance
     this.axios = axios.create({
@@ -29,13 +32,47 @@ class ApiService {
       }
     )
     
-    // Add response interceptor for error handling
+    // Add response interceptor for error handling and token refresh
     this.axios.interceptors.response.use(
       (response) => response,
-      (error) => {
-        if (error.response?.status === 401) {
-          // Token expired or invalid, clear it
-          this.setToken(null)
+      async (error) => {
+        const originalRequest = error.config
+        
+        if (error.response?.status === 401 && !originalRequest._retry) {
+          // Token expired, try to refresh
+          originalRequest._retry = true
+          
+          if (this.isRefreshing) {
+            // If already refreshing, queue this request
+            return new Promise((resolve, reject) => {
+              this.failedQueue.push({ resolve, reject })
+            }).then(token => {
+              originalRequest.headers.Authorization = `Bearer ${token}`
+              return this.axios(originalRequest)
+            }).catch(err => {
+              return Promise.reject(err)
+            })
+          }
+          
+          try {
+            const newTokens = await this.refreshAccessToken()
+            if (newTokens) {
+              // Retry the original request with new token
+              originalRequest.headers.Authorization = `Bearer ${newTokens.access_token}`
+              
+              // Process queued requests
+              this.processQueue(null, newTokens.access_token)
+              
+              return this.axios(originalRequest)
+            }
+          } catch (refreshError) {
+            // Refresh failed, logout user
+            this.processQueue(refreshError, null)
+            this.logout()
+            // Emit logout event for auth store to handle
+            window.dispatchEvent(new CustomEvent('auth-logout'))
+            return Promise.reject(refreshError)
+          }
         }
         
         const message = error.response?.data?.detail || error.message || 'Request failed'
@@ -53,8 +90,60 @@ class ApiService {
     }
   }
 
+  setRefreshToken(refreshToken) {
+    this.refreshToken = refreshToken
+    if (refreshToken) {
+      localStorage.setItem('refresh_token', refreshToken)
+    } else {
+      localStorage.removeItem('refresh_token')
+    }
+  }
+
   getToken() {
     return this.token || localStorage.getItem('auth_token')
+  }
+
+  getRefreshToken() {
+    return this.refreshToken || localStorage.getItem('refresh_token')
+  }
+
+  processQueue(error, token = null) {
+    this.failedQueue.forEach(({ resolve, reject }) => {
+      if (error) {
+        reject(error)
+      } else {
+        resolve(token)
+      }
+    })
+    
+    this.failedQueue = []
+  }
+
+  async refreshAccessToken() {
+    if (!this.getRefreshToken()) {
+      throw new Error('No refresh token available')
+    }
+
+    this.isRefreshing = true
+
+    try {
+      // Create a new axios instance without interceptors to avoid infinite loops
+      const response = await axios.post(`${this.baseUrl}/auth/refresh`, {
+        refresh_token: this.getRefreshToken()
+      }, {
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      })
+
+      const { access_token, refresh_token } = response.data
+      this.setToken(access_token)
+      this.setRefreshToken(refresh_token)
+      
+      return response.data
+    } finally {
+      this.isRefreshing = false
+    }
   }
 
   async request(endpoint, options = {}) {
@@ -505,7 +594,7 @@ class ApiService {
    * Login with username and password
    * @param {string} username - Username
    * @param {string} password - Password
-   * @returns {Promise<Object>} Login response with token and user info
+   * @returns {Promise<Object>} Login response with tokens and user info
    */
   async login(username, password) {
     const response = await this.request('/auth/login', {
@@ -513,9 +602,12 @@ class ApiService {
       body: JSON.stringify({ username, password })
     })
     
-    // Store the token
+    // Store both tokens
     if (response.access_token) {
       this.setToken(response.access_token)
+    }
+    if (response.refresh_token) {
+      this.setRefreshToken(response.refresh_token)
     }
     
     return response
@@ -526,6 +618,7 @@ class ApiService {
    */
   logout() {
     this.setToken(null)
+    this.setRefreshToken(null)
   }
 
   /**
