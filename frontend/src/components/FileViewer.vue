@@ -803,7 +803,7 @@ const josmWmsUrl = computed(() => {
   
   if (!mapParam) return '#'
   
-  const wmsGetMapUrl = encodeURIComponent(`${wmsBaseUrl}?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&LAYERS=geotiff_layer&MAP=${mapParam}&SRS=EPSG:3857&FORMAT=image/png&TRANSPARENT=TRUE&BBOX={bbox}&WIDTH={width}&HEIGHT={height}`)
+  const wmsGetMapUrl = encodeURIComponent(`${wmsBaseUrl}?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&STYLES=&LAYERS=geotiff_layer&MAP=${mapParam}&SRS=EPSG:3857&FORMAT=image/png&TRANSPARENT=TRUE&BBOX={bbox}&WIDTH={width}&HEIGHT={height}`)
   
   return `http://127.0.0.1:8111/imagery?title=${title}&type=wms&url=${wmsGetMapUrl}`
 })
