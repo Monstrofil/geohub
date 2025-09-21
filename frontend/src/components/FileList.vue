@@ -500,11 +500,14 @@ watch(() => props.treePath, loadFiles)
   justify-content: space-between;
   align-items: center;
   margin-bottom: 1rem;
+  flex-wrap: wrap;
+  gap: 0.5rem;
 }
 
 .file-actions {
   display: flex;
   gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
 .action-btn {
@@ -523,6 +526,9 @@ watch(() => props.treePath, loadFiles)
   transition: background 0.15s, color 0.15s, box-shadow 0.15s, transform 0.1s;
   outline: none;
   position: relative;
+  /* Better touch targets for mobile */
+  min-height: 44px;
+  min-width: 44px;
 }
 .action-btn:active {
   transform: scale(0.97);
@@ -581,11 +587,54 @@ watch(() => props.treePath, loadFiles)
   flex-shrink: 0;
 }
 
+/* Mobile responsive layout */
+@media (max-width: 768px) {
+  .section-feature-list {
+    padding: 0.75rem;
+  }
+  
+  .section-feature-list h3 {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+  
+  .file-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+  
+  .action-btn {
+    flex: 1;
+    min-width: auto;
+    padding: 0.75rem 1rem;
+    font-size: 0.9rem;
+  }
+  
+  .file-list-layout {
+    flex-direction: column;
+    gap: 1rem;
+  }
+  
+  .file-list-sidebar {
+    order: -1; /* Show sidebar first on mobile */
+    width: 100%;
+  }
+}
+
 .feature-list {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
   justify-content: flex-start;
+}
+
+/* Mobile file card layout */
+@media (max-width: 768px) {
+  .feature-list {
+    gap: 0.75rem;
+    justify-content: center;
+  }
 }
 
 .loading {
@@ -603,6 +652,20 @@ watch(() => props.treePath, loadFiles)
   margin: 1rem 0;
 }
 
+/* Mobile loading and error states */
+@media (max-width: 768px) {
+  .loading {
+    padding: 1.5rem 1rem;
+    font-size: 0.9rem;
+  }
+  
+  .error {
+    padding: 0.75rem;
+    font-size: 0.9rem;
+    margin: 0.5rem 0;
+  }
+}
+
 
 
 /* Breadcrumb styles */
@@ -614,6 +677,14 @@ watch(() => props.treePath, loadFiles)
   border-bottom: 1px solid #e9ecef;
   overflow-x: auto;
   margin-bottom: 1rem;
+  /* Enable smooth scrolling on mobile */
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+
+.breadcrumb::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
 }
 
 .breadcrumb-item {
@@ -626,6 +697,10 @@ watch(() => props.treePath, loadFiles)
   font-size: 0.9rem;
   transition: all 0.15s;
   white-space: nowrap;
+  /* Better touch targets on mobile */
+  min-height: 44px;
+  display: flex;
+  align-items: center;
 }
 
 .breadcrumb-item:hover {
@@ -698,6 +773,33 @@ watch(() => props.treePath, loadFiles)
   justify-content: center;
 }
 
+/* Mobile empty state */
+@media (max-width: 768px) {
+  .empty-state {
+    padding: 2rem 1rem;
+    margin: 0.5rem 0;
+  }
+  
+  .empty-state h3 {
+    font-size: 1.25rem;
+  }
+  
+  .empty-state p {
+    font-size: 0.9rem;
+    margin-bottom: 1.5rem;
+  }
+  
+  .empty-actions {
+    flex-direction: column;
+    width: 100%;
+    max-width: 280px;
+  }
+  
+  .empty-actions .action-btn {
+    width: 100%;
+  }
+}
+
 /* Drag and drop styles */
 .file-list-main {
   position: relative;
@@ -708,6 +810,30 @@ watch(() => props.treePath, loadFiles)
   background: linear-gradient(135deg, #e8f5e8 0%, #f1f8e9 100%);
   border: 2px dashed #4caf50;
   border-radius: 12px;
+}
+
+/* Mobile drag and drop improvements */
+@media (max-width: 768px) {
+  .file-list-main {
+    min-height: 200px;
+  }
+  
+  .file-list-main.drop-zone-active {
+    border-width: 3px;
+    border-radius: 16px;
+    padding: 1rem;
+  }
+  
+  .breadcrumb-item.drop-target {
+    border-width: 3px;
+    padding: 0.5rem;
+  }
+  
+  /* Better visual feedback for mobile drag operations */
+  .file-list-main.moving {
+    border-width: 3px;
+    border-radius: 16px;
+  }
 }
 
 

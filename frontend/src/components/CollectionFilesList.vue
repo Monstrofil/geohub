@@ -389,4 +389,45 @@ watch(() => [props.refName, props.collectionPath], loadCollectionFiles)
   color: #dc3545;
   background: #fff8f8;
 }
+
+/* Mobile responsive styles */
+@media (max-width: 768px) {
+  .collection-files-section {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    width: 100%;
+  }
+  
+  .file-item {
+    padding: 0.5rem;
+    gap: 0.75rem;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  
+  .file-name {
+    white-space: normal;
+    word-break: break-word;
+    font-size: 0.85rem;
+  }
+  
+  .file-meta {
+    flex-direction: column;
+    gap: 0.25rem;
+    font-size: 0.75rem;
+  }
+  
+  .file-actions {
+    gap: 0.25rem;
+  }
+  
+  .view-btn,
+  .edit-btn,
+  .delete-btn {
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+    min-height: 36px;
+  }
+}
 </style> 

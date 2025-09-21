@@ -1123,6 +1123,28 @@ watch(() => props.treeItemId, () => {
   background: white;
   border-bottom: 1px solid #eee;
   box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  flex-wrap: wrap;
+}
+
+/* Mobile header styles */
+@media (max-width: 768px) {
+  .viewer-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.75rem;
+  }
+  
+  .header-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+  
+  .edit-btn, .login-btn {
+    flex: 1;
+    justify-content: center;
+    min-height: 44px;
+  }
 }
 
 .file-info {
@@ -1154,6 +1176,30 @@ watch(() => props.treeItemId, () => {
   color: #666;
 }
 
+/* Mobile file info styles */
+@media (max-width: 768px) {
+  .file-info-header {
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+  }
+  
+  .file-info {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+  
+  .file-name {
+    font-size: 1.25rem;
+  }
+  
+  .file-meta {
+    flex-direction: column;
+    gap: 0.25rem;
+    font-size: 0.85rem;
+  }
+}
+
 .file-type {
   text-transform: uppercase;
   font-weight: 500;
@@ -1170,12 +1216,23 @@ watch(() => props.treeItemId, () => {
   cursor: pointer;
   color: #666;
   transition: all 0.15s;
+  /* Better touch targets for mobile */
+  min-height: 44px;
 }
 
 .back-btn:hover {
   background: #f8f9fa;
   border-color: #007bff;
   color: #007bff;
+}
+
+/* Mobile back button */
+@media (max-width: 768px) {
+  .back-btn {
+    width: 100%;
+    justify-content: center;
+    padding: 0.75rem 1rem;
+  }
 }
 
 .header-actions {
@@ -1195,6 +1252,7 @@ watch(() => props.treeItemId, () => {
   background: #007bff;
   color: white;
   border: none;
+  min-height: 44px;
 }
 
 .edit-btn:hover {
@@ -1213,6 +1271,7 @@ watch(() => props.treeItemId, () => {
   background: #7b1fa2;
   color: white;
   border: none;
+  min-height: 44px;
 }
 
 .login-btn:hover {
@@ -1224,6 +1283,13 @@ watch(() => props.treeItemId, () => {
   flex: 1;
   padding: 1rem;
   overflow-y: auto;
+}
+
+/* Mobile viewer content */
+@media (max-width: 768px) {
+  .viewer-content {
+    padding: 0.75rem;
+  }
 }
 
 .content-layout {
@@ -1239,6 +1305,19 @@ watch(() => props.treeItemId, () => {
 .content-sidebar {
   width: 350px;
   flex-shrink: 0;
+}
+
+/* Mobile responsive layout */
+@media (max-width: 768px) {
+  .content-layout {
+    flex-direction: column;
+    gap: 1rem;
+  }
+  
+  .content-sidebar {
+    width: 100%;
+    order: -1; /* Show sidebar first on mobile */
+  }
 }
 
 .loading, .error, .not-found {
@@ -1364,6 +1443,8 @@ watch(() => props.treeItemId, () => {
   padding: 2rem;
   margin-bottom: 2rem;
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .collection-description {
@@ -1375,6 +1456,20 @@ watch(() => props.treeItemId, () => {
   display: flex;
   gap: 2rem;
   margin-bottom: 1.5rem;
+}
+
+/* Mobile collection styles */
+@media (max-width: 768px) {
+  .collection-info {
+    padding: 1rem;
+    margin-bottom: 1rem;
+    width: 100%;
+  }
+  
+  .collection-stats {
+    flex-direction: column;
+    gap: 1rem;
+  }
 }
 
 .stat-item {
@@ -1595,11 +1690,22 @@ watch(() => props.treeItemId, () => {
   padding: 2rem;
   margin-bottom: 2rem;
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  width: 100%;
 }
 
 .collection-content p {
   color: #666;
   margin-bottom: 1.5rem;
+}
+
+/* Mobile collection content */
+@media (max-width: 768px) {
+  .collection-content {
+    padding: 1rem;
+    margin-bottom: 1rem;
+    width: 100%;
+    box-sizing: border-box;
+  }
 }
 
 /* Georeferencing needed styles */

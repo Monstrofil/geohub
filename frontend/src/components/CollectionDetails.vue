@@ -362,6 +362,42 @@ onMounted(async () => {
   flex-shrink: 0;
 }
 
+/* Mobile responsive styles */
+@media (max-width: 768px) {
+  .collection-details {
+    width: 100%;
+    gap: 1rem;
+  }
+  
+  .unified-properties-section {
+    padding: 1rem;
+  }
+  
+  .object-type-display {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+  
+  .properties-table td:first-child {
+    max-width: none;
+  }
+  
+  .properties-table td:last-child {
+    max-width: none;
+    text-align: left;
+  }
+  
+  .permissions-table td:first-child {
+    min-width: auto;
+  }
+  
+  .permissions-table td:last-child {
+    max-width: none;
+    text-align: left;
+  }
+}
+
 .loading-state, .error-state {
   display: flex;
   flex-direction: column;
