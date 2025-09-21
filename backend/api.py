@@ -378,6 +378,10 @@ async def convert_to_geo_raster(item_id: uuid.UUID, current_user: Optional[User]
         raise HTTPException(status_code=404, detail="Raw file not found")
 
     geo_raster_file_obj = await models_factory.convert_to_geo_raster(raw_file, "uploads")
+    
+    # Ensure the new geo raster file is marked as not georeferenced initially
+    geo_raster_file_obj.is_georeferenced = False
+    await geo_raster_file_obj.save()
 
     # Update TreeItem to point to GeoRasterFile
     tree_item.object_type = "geo_raster_file"
@@ -547,6 +551,7 @@ async def apply_georeferencing(file_id: uuid.UUID, request: GeoreferencingApplyR
     map_config_path = mapserver_service._create_map_config(georeferenced_path)
     geo_raster_file.map_config_path = map_config_path
     geo_raster_file.file_path = georeferenced_path
+    geo_raster_file.is_georeferenced = True
     
     await geo_raster_file.save()
 
@@ -594,6 +599,7 @@ async def reset_georeferencing(file_id: uuid.UUID, current_user: Optional[User] 
     map_config_path = mapserver_service._create_map_config(new_file_path)
     geo_raster_file.map_config_path = map_config_path
     geo_raster_file.file_path = new_file_path
+    geo_raster_file.is_georeferenced = False  # Mark as not georeferenced
 
     await geo_raster_file.save()
     

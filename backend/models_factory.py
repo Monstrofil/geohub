@@ -82,7 +82,8 @@ async def create_geo_file(file_info: Dict[str, str], tags: Dict[str, str] = None
         original_file_path=None,
         file_size=file_info["file_size"],
         mime_type=file_info["mime_type"],
-        map_config_path=map_config_path
+        map_config_path=map_config_path,
+        is_georeferenced=True  # Files created via this function are already georeferenced
     )
     
 
@@ -120,10 +121,8 @@ async def convert_to_geo_raster(raw_file: RawFile, upload_dir: str = "uploads") 
         original_file_path=dummy_georeferenced_file_path,
         file_size=raw_file.file_size,
         mime_type=raw_file.mime_type,
-        image_width=image_width,
-        image_height=image_height,
-        image_bands=image_bands,
-        map_config_path=map_config_path
+        map_config_path=map_config_path,
+        is_georeferenced=False
     )
     await geo_raster.save()
     await raw_file.delete()

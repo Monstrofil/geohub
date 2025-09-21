@@ -326,7 +326,7 @@
                 </div>
 
                 <!-- Regular file that can be converted and georeferenced -->
-                <div v-else-if="file.object_type === 'raw_file' && probeResult && probeResult.can_georeference && !probeResult.is_already_georeferenced" class="can-georeference">
+                <div v-else-if="file.object_type === 'raw_file' && probeResult && probeResult.can_georeference && !isFileGeoreferenced" class="can-georeference">
                   <div class="georef-icon">
                     <svg width="64" height="64" viewBox="0 0 64 64">
                       <circle cx="32" cy="32" r="30" fill="#28a745"/>
@@ -353,11 +353,12 @@
                 </div>
 
                 <!-- Geo-raster file that needs georeferencing (no conversion needed) -->
-                <div v-else-if="file.object_type === 'geo_raster_file' && probeResult && probeResult.can_georeference && !probeResult.is_already_georeferenced" class="needs-georeferencing">
+                <div v-else-if="file.object_type === 'geo_raster_file' && probeResult && probeResult.can_georeference && !isFileGeoreferenced" class="needs-georeferencing">
                   <div class="georef-icon">
                     <svg width="64" height="64" viewBox="0 0 64 64">
                       <circle cx="32" cy="32" r="30" fill="#ffc107"/>
                       <path d="M32 16v16M32 40h0" stroke="white" stroke-width="4" fill="none" stroke-linecap="round"/>
+                      <circle cx="32" cy="32" r="2" fill="white"/>
                     </svg>
                   </div>
                   <h3>Georeferencing Required</h3>
@@ -380,7 +381,7 @@
                 </div>
 
                 <!-- File is already georeferenced (fallback case) -->
-                <div v-else-if="probeResult && probeResult.is_already_georeferenced" class="already-georeferenced">
+                <div v-else-if="isFileGeoreferenced" class="already-georeferenced">
                   <div class="georef-icon">
                     <svg width="64" height="64" viewBox="0 0 64 64">
                       <circle cx="32" cy="32" r="30" fill="#17a2b8"/>
@@ -791,6 +792,12 @@ const fileTypeLabel = computed(() => {
 
 // Check if file is georeferenced
 const isFileGeoreferenced = computed(() => {
+  // For geo_raster_file objects, check the is_georeferenced field from the database
+  if (file.value && file.value.object_type === 'geo_raster_file' && file.value.object_details) {
+    return file.value.object_details.is_georeferenced === true
+  }
+  
+  // For other files, fall back to probe result
   if (probeResult.value && probeResult.value.can_georeference) {
     return probeResult.value.is_already_georeferenced
   }
@@ -911,6 +918,11 @@ function onGeoreferencingCompleted(result) {
     file.value.tags = { ...file.value.tags, ...result.fileInfo }
   }
   
+  // Update the is_georeferenced field in the file object
+  if (file.value && file.value.object_details) {
+    file.value.object_details.is_georeferenced = true
+  }
+  
   // Force re-render to show the map
   loadFile()
 }
@@ -931,6 +943,11 @@ async function resetGeoreferencing() {
     
     // Close the confirmation modal
     showResetConfirmation.value = false
+    
+    // Update the is_georeferenced field in the file object
+    if (file.value && file.value.object_details) {
+      file.value.object_details.is_georeferenced = false
+    }
     
     // Reload the file to reflect the changes
     await loadFile()
@@ -974,6 +991,11 @@ async function convertToGeoRaster() {
     
     // Update the file object with the new data
     file.value = updatedFile
+    
+    // Update the is_georeferenced field in the file object
+    if (file.value && file.value.object_details) {
+      file.value.object_details.is_georeferenced = false
+    }
     
     // Clear probe result since file is now converted
     probeResult.value = null
@@ -1709,6 +1731,11 @@ watch(() => props.treeItemId, () => {
 }
 
 .needs-georeferencing {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 2rem;
   background: #fff8e1;
   border: 2px solid #ffc107;
   border-radius: 12px;

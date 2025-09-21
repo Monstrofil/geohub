@@ -90,6 +90,7 @@ class GeoRasterFile(models.Model):
     file_path = fields.CharField(max_length=1000)  # Current file path (may be georeferenced version)
     original_file_path = fields.CharField(max_length=1000, null=True)  # Original before georeferencing
     map_config_path = fields.CharField(max_length=1000, null=True)  # MapServer config file path
+    is_georeferenced = fields.BooleanField(default=False)  # Whether the file has been properly georeferenced
     file_size = fields.BigIntField()
     mime_type = fields.CharField(max_length=200)
     created_at = fields.DatetimeField(auto_now_add=True)
