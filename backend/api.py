@@ -6,6 +6,7 @@ import datetime
 import json
 import uuid
 import shutil
+from pathlib import Path
 from pydantic import BaseModel, ConfigDict
 
 import models
@@ -549,7 +550,7 @@ async def apply_georeferencing(file_id: uuid.UUID, request: GeoreferencingApplyR
     
     await geo_raster_file.save()
 
-    if os.path.exists(old_file_path):
+    if os.path.exists(old_file_path) and old_file_path != geo_raster_file.original_file_path:
         os.remove(old_file_path)
     
     
@@ -557,5 +558,55 @@ async def apply_georeferencing(file_id: uuid.UUID, request: GeoreferencingApplyR
         "message": "Georeferencing applied successfully",
         "file": TreeItemResponse.model_validate(tree_obj),
         "validation_results": validation_results
+    }
+
+
+@router.post("/files/{file_id}/reset-georeferencing")
+async def reset_georeferencing(file_id: uuid.UUID, current_user: Optional[User] = Depends(get_current_user_optional)):
+    """Reset georeferencing by removing warped file and restoring original file path"""
+    tree_obj = await models.TreeItem.get_or_none(id=file_id, object_type="geo_raster_file")
+    if not tree_obj:
+        raise HTTPException(status_code=404, detail="Geo raster file not found")
+    
+    await require_permission(tree_obj, current_user, Permission.WRITE)
+    
+    geo_raster_file = await tree_obj.get_object()
+    old_file_path = geo_raster_file.file_path
+    
+    # Check if there's an original file path to restore
+    if not geo_raster_file.original_file_path:
+        raise HTTPException(status_code=400, detail="No original file path available to restore")
+    
+    # Check if original file still exists
+    if not os.path.exists(geo_raster_file.original_file_path):
+        raise HTTPException(status_code=404, detail="Original file not found on disk")
+
+    if (geo_raster_file.file_path == geo_raster_file.original_file_path):
+        raise HTTPException(status_code=400, detail="File is already in original state")
+
+    # copy original file to file path and generate new uuid name with same extension
+    new_file_path = Path(geo_raster_file.original_file_path).parent / f"{uuid.uuid4()}.tif"
+    print(f"Copying original file to {new_file_path}")
+    shutil.copy(geo_raster_file.original_file_path, str(new_file_path))
+
+    # regenerate map config to clear cache on mapserver
+    old_map_config_path = geo_raster_file.map_config_path
+    map_config_path = mapserver_service._create_map_config(new_file_path)
+    geo_raster_file.map_config_path = map_config_path
+    geo_raster_file.file_path = new_file_path
+
+    await geo_raster_file.save()
+    
+    # Clear the map config since the file is no longer georeferenced
+    if old_map_config_path and os.path.exists(old_map_config_path):
+        os.remove(old_map_config_path)
+    
+    # Remove the previous warped file if it exists
+    if os.path.exists(old_file_path):
+        os.remove(old_file_path)
+    
+    return {
+        "message": "Georeferencing reset successfully",
+        "file": TreeItemResponse.model_validate(tree_obj)
     }
     

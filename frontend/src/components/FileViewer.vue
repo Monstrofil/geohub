@@ -288,6 +288,23 @@
               <div v-if="copyStatus" class="copy-status" :class="{ 'success': copyStatus.success, 'error': !copyStatus.success }">
                 {{ copyStatus.message }}
               </div>
+              
+              <!-- Re-georeference option for already georeferenced files -->
+              <div class="georef-actions-section">
+                <div class="georef-actions-header">
+                  <h3>Georeferencing Actions</h3>
+                  <p>This file is already georeferenced and displayed on the map above.</p>
+                </div>
+                <div class="georef-actions">
+                  <button class="btn btn-warning regeoref-btn" @click="confirmResetGeoreferencing">
+                    <svg width="24" height="24" viewBox="0 0 24 24">
+                      <path d="M1 4v6h6" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                      <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    Re-georeference
+                  </button>
+                </div>
+              </div>
             </div>
               
               <!-- Georeferencing needed for raster files -->
@@ -528,6 +545,39 @@
       @close="closeGeoreferencing"
       @completed="onGeoreferencingCompleted" 
     />
+    
+    <!-- Reset Georeferencing Confirmation Modal -->
+    <div v-if="showResetConfirmation" class="modal-overlay" @click="showResetConfirmation = false">
+      <div class="modal-content" @click.stop>
+        <div class="modal-header">
+          <h3>Reset Georeferencing</h3>
+          <button class="modal-close" @click="showResetConfirmation = false">
+            <svg width="24" height="24" viewBox="0 0 24 24">
+              <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="warning-icon">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
+              <path d="M12 9v4M12 17h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <h4>Are you ready to start from scratch?</h4>
+          <p>This will reset the georeferencing for this file, removing all current control points and returning it to its original state. You will need to re-add control points to georeference it again.</p>
+          <p><strong>This action cannot be undone.</strong></p>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" @click="showResetConfirmation = false">
+            Cancel
+          </button>
+          <button class="btn btn-danger" @click="resetGeoreferencing" :disabled="loading">
+            <div v-if="loading" class="spinner"></div>
+            Reset & Start Over
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -560,6 +610,7 @@ const error = ref(null)
 // Georeferencing state
 const showGeoreferencingModal = ref(false)
 const georeferencingStatus = ref(null)
+const showResetConfirmation = ref(false)
 
 // Probe state for checking if file can be georeferenced
 const probeResult = ref(null)
@@ -863,6 +914,36 @@ function onGeoreferencingCompleted(result) {
   
   // Force re-render to show the map
   loadFile()
+}
+
+// Reset georeferencing functions
+function confirmResetGeoreferencing() {
+  showResetConfirmation.value = true
+}
+
+async function resetGeoreferencing() {
+  if (!file.value?.id) return
+  
+  loading.value = true
+  
+  try {
+    // Call the reset-georeferencing API
+    await apiService.resetGeoreferencing(file.value.id)
+    
+    // Close the confirmation modal
+    showResetConfirmation.value = false
+    
+    // Reload the file to reflect the changes
+    await loadFile()
+    
+    // Now start the georeferencing process
+    startGeoreferencing()
+  } catch (err) {
+    console.error('Failed to reset georeferencing:', err)
+    alert(`Failed to reset georeferencing: ${err.message}`)
+  } finally {
+    loading.value = false
+  }
 }
 
 // Probe functions
@@ -1681,6 +1762,47 @@ watch(() => props.treeItemId, () => {
   border-radius: 12px;
 }
 
+.regeoref-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  background: #ffc107;
+  color: #212529;
+  border: none;
+  border-radius: 6px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background-color 0.15s;
+  margin-top: 1rem;
+}
+
+.regeoref-btn:hover {
+  background: #e0a800;
+}
+
+.georef-actions-section {
+  background: white;
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.georef-actions-header h3 {
+  margin: 0 0 0.5rem 0;
+  font-size: 1.2rem;
+  color: #333;
+  font-weight: 600;
+}
+
+.georef-actions-header p {
+  margin: 0 0 1rem 0;
+  color: #666;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
 .default-georeferencing {
   display: flex;
   flex-direction: column;
@@ -2170,5 +2292,144 @@ watch(() => props.treeItemId, () => {
     padding: 0.2rem 0.4rem;
     min-height: 18px;
   }
+}
+
+/* Reset Confirmation Modal Styles */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  max-width: 500px;
+  width: 90%;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.5rem 1.5rem 0 1.5rem;
+  border-bottom: 1px solid #e5e7eb;
+  margin-bottom: 1rem;
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  padding: 0.5rem;
+  cursor: pointer;
+  border-radius: 6px;
+  color: #6b7280;
+  transition: all 0.15s;
+}
+
+.modal-close:hover {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.modal-body {
+  padding: 0 1.5rem 1rem 1.5rem;
+  text-align: center;
+}
+
+.warning-icon {
+  margin-bottom: 1rem;
+}
+
+.modal-body h4 {
+  margin: 0 0 1rem 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.modal-body p {
+  margin: 0 0 1rem 0;
+  color: #6b7280;
+  line-height: 1.5;
+  text-align: left;
+}
+
+.modal-body p:last-child {
+  margin-bottom: 0;
+}
+
+.modal-footer {
+  display: flex;
+  gap: 0.75rem;
+  padding: 1rem 1.5rem 1.5rem 1.5rem;
+  justify-content: flex-end;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-weight: 500;
+  text-decoration: none;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-size: 0.875rem;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background: #f3f4f6;
+  color: #374151;
+  border: 1px solid #d1d5db;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: #e5e7eb;
+  border-color: #9ca3af;
+}
+
+.btn-danger {
+  background: #dc2626;
+  color: white;
+  border: 1px solid #dc2626;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: #b91c1c;
+  border-color: #b91c1c;
+}
+
+.btn-danger .spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top: 2px solid white;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
 }
 </style> 

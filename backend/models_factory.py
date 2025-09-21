@@ -1,5 +1,6 @@
 
 import uuid
+import os
 from pathlib import Path
 from typing import Dict
 from models import TreeItem, RawFile, GeoRasterFile
@@ -116,7 +117,7 @@ async def convert_to_geo_raster(raw_file: RawFile, upload_dir: str = "uploads") 
     geo_raster = await GeoRasterFile.create(
         original_name=raw_file.original_name,
         file_path=dummy_georeferenced_file_path,
-        original_file_path=raw_file.file_path,
+        original_file_path=dummy_georeferenced_file_path,
         file_size=raw_file.file_size,
         mime_type=raw_file.mime_type,
         image_width=image_width,
@@ -126,5 +127,8 @@ async def convert_to_geo_raster(raw_file: RawFile, upload_dir: str = "uploads") 
     )
     await geo_raster.save()
     await raw_file.delete()
+    
+    if os.path.exists(raw_file.file_path):
+        os.remove(raw_file.file_path)
     
     return geo_raster

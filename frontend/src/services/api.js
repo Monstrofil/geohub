@@ -724,6 +724,17 @@ class ApiService {
       method: 'POST'
     })
   }
+
+  /**
+   * Reset georeferencing by removing warped file and restoring original file path
+   * @param {string} fileId - The file ID
+   * @returns {Promise<Object>} Reset result
+   */
+  async resetGeoreferencing(fileId) {
+    return await this.request(`/files/${fileId}/reset-georeferencing`, {
+      method: 'POST'
+    })
+  }
 }
 
 const apiService = new ApiService()
