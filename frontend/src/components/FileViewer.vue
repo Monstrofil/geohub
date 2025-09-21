@@ -289,22 +289,6 @@
                 {{ copyStatus.message }}
               </div>
               
-              <!-- Re-georeference option for already georeferenced files -->
-              <div class="georef-actions-section">
-                <div class="georef-actions-header">
-                  <h3>Georeferencing Actions</h3>
-                  <p>This file is already georeferenced and displayed on the map above.</p>
-                </div>
-                <div class="georef-actions">
-                  <button class="btn btn-warning regeoref-btn" @click="confirmResetGeoreferencing">
-                    <svg width="24" height="24" viewBox="0 0 24 24">
-                      <path d="M1 4v6h6" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-                      <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-                    </svg>
-                    Re-georeference
-                  </button>
-                </div>
-              </div>
             </div>
               
               <!-- Georeferencing needed for raster files -->
@@ -530,6 +514,21 @@
                   <span class="info-label">Modified:</span>
                   <span class="info-value">{{ formatDate(file.updated_at) }}</span>
                 </div>
+              </div>
+            </div>
+
+            <!-- Georeferencing Actions section for already georeferenced files -->
+            <div v-if="file && isFileGeoreferenced" class="georef-actions-section">
+              <h3>Georeferencing Actions</h3>
+              <p>This file is already georeferenced and displayed on the map.</p>
+              <div class="georef-actions">
+                <button class="btn btn-warning regeoref-btn" @click="confirmResetGeoreferencing">
+                  <svg width="24" height="24" viewBox="0 0 24 24">
+                    <path d="M1 4v6h6" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                  Re-georeference
+                </button>
               </div>
             </div>
           </div>
@@ -1785,18 +1784,17 @@ watch(() => props.treeItemId, () => {
   background: white;
   border-radius: 8px;
   padding: 1.5rem;
-  margin-bottom: 2rem;
+  margin-top: 1.5rem;
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
-.georef-actions-header h3 {
-  margin: 0 0 0.5rem 0;
+.georef-actions-section h3 {
+  margin: 0 0 1rem 0;
   font-size: 1.2rem;
   color: #333;
-  font-weight: 600;
 }
 
-.georef-actions-header p {
+.georef-actions-section p {
   margin: 0 0 1rem 0;
   color: #666;
   font-size: 0.9rem;
