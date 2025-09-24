@@ -20,6 +20,13 @@ def analyze_raster_file(file_path: str) -> Dict[str, Any]:
                 "is_georeferenced": False,
                 "error": "File cannot be opened by GDAL"
             }
+
+        if len(src_ds.GetSubDatasets()) > 1:
+            return {
+                "gdal_compatible": False,
+                "is_georeferenced": False,
+                "error": "File is a subdataset, not a single page"
+            }
         
         # Get basic info
         width = src_ds.RasterXSize
