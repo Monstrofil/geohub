@@ -464,7 +464,7 @@
                 <div class="object-type-info">
                   <div class="object-type-name">{{ selectedType.name }}</div>
                   <div class="object-type-description">
-                    Matched based on file tags and properties
+                    {{ selectedType.description || 'Description not set' }}
                   </div>
                 </div>
               </div>
