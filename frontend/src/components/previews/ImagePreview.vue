@@ -179,6 +179,7 @@ const imageUrl = computed(() => {
 
 .image-viewer {
   flex: 1;
+  max-height: 100vh;
   overflow: hidden;
   position: relative;
   cursor: grab;
