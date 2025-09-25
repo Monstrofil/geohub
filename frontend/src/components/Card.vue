@@ -14,21 +14,24 @@
       <div class="card" :class="cardClasses">
         <!-- Header with icon and actions -->
         <div class="card-header">
-          <div class="card-icon" v-html="icon"></div>
+          <div class="card-icon-section">
+            <div class="card-icon" v-html="icon"></div>
+            <div class="preset-name" v-if="matchedPreset?.name">{{ matchedPreset.name }}</div>
+          </div>
           <div class="card-actions" v-if="isAuthenticated">
-            <router-link v-if="props.file?.id" :to="{name: 'FileEditor', query: { id: props.file.id }}" class="action-btn edit-btn" :title="`Edit ${itemType}`">
+            <router-link v-if="props.file?.id" :to="{name: 'FileEditor', query: { id: props.file.id }}" class="action-btn edit-btn" :title="`Edit ${itemType}`" @click.stop>
               <svg width="14" height="14" viewBox="0 0 16 16">
                 <path d="M11 1L15 5L5 15H1V11L11 1Z" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
                 <path d="M8 4L12 8" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
               </svg>
             </router-link>
-            <button v-if="props.file?.id" class="action-btn move-btn" @click.stop="handleMove" :title="`Move ${itemType}`">
+            <button v-if="props.file?.id" class="action-btn move-btn" @click.prevent.stop="handleMove" :title="`Move ${itemType}`">
               <svg width="14" height="14" viewBox="0 0 16 16">
                 <path d="M8 2L12 6H10V10H6V6H4L8 2Z" fill="currentColor"/>
                 <path d="M2 14H14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
               </svg>
             </button>
-            <button class="action-btn remove-btn" @click.stop="handleRemove" :title="`Remove ${itemType}`">
+            <button class="action-btn remove-btn" @click.prevent.stop="handleRemove" :title="`Remove ${itemType}`">
               <svg width="14" height="14" viewBox="0 0 16 16">
                 <path d="M2 2l12 12M14 2l-12 12" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/>
               </svg>
@@ -414,7 +417,7 @@ const handleMoved = (moveData) => {
 .card-wrapper {
   position: relative;
   display: inline-block;
-  margin: 0.5rem;
+  margin: 1rem;
 }
 
 .card-link {
@@ -428,9 +431,10 @@ const handleMoved = (moveData) => {
   border: 2px solid #e5e7eb;
   border-radius: 16px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-  padding: 1rem;
   width: 240px;
-  min-height: 160px;
+  min-width: 200px;
+  max-width: 400px;
+  flex: 1 1 240px;
   transition: all 0.2s ease;
   cursor: pointer;
   position: relative;
@@ -502,6 +506,15 @@ const handleMoved = (moveData) => {
   justify-content: space-between;
   align-items: flex-start;
   margin-bottom: 0.75rem;
+  padding: 1rem 1rem 0 1rem;
+}
+
+.card-icon-section {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
 }
 
 .card-icon {
@@ -509,6 +522,21 @@ const handleMoved = (moveData) => {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.preset-name {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #6b7280;
+  text-align: center;
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: rgba(249, 250, 251, 0.8);
+  padding: 0.25rem 0.5rem;
+  border-radius: 8px;
+  border: 1px solid rgba(229, 231, 235, 0.5);
 }
 
 .card-actions {
@@ -574,6 +602,9 @@ const handleMoved = (moveData) => {
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
+  min-width: 0; /* Allow shrinking */
+  padding: 0 1rem;
+  padding-bottom: 1rem;
 }
 
 .preview-fields {
@@ -590,11 +621,19 @@ const handleMoved = (moveData) => {
   background: rgba(249, 250, 251, 0.8);
   border-radius: 8px;
   border: 1px solid rgba(229, 231, 235, 0.5);
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .card:has(.collection-elements) .preview-field {
   background: rgba(255, 248, 225, 0.8);
   border-color: rgba(255, 224, 130, 0.5);
+}
+
+.card:has(.collection-elements) .preset-name {
+  background: rgba(255, 248, 225, 0.8);
+  border-color: rgba(255, 224, 130, 0.5);
+  color: #92400e;
 }
 
 .field-label {
@@ -624,6 +663,7 @@ const handleMoved = (moveData) => {
 /* Collection-specific elements */
 .collection-elements {
   position: relative;
+  padding: 0 1rem 1rem 1rem;
 }
 
 .directory-badge {
@@ -688,6 +728,7 @@ const handleMoved = (moveData) => {
 /* File-specific elements */
 .file-elements {
   margin-top: auto;
+  padding: 0 1rem 1rem 1rem;
 }
 
 .file-type-indicator {
@@ -711,9 +752,25 @@ const handleMoved = (moveData) => {
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .card {
-    width: 200px;
+    min-width: 180px;
+    max-width: 300px;
     min-height: 140px;
-    padding: 0.75rem;
+  }
+  
+  .card-header {
+    padding: 0.75rem 0.75rem 0 0.75rem;
+  }
+  
+  .preview-section {
+    padding: 0 0.75rem;
+  }
+  
+  .collection-elements {
+    padding: 0 0.75rem 0.75rem 0.75rem;
+  }
+  
+  .file-elements {
+    padding: 0 0.75rem 0.75rem 0.75rem;
   }
   
   .preview-field {

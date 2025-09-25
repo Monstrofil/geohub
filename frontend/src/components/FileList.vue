@@ -621,17 +621,17 @@ watch(() => props.treePath, loadFiles)
 }
 
 .feature-list {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 0.5rem;
-  justify-content: flex-start;
+  align-items: start;
 }
 
 /* Mobile file card layout */
 @media (max-width: 768px) {
   .feature-list {
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: 0.75rem;
-    justify-content: center;
   }
 }
 
