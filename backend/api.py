@@ -1,5 +1,5 @@
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Path, Query, Depends
-from fastapi.responses import FileResponse as FastAPIFileResponse
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Path, Query, Depends, Request
+from fastapi.responses import FileResponse as FastAPIFileResponse, Response
 from typing import List, Dict, Optional, Any
 import os
 import datetime 
@@ -421,7 +421,8 @@ async def download_file(
     return FastAPIFileResponse(
         path=download_path,
         filename=obj.original_name,
-        media_type=obj.mime_type
+        media_type=obj.mime_type,
+        headers={"Content-Disposition": f"inline"}
     )
 
 

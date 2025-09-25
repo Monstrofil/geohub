@@ -1,5 +1,6 @@
 from models import TreeItem
 import os
+import mimetypes
 import uuid
 import aiofiles
 from typing import Dict, Any, Optional
@@ -37,13 +38,15 @@ class FileService:
         content = await file.read()
         async with aiofiles.open(file_path, 'wb') as f:
             await f.write(content)
+
+        mime_type, _ = mimetypes.guess_type(file_path)
         
         return {
             "original_name": file.filename,
             "name": unique_filename,
             "file_path": file_path,
             "file_size": len(content),
-            "mime_type": file.content_type or "application/octet-stream"
+            "mime_type": mime_type or "application/octet-stream"
         }
     
     @classmethod
