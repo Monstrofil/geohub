@@ -291,160 +291,19 @@
               
             </div>
               
-              <!-- Georeferencing needed for raster files -->
-              <div v-else-if="file && !isFileGeoreferenced" class="georeferencing-needed">
-                
-                <!-- Probing status -->
-                <div v-if="probeLoading" class="probe-status">
-                  <div class="spinner"></div>
-                  <h3>Checking file compatibility...</h3>
-                  <p>Analyzing if this file can be georeferenced...</p>
-                </div>
-
-                <!-- Probe error -->
-                <div v-else-if="probeError" class="probe-error">
-                  <div class="georef-icon">
-                    <svg width="64" height="64" viewBox="0 0 64 64">
-                      <circle cx="32" cy="32" r="30" fill="#dc3545"/>
-                      <path d="M20 20l24 24M44 20l-24 24" stroke="white" stroke-width="4" fill="none" stroke-linecap="round"/>
-                    </svg>
+              <!-- File Preview Section - displays regardless of georeferencing ability -->
+              <div v-if="previewComponent" class="file-preview-section">
+                <div class="file-preview-container">
+                  <div class="preview-header">
+                    <h3>File Preview</h3>
                   </div>
-                  <h3>File Analysis Failed</h3>
-                  <p>{{ probeError }}</p>
-                </div>
-
-                <!-- File cannot be georeferenced -->
-                <div v-else-if="probeResult && !probeResult.can_georeference" class="cannot-georeference">
-                  <div class="georef-icon">
-                    <svg width="64" height="64" viewBox="0 0 64 64">
-                      <circle cx="32" cy="32" r="30" fill="#6c757d"/>
-                      <path d="M20 20l24 24M44 20l-24 24" stroke="white" stroke-width="4" fill="none" stroke-linecap="round"/>
-                    </svg>
-                  </div>
-                  <h3>Cannot Be Georeferenced</h3>
-                  <p>{{ probeResult.error || 'This file is not compatible with georeferencing tools.' }}</p>
-                </div>
-
-                <!-- Regular file that can be converted and georeferenced -->
-                <div v-else-if="file.object_type === 'raw_file' && probeResult && probeResult.can_georeference && !isFileGeoreferenced" class="can-georeference">
-                  <div class="georef-icon">
-                    <svg width="64" height="64" viewBox="0 0 64 64">
-                      <circle cx="32" cy="32" r="30" fill="#28a745"/>
-                      <path d="M20 32l8 8 16-16" stroke="white" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-                    </svg>
-                  </div>
-                  <h3>Ready for Georeferencing</h3>
-                  <p>This file can be prepared for georeferencing. We'll convert it to a geo-raster format and then open the georeferencing interface where you can add control points.</p>
-                  
-                  <div class="georef-actions">
-                    <button class="btn btn-success convert-btn" @click="convertToGeoRaster" :disabled="isConverting">
-                      <div v-if="isConverting" class="spinner"></div>
-                      <svg v-else width="24" height="24" viewBox="0 0 24 24">
-                        <path d="M9 12l2 2 4-4" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-                        <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/>
-                      </svg>
-                      {{ isConverting ? 'Converting...' : 'Convert & Start Georeferencing' }}
-                    </button>
-                  </div>
-                  
-                  <div class="file-info">
-                    <p><strong>File details:</strong> {{ probeResult.image_info?.width }}×{{ probeResult.image_info?.height }} pixels, {{ probeResult.image_info?.bands }} bands</p>
-                  </div>
-                </div>
-
-                <!-- Geo-raster file that needs georeferencing (no conversion needed) -->
-                <div v-else-if="file.object_type === 'geo_raster_file' && probeResult && probeResult.can_georeference && !isFileGeoreferenced" class="needs-georeferencing">
-                  <div class="georef-icon">
-                    <svg width="64" height="64" viewBox="0 0 64 64">
-                      <circle cx="32" cy="32" r="30" fill="#ffc107"/>
-                      <path d="M32 16v16M32 40h0" stroke="white" stroke-width="4" fill="none" stroke-linecap="round"/>
-                      <circle cx="32" cy="32" r="2" fill="white"/>
-                    </svg>
-                  </div>
-                  <h3>Georeferencing Required</h3>
-                  <p>This geo-raster file is ready for georeferencing. Add control points to georeference it to a map coordinate system.</p>
-                  
-                  <div class="georef-actions">
-                    <button class="btn btn-primary georef-btn" @click="startGeoreferencing">
-                      <svg width="24" height="24" viewBox="0 0 24 24">
-                        <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/>
-                        <circle cx="12" cy="12" r="2" fill="currentColor"/>
-                        <path d="M12 2v4M12 18v4M2 12h4M18 12h4" stroke="currentColor" stroke-width="2"/>
-                      </svg>
-                      Start Georeferencing
-                    </button>
-                  </div>
-                  
-                  <div class="file-info">
-                    <p><strong>File details:</strong> {{ probeResult.image_info?.width }}×{{ probeResult.image_info?.height }} pixels, {{ probeResult.image_info?.bands }} bands</p>
-                  </div>
-                </div>
-
-                <!-- File is already georeferenced (fallback case) -->
-                <div v-else-if="isFileGeoreferenced" class="already-georeferenced">
-                  <div class="georef-icon">
-                    <svg width="64" height="64" viewBox="0 0 64 64">
-                      <circle cx="32" cy="32" r="30" fill="#17a2b8"/>
-                      <path d="M20 32l8 8 16-16" stroke="white" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-                    </svg>
-                  </div>
-                  <h3>Already Georeferenced</h3>
-                  <p>This file already has georeferencing information. It should be displayed on the map.</p>
-                </div>
-
-                <!-- Default georeferencing option (no probe result yet) -->
-                <div v-else class="default-georeferencing">
-                  <div class="georef-header">
-                    <div class="georef-icon">
-                      <svg width="64" height="64" viewBox="0 0 64 64">
-                        <circle cx="32" cy="32" r="30" fill="#ffc107"/>
-                        <path d="M32 16v16M32 40h0" stroke="white" stroke-width="4" fill="none" stroke-linecap="round"/>
-                      </svg>
-                    </div>
-                    <h3>Georeferencing Required</h3>
-                    <p>This raster file needs georeferencing to be displayed on a map. Add control points to georeference it.</p>
-                  </div>
-                  
-                  <div class="georef-actions">
-                    <button class="btn btn-primary georef-btn" @click="startGeoreferencing">
-                      <svg width="24" height="24" viewBox="0 0 24 24">
-                        <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/>
-                        <circle cx="12" cy="12" r="2" fill="currentColor"/>
-                        <path d="M12 2v4M12 18v4M2 12h4M18 12h4" stroke="currentColor" stroke-width="2"/>
-                      </svg>
-                      Start Georeferencing
-                    </button>
-                  </div>
-                </div>
-                
-                <div v-if="georeferencingStatus" class="georef-status">
-                  <div v-if="georeferencingStatus.loading" class="status-loading">
-                    <div class="spinner"></div>
-                    <span>Loading georeferencing interface...</span>
-                  </div>
-                  <div v-else-if="georeferencingStatus.error" class="status-error">
-                    <span>Error: {{ georeferencingStatus.error }}</span>
-                  </div>
-                </div>
-              </div>
-              
-              <!-- Vector file content -->
-              <div v-else-if="getBaseFileType(file) === 'vector'" class="vector-content">
-                <h3>Vector File</h3>
-                <p>This is a vector file ({{ getMimeType(file) }}).</p>
-                <div class="preview-placeholder">
-                  <i class="fas fa-draw-polygon"></i>
-                  <p>Vector preview would be displayed here</p>
-                </div>
-              </div>
-              
-              <!-- Generic file content -->
-              <div v-else class="generic-content">
-                <h3>File Content</h3>
-                <p>File type: {{ getMimeType(file) }}</p>
-                <div class="preview-placeholder">
-                  <i class="fas fa-file"></i>
-                  <p>File preview would be displayed here</p>
+                  <component 
+                    :is="previewComponent.component" 
+                    :file-id="file.id"
+                    :file="file"
+                    @error="handlePreviewError"
+                    @loaded="handlePreviewLoaded"
+                  />
                 </div>
               </div>
             </div>
@@ -514,6 +373,146 @@
                 <div class="info-item" v-if="file.updated_at">
                   <span class="info-label">Modified:</span>
                   <span class="info-value">{{ formatDate(file.updated_at) }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Georeferencing needed for raster files -->
+            <div v-if="file && !isFileGeoreferenced" class="georeferencing-needed">
+              
+              <!-- Probing status -->
+              <div v-if="probeLoading" class="probe-status">
+                <div class="spinner"></div>
+                <h3>Checking file compatibility...</h3>
+                <p>Analyzing if this file can be georeferenced...</p>
+              </div>
+
+              <!-- Probe error -->
+              <div v-else-if="probeError" class="probe-error">
+                <div class="georef-icon">
+                  <svg width="64" height="64" viewBox="0 0 64 64">
+                    <circle cx="32" cy="32" r="30" fill="#dc3545"/>
+                    <path d="M20 20l24 24M44 20l-24 24" stroke="white" stroke-width="4" fill="none" stroke-linecap="round"/>
+                  </svg>
+                </div>
+                <h3>File Analysis Failed</h3>
+                <p>{{ probeError }}</p>
+              </div>
+
+              <!-- File cannot be georeferenced -->
+              <div v-else-if="probeResult && !probeResult.can_georeference" class="cannot-georeference">
+                <div class="no-preview-message">
+                  <div class="georef-icon">
+                    <svg width="64" height="64" viewBox="0 0 64 64">
+                      <circle cx="32" cy="32" r="30" fill="#6c757d"/>
+                      <path d="M20 20l24 24M44 20l-24 24" stroke="white" stroke-width="4" fill="none" stroke-linecap="round"/>
+                    </svg>
+                  </div>
+                  <h3>Cannot Be Georeferenced</h3>
+                  <p>{{ probeResult.error || 'This file is not compatible with georeferencing tools.' }}</p>
+                  <p v-if="!previewComponent" class="no-preview-note">No preview is available for this file type.</p>
+                </div>
+              </div>
+
+              <!-- Regular file that can be converted and georeferenced -->
+              <div v-else-if="file.object_type === 'raw_file' && probeResult && probeResult.can_georeference && !isFileGeoreferenced" class="can-georeference">
+                <div class="georef-icon">
+                  <svg width="64" height="64" viewBox="0 0 64 64">
+                    <circle cx="32" cy="32" r="30" fill="#28a745"/>
+                    <path d="M20 32l8 8 16-16" stroke="white" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                </div>
+                <h3>Ready for Georeferencing</h3>
+                <p>This file can be prepared for georeferencing. We'll convert it to a geo-raster format and then open the georeferencing interface where you can add control points.</p>
+                
+                <div class="georef-actions">
+                  <button class="btn btn-success convert-btn" @click="convertToGeoRaster" :disabled="isConverting">
+                    <div v-if="isConverting" class="spinner"></div>
+                    <svg v-else width="24" height="24" viewBox="0 0 24 24">
+                      <path d="M9 12l2 2 4-4" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                      <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/>
+                    </svg>
+                    {{ isConverting ? 'Converting...' : 'Convert & Start Georeferencing' }}
+                  </button>
+                </div>
+                
+                <div class="file-info">
+                  <p><strong>File details:</strong> {{ probeResult.image_info?.width }}×{{ probeResult.image_info?.height }} pixels, {{ probeResult.image_info?.bands }} bands</p>
+                </div>
+              </div>
+
+              <!-- Geo-raster file that needs georeferencing (no conversion needed) -->
+              <div v-else-if="file.object_type === 'geo_raster_file' && probeResult && probeResult.can_georeference && !isFileGeoreferenced" class="needs-georeferencing">
+                <div class="georef-icon">
+                  <svg width="64" height="64" viewBox="0 0 64 64">
+                    <circle cx="32" cy="32" r="30" fill="#ffc107"/>
+                    <path d="M32 16v16M32 40h0" stroke="white" stroke-width="4" fill="none" stroke-linecap="round"/>
+                    <circle cx="32" cy="32" r="2" fill="white"/>
+                  </svg>
+                </div>
+                <h3>Georeferencing Required</h3>
+                <p>This geo-raster file is ready for georeferencing. Add control points to georeference it to a map coordinate system.</p>
+                
+                <div class="georef-actions">
+                  <button class="btn btn-primary georef-btn" @click="startGeoreferencing">
+                    <svg width="24" height="24" viewBox="0 0 24 24">
+                      <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/>
+                      <circle cx="12" cy="12" r="2" fill="currentColor"/>
+                      <path d="M12 2v4M12 18v4M2 12h4M18 12h4" stroke="currentColor" stroke-width="2"/>
+                    </svg>
+                    Start Georeferencing
+                  </button>
+                </div>
+                
+                <div class="file-info">
+                  <p><strong>File details:</strong> {{ probeResult.image_info?.width }}×{{ probeResult.image_info?.height }} pixels, {{ probeResult.image_info?.bands }} bands</p>
+                </div>
+              </div>
+
+              <!-- File is already georeferenced (fallback case) -->
+              <div v-else-if="isFileGeoreferenced" class="already-georeferenced">
+                <div class="georef-icon">
+                  <svg width="64" height="64" viewBox="0 0 64 64">
+                    <circle cx="32" cy="32" r="30" fill="#17a2b8"/>
+                    <path d="M20 32l8 8 16-16" stroke="white" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                </div>
+                <h3>Already Georeferenced</h3>
+                <p>This file already has georeferencing information. It should be displayed on the map.</p>
+              </div>
+
+              <!-- Default georeferencing option (no probe result yet) -->
+              <div v-else class="default-georeferencing">
+                <div class="georef-header">
+                  <div class="georef-icon">
+                    <svg width="64" height="64" viewBox="0 0 64 64">
+                      <circle cx="32" cy="32" r="30" fill="#ffc107"/>
+                      <path d="M32 16v16M32 40h0" stroke="white" stroke-width="4" fill="none" stroke-linecap="round"/>
+                    </svg>
+                  </div>
+                  <h3>Georeferencing Required</h3>
+                  <p>This raster file needs georeferencing to be displayed on a map. Add control points to georeference it.</p>
+                </div>
+                
+                <div class="georef-actions">
+                  <button class="btn btn-primary georef-btn" @click="startGeoreferencing">
+                    <svg width="24" height="24" viewBox="0 0 24 24">
+                      <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/>
+                      <circle cx="12" cy="12" r="2" fill="currentColor"/>
+                      <path d="M12 2v4M12 18v4M2 12h4M18 12h4" stroke="currentColor" stroke-width="2"/>
+                    </svg>
+                    Start Georeferencing
+                  </button>
+                </div>
+              </div>
+              
+              <div v-if="georeferencingStatus" class="georef-status">
+                <div v-if="georeferencingStatus.loading" class="status-loading">
+                  <div class="spinner"></div>
+                  <span>Loading georeferencing interface...</span>
+                </div>
+                <div v-else-if="georeferencingStatus.error" class="status-error">
+                  <span>Error: {{ georeferencingStatus.error }}</span>
                 </div>
               </div>
             </div>
@@ -592,6 +591,7 @@ import { matchTagsToPreset, getAllPresets } from '../utils/tagMatcher.js'
 import { loadFieldDefinitions, resolveFields } from '../utils/fieldResolver.js'
 import apiService from '../services/api.js'
 import { getFileSize, getBaseFileType, getMimeType, getOriginalName, getDisplayName as getFileDisplayName, formatFileSize as formatSize } from '../utils/fileHelpers.js'
+import { findPreviewComponent, previewComponents } from './previews/index.js'
 
 const route = useRoute()
 const router = useRouter()
@@ -619,6 +619,10 @@ const probeError = ref(null)
 
 // Conversion state
 const isConverting = ref(false)
+
+// Preview component state
+const previewComponent = ref(null)
+const previewComponentLoading = ref(false)
 
 // Layer controls state
 const layerPanelOpen = ref(true)
@@ -726,6 +730,8 @@ async function loadFile() {
       // Clear previous probe results
       probeResult.value = null
       probeError.value = null
+      // Check for preview components
+      checkPreviewComponent()
       // Probe the file in the background
       probeFile()
     }
@@ -960,6 +966,63 @@ async function resetGeoreferencing() {
   } finally {
     loading.value = false
   }
+}
+
+// Preview component functions
+function checkPreviewComponent() {
+  console.log('🔍 [FileViewer] Checking preview component for file:', file.value)
+  
+  if (!file.value) {
+    console.log('⚠️ [FileViewer] No file available for preview check')
+    return
+  }
+  
+  // Check file size - only show preview for files that aren't too large
+  const fileSize = file.value.object_details?.file_size
+  const MAX_FILE_SIZE = 50 * 1024 * 1024 // 50MB maximum size for preview
+  const isSizeAppropriate = fileSize && fileSize <= MAX_FILE_SIZE
+  
+  console.log('📏 [FileViewer] File size check:', {
+    fileSize: fileSize,
+    maxSize: MAX_FILE_SIZE,
+    isSizeAppropriate: isSizeAppropriate,
+    fileSizeFormatted: fileSize ? `${(fileSize / 1024 / 1024).toFixed(2)} MB` : 'unknown'
+  })
+  
+  if (!isSizeAppropriate) {
+    previewComponent.value = null
+    console.log('❌ [FileViewer] File too large for preview:', fileSize, 'bytes (max:', MAX_FILE_SIZE, 'bytes)')
+    return
+  }
+  
+  const preview = findPreviewComponent(file.value)
+  console.log('🔍 [FileViewer] Preview component search result:', preview)
+  
+  if (preview) {
+    previewComponent.value = preview
+    console.log('✅ [FileViewer] Found preview component:', preview.name)
+  } else {
+    previewComponent.value = null
+    console.log('❌ [FileViewer] No preview component found for file type:', file.value.object_details?.mime_type)
+    console.log('❌ [FileViewer] File details:', {
+      id: file.value.id,
+      name: file.value.name,
+      object_type: file.value.object_type,
+      mime_type: file.value.mime_type,
+      'object_details.mime_type': file.value.object_details?.mime_type,
+      'object_details.file_size': file.value.object_details?.file_size,
+      type: file.value.type
+    })
+  }
+}
+
+function handlePreviewError(error) {
+  console.error('❌ [FileViewer] Preview component error:', error)
+  // Could show a toast notification or handle the error as needed
+}
+
+function handlePreviewLoaded() {
+  console.log('✅ [FileViewer] Preview component loaded successfully')
 }
 
 // Probe functions
@@ -1722,6 +1785,60 @@ watch(() => props.treeItemId, () => {
   box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 }
 
+/* Georeferencing section when in right panel */
+.content-sidebar .georeferencing-needed {
+  padding: 1.5rem;
+  margin: 1.5rem 0 0 0;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* Adjust georef icon size for right panel */
+.content-sidebar .georef-icon {
+  margin-bottom: 1rem;
+}
+
+.content-sidebar .georef-icon svg {
+  width: 48px;
+  height: 48px;
+}
+
+/* Adjust text sizing for right panel */
+.content-sidebar .georeferencing-needed h3 {
+  font-size: 1.1rem;
+  margin-bottom: 0.75rem;
+}
+
+.content-sidebar .georeferencing-needed p {
+  font-size: 0.9rem;
+  line-height: 1.4;
+  margin-bottom: 1rem;
+}
+
+/* Adjust button sizing for right panel */
+.content-sidebar .georef-actions {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+.content-sidebar .georef-actions .btn {
+  width: 100%;
+  font-size: 0.9rem;
+  padding: 0.75rem 1rem;
+}
+
+/* Adjust file info for right panel */
+.content-sidebar .file-info {
+  margin-top: 1rem;
+  font-size: 0.85rem;
+}
+
+/* Adjust georef status for right panel */
+.content-sidebar .georef-status {
+  margin-top: 1rem;
+  font-size: 0.85rem;
+}
+
 .georef-header {
   margin-bottom: 2rem;
 }
@@ -1821,8 +1938,49 @@ watch(() => props.treeItemId, () => {
   display: flex;
   flex-direction: column;
   align-items: center;
+  padding: 2rem;
+}
+
+.file-preview-section {
+  background: white;
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.file-preview-container {
+  width: 100%;
+  max-width: 100%;
+}
+
+.preview-header {
+  text-align: center;
+  margin-bottom: 1rem;
+}
+
+.preview-header h3 {
+  color: #495057;
+  margin-bottom: 0.5rem;
+}
+
+.preview-header p {
+  color: #6c757d;
+  font-size: 0.9rem;
+}
+
+.no-preview-message {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   gap: 1rem;
   padding: 2rem;
+}
+
+.no-preview-note {
+  color: #6c757d;
+  font-size: 0.9rem;
+  font-style: italic;
 }
 
 .probe-error .georef-icon,

@@ -40,7 +40,7 @@ export function getFileSize(file) {
  * @returns {string} MIME type
  */
 export function getMimeType(file) {
-  return getFileProperty(file, 'mime_type', 'application/octet-stream')
+  return file.object_details.mime_type
 }
 
 /**
