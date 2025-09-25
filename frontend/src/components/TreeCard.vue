@@ -1,6 +1,6 @@
 <template>
   <div 
-    class="tree-card-container"
+    class="tree-card-wrapper"
     :draggable="isAuthenticated && !props.moveBlocked"
     @dragstart="handleDragStart"
     @dragend="handleDragEnd"
@@ -10,16 +10,55 @@
     @dragleave="handleDragLeave"
     :class="{ 'move-blocked': props.moveBlocked }"
   >
-    <router-link :to="{name: 'FileList', query: { treePath: fullPath }}">
+    <router-link :to="{name: 'FileList', query: { treePath: fullPath }}" class="tree-card-link">
       <div class="tree-card" :class="{ 'selected': selected, 'dragging': isDragging, 'drop-target': isDropTarget, 'moving': isMoving }">
+        <!-- Header with icon and actions -->
+        <div class="tree-header">
+          <div class="tree-icon" v-html="icon"></div>
+          <div class="tree-actions" v-if="isAuthenticated">
+            <router-link v-if="props.file?.id" :to="{name: 'FileEditor', query: { id: props.file.id }}" class="action-btn edit-btn" title="Edit collection">
+              <svg width="14" height="14" viewBox="0 0 16 16">
+                <path d="M11 1L15 5L5 15H1V11L11 1Z" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M8 4L12 8" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </router-link>
+            <button v-if="props.file?.id" class="action-btn move-btn" @click.stop="handleMove" title="Move collection">
+              <svg width="14" height="14" viewBox="0 0 16 16">
+                <path d="M8 2L12 6H10V10H6V6H4L8 2Z" fill="currentColor"/>
+                <path d="M2 14H14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              </svg>
+            </button>
+            <button class="action-btn remove-btn" @click.stop="handleRemove" title="Remove collection">
+              <svg width="14" height="14" viewBox="0 0 16 16">
+                <path d="M2 2l12 12M14 2l-12 12" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Preview fields -->
+        <div class="preview-section" v-if="previewValues.length > 0">
+          <div class="preview-fields">
+            <div 
+              v-for="field in previewValues" 
+              :key="field.key" 
+              class="preview-field"
+            >
+              <span class="field-label">{{ field.label }}</span>
+              <span class="field-value">{{ field.value || 'undefined' }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Directory badge -->
         <div class="directory-badge">
           <svg width="12" height="12" viewBox="0 0 12 12">
             <path d="M2 2h8v8H2z" fill="none" stroke="#ffb300" stroke-width="1.2"/>
             <path d="M2 2h3l1 2h4" fill="none" stroke="#ffb300" stroke-width="1.2"/>
           </svg>
         </div>
-        <div class="tree-icon" v-html="icon"></div>
-        <div class="tree-name">{{ name }}</div>
+
+        <!-- Drop indicators -->
         <div v-if="isDropTarget && !isMoving" class="drop-indicator">Drop here to move</div>
         <div v-if="isMoving" class="move-indicator">
           <div class="spinner"></div>
@@ -27,40 +66,6 @@
         </div>
       </div>
     </router-link>
-    <router-link v-if="isAuthenticated && props.file?.id" :to="{name: 'FileEditor', query: { id: props.file.id }}">
-      <button 
-        class="edit-btn" 
-        title="Edit collection"
-      >
-        <svg width="16" height="16" viewBox="0 0 16 16">
-          <path d="M11 1L15 5L5 15H1V11L11 1Z" stroke="#007bff" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M8 4L12 8" stroke="#007bff" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-      </button>
-    </router-link>
-    
-    <button 
-      v-if="isAuthenticated && props.file?.id"
-      class="move-btn" 
-      @click.stop="handleMove"
-      title="Move collection"
-    >
-      <svg width="16" height="16" viewBox="0 0 16 16">
-        <path d="M8 2L12 6H10V10H6V6H4L8 2Z" fill="#ff9800"/>
-        <path d="M2 14H14" stroke="#ff9800" stroke-width="2" stroke-linecap="round"/>
-      </svg>
-    </button>
-    
-    <button 
-      v-if="isAuthenticated"
-      class="remove-btn" 
-      @click.stop="handleRemove"
-      title="Remove collection"
-    >
-      <svg width="16" height="16" viewBox="0 0 16 16">
-        <path d="M2 2l12 12M14 2l-12 12" stroke="#dc3545" stroke-width="2" fill="none" stroke-linecap="round"/>
-      </svg>
-    </button>
     
     <!-- Move Modal -->
     <MoveModal
@@ -76,9 +81,10 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import apiService from '../services/api.js'
 import { matchTagsToPreset } from '../utils/tagMatcher.js'
+import { loadFieldDefinitions } from '../utils/fieldResolver.js'
 import { isAuthenticated } from '../stores/auth.js'
 import MoveModal from './MoveModal.vue'
 
@@ -109,6 +115,36 @@ const matchedPreset = computed(() => {
   }
   return matchTagsToPreset(props.file.tags, null, props.file.object_type)
 })
+
+// Preview field values
+const previewValues = ref([])
+
+// Load preview values when component mounts or file changes
+const loadPreviewValues = async () => {
+  if (!matchedPreset.value?.previewFields || !props.file?.tags) {
+    previewValues.value = []
+    return
+  }
+  
+  const fieldDefinitions = await loadFieldDefinitions()
+  const previewFields = matchedPreset.value.previewFields
+  
+  previewValues.value = previewFields.map(fieldKey => {
+    const fieldDef = fieldDefinitions[fieldKey]
+    const value = props.file.tags[fieldKey] || 'undefined'
+    
+    return {
+      key: fieldKey,
+      label: fieldDef?.label || fieldKey.charAt(0).toUpperCase() + fieldKey.slice(1),
+      value: value
+    }
+  }).filter(Boolean)
+}
+
+// Watch for changes in matched preset and file tags
+watch([matchedPreset, () => props.file?.tags], () => {
+  loadPreviewValues()
+}, { immediate: true })
 
 const fullPath = computed(() => {
   // Use the LTREE path from the collection object directly
@@ -277,41 +313,129 @@ const handleMoved = (moveData) => {
 </script>
 
 <style scoped>
-.tree-card-container {
+.tree-card-wrapper {
   position: relative;
   display: inline-block;
+  margin: 0.5rem;
+}
+
+.tree-card-link {
+  text-decoration: none;
+  color: inherit;
+  display: block;
 }
 
 .tree-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
   background: linear-gradient(135deg, #fffbf0 0%, #fff8e1 100%);
   border: 2px solid #ffe082;
   border-radius: 16px;
-  box-shadow: 0 3px 12px rgba(255, 193, 7, 0.15);
-  padding: 1.25rem 1rem;
-  margin: 0.5rem;
-  width: 120px;
-  height: 120px;
+  box-shadow: 0 2px 8px rgba(255, 193, 7, 0.15);
+  padding: 1rem;
+  width: 240px;
+  min-height: 160px;
   transition: all 0.2s ease;
   cursor: pointer;
   position: relative;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.tree-card:hover {
+  border-color: #ffb300;
+  box-shadow: 0 8px 25px rgba(255, 179, 0, 0.25);
+  transform: translateY(-2px);
+}
+
+.tree-card.selected {
+  border-color: #ff8f00;
+  background: linear-gradient(135deg, #fff3c4 0%, #ffe082 100%);
+  box-shadow: 0 8px 25px rgba(255, 143, 0, 0.3);
 }
 
 .tree-card.dragging {
-  opacity: 0.5;
-  transform: scale(0.95);
+  opacity: 0.6;
+  transform: scale(0.95) rotate(2deg);
   z-index: 1000;
 }
 
 .tree-card.drop-target {
   border-color: #4caf50;
   background: linear-gradient(135deg, #e8f5e8 0%, #c8e6c9 100%);
-  box-shadow: 0 6px 20px rgba(76, 175, 80, 0.3);
+  box-shadow: 0 8px 25px rgba(76, 175, 80, 0.3);
   transform: scale(1.05);
+}
+
+/* Header */
+.tree-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 0.75rem;
+}
+
+.tree-icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tree-actions {
+  display: flex;
+  gap: 0.25rem;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.tree-card:hover .tree-actions {
+  opacity: 1;
+}
+
+.action-btn {
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-decoration: none;
+}
+
+.edit-btn {
+  background: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+}
+
+.edit-btn:hover {
+  background: #3b82f6;
+  color: white;
+  transform: scale(1.1);
+}
+
+.move-btn {
+  background: rgba(245, 158, 11, 0.1);
+  color: #f59e0b;
+}
+
+.move-btn:hover {
+  background: #f59e0b;
+  color: white;
+  transform: scale(1.1);
+}
+
+.remove-btn {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+}
+
+.remove-btn:hover {
+  background: #ef4444;
+  color: white;
+  transform: scale(1.1);
 }
 
 .drop-indicator {
@@ -366,47 +490,73 @@ const handleMoved = (moveData) => {
   pointer-events: none;
 }
 
-.tree-card-container.move-blocked {
+.tree-card-wrapper.move-blocked {
   opacity: 0.6;
   cursor: not-allowed;
 }
 
-.tree-card-container.move-blocked .tree-card {
+.tree-card-wrapper.move-blocked .tree-card {
   pointer-events: none;
 }
-.tree-card:hover {
-  box-shadow: 0 6px 20px rgba(255, 193, 7, 0.25);
-  transform: translateY(-3px) scale(1.02);
-  border-color: #ffb300;
-}
-.tree-card.selected {
-  border-color: #ff8f00;
-  background: linear-gradient(135deg, #fff3c4 0%, #ffe082 100%);
-  box-shadow: 0 6px 20px rgba(255, 143, 0, 0.3);
-  transform: scale(1.05);
-}
-.tree-icon {
-  margin-bottom: 0.5rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  filter: drop-shadow(0 1px 2px rgba(255, 179, 0, 0.3));
-}
+/* Collection name */
 .tree-name {
-  font-size: 0.85rem;
+  font-size: 0.9rem;
   font-weight: 600;
-  color: #333;
+  color: #1f2937;
   text-align: center;
   word-break: break-word;
   line-height: 1.3;
-  max-height: 2.2rem;
-  overflow: hidden;
+  margin-bottom: 0.75rem;
+  min-height: 2.6rem;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   line-clamp: 2;
   -webkit-box-orient: vertical;
-  margin-bottom: 0.1rem;
+  overflow: hidden;
+}
+
+/* Preview section */
+.preview-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+}
+
+.preview-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.preview-field {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 0.5rem;
+  background: rgba(255, 248, 225, 0.8);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 224, 130, 0.5);
+}
+
+.field-label {
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: #92400e;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.25rem;
+}
+
+.field-value {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #374151;
+  text-align: left;
+  word-break: break-word;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .directory-badge {
@@ -421,103 +571,17 @@ const handleMoved = (moveData) => {
   z-index: 5;
 }
 
-.edit-btn {
-  position: absolute;
-  top: 6px;
-  right: 50px;
-  background: rgba(255, 255, 255, 0.95);
-  border: 1px solid #007bff;
-  border-radius: 50%;
-  width: 22px;
-  height: 22px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  opacity: 0;
-  transition: opacity 0.2s, background-color 0.2s, transform 0.1s;
-  z-index: 10;
-  backdrop-filter: blur(4px);
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .tree-card {
+    width: 200px;
+    min-height: 140px;
+    padding: 0.75rem;
+  }
+  
+  .tree-name {
+    font-size: 0.8rem;
+  }
 }
 
-.tree-card-container:hover .edit-btn {
-  opacity: 1;
-}
-
-.edit-btn:hover {
-  background: #007bff;
-  transform: scale(1.05);
-}
-
-.edit-btn:hover svg path {
-  stroke: white;
-}
-
-.move-btn {
-  position: absolute;
-  top: 6px;
-  right: 28px;
-  background: rgba(255, 255, 255, 0.95);
-  border: 1px solid #ff9800;
-  border-radius: 50%;
-  width: 22px;
-  height: 22px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  opacity: 0;
-  transition: opacity 0.2s, background-color 0.2s, transform 0.1s;
-  z-index: 10;
-  backdrop-filter: blur(4px);
-}
-
-.tree-card-container:hover .move-btn {
-  opacity: 1;
-}
-
-.move-btn:hover {
-  background: #ff9800;
-  transform: scale(1.05);
-}
-
-.move-btn:hover svg path {
-  fill: white;
-}
-
-.move-btn:hover svg path[stroke] {
-  stroke: white;
-}
-
-.remove-btn {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  background: rgba(255, 255, 255, 0.95);
-  border: 1px solid #dc3545;
-  border-radius: 50%;
-  width: 22px;
-  height: 22px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  opacity: 0;
-  transition: opacity 0.2s, background-color 0.2s, transform 0.1s;
-  z-index: 10;
-  backdrop-filter: blur(4px);
-}
-
-.tree-card-container:hover .remove-btn {
-  opacity: 1;
-}
-
-.remove-btn:hover {
-  background: #dc3545;
-  transform: scale(1.05);
-}
-
-.remove-btn:hover svg path {
-  stroke: white;
-}
 </style> 

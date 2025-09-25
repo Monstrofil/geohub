@@ -5,6 +5,7 @@
   "tags": {
     
   },
+  "previewFields": ["name", "description"],
   "terms": ["collection", "folder", "group"],
   "name": "Collection",
   "matchScore": 0.9

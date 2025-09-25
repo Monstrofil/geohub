@@ -4,6 +4,7 @@
   "object_type": ["raw"],
   "tags": {"mime": "application/msword"},
   "terms": ["file", "document", "doc", "word"],
+  "previewFields": ["name"],
   "name": "Word Document",
   "matchScore": 0.8
 } 

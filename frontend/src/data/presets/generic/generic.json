@@ -3,6 +3,7 @@
   "fields": ["name"],
   "object_type": ["raw", "raster", "vector"],
   "tags": {},
+  "previewFields": ["name"],
   "terms": ["file", "generic"],
   "name": "Generic File",
   "matchScore": 0.1

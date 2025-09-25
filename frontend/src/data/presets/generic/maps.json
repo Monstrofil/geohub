@@ -6,6 +6,7 @@
     "type": "collection",
     "collection": "maps"
   },
+  "previewFields": ["name", "description"],
   "terms": ["maps", "cartography", "atlas", "geographical", "topographic", "navigation"],
   "name": "Maps Collection",
   "matchScore": 0.95

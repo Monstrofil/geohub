@@ -6,6 +6,7 @@
     "mbd": "plan1",
     "plan": "detail_plan"
   },
+  "previewFields": ["name", "year"],
   "terms": ["detail", "plan"],
   "name": "Detail Plan",
   "matchScore": 0.9

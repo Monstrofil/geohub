@@ -1,9 +1,0 @@
-{
-  "icon": "<svg width='24' height='24' viewBox='0 0 24 24'><rect x='4' y='2' width='16' height='20' rx='2' fill='#ffebee' stroke='#f44336' stroke-width='2'/><text x='12' y='14' text-anchor='middle' font-family='Arial' font-size='8' fill='#f44336' font-weight='bold'>PDF</text><path d='M8 6h8M8 8h6M8 10h7M8 16h8M8 18h5' stroke='#f44336' stroke-width='1'/></svg>",
-  "fields": ["name", "description"],
-  "object_type": ["raster"],
-  "tags": {"mime": "application/pdf"},
-  "terms": ["file", "raster", "pdf", "document", "image"],
-  "name": "PDF Raster",
-  "matchScore": 0.8
-}
