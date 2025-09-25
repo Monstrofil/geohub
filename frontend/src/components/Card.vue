@@ -431,9 +431,7 @@ const handleMoved = (moveData) => {
   border: 2px solid #e5e7eb;
   border-radius: 16px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-  width: 240px;
-  min-width: 200px;
-  max-width: 400px;
+  width: 100%;
   flex: 1 1 240px;
   transition: all 0.2s ease;
   cursor: pointer;
