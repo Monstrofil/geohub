@@ -25,7 +25,7 @@ def analyze_raster_file(file_path: str) -> Dict[str, Any]:
             return {
                 "gdal_compatible": False,
                 "is_georeferenced": False,
-                "error": "File is a subdataset, not a single page"
+                "error": "File has multiple pages, cannot be georeferenced"
             }
         
         # Get basic info
