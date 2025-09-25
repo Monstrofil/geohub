@@ -12,6 +12,8 @@
     "maplibre-gl": "^3.6.2",
     "pdfjs-dist": "^5.4.149",
     "proj4": "^2.19.10",
+    "v-viewer": "^3.0.22",
+    "viewerjs": "^1.11.7",
     "vue": "^3.4.0",
     "vue-router": "^4.5.1",
     "vue3-pdf-app": "^1.0.3"
