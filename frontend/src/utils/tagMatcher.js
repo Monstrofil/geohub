@@ -71,7 +71,7 @@ export function getFileType(file, allPresets = null) {
 
   const matchedPreset = matchTagsToPreset(file.tags, allPresets, file.object_type)
   
-  // Map preset names to file types for the FileCard component
+  // Map preset names to file types for the Card component
   if (matchedPreset) {
     if (matchedPreset.name === 'Generic Raster Graphic') return 'raster'
     if (matchedPreset.name === 'Generic Vector Graphic') return 'vector'

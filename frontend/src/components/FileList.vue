@@ -101,8 +101,7 @@
           :class="{ 'drop-zone-active': isMainDropZone, 'moving': isMovingToMain }"
         >
           <div class="feature-list">
-            <component 
-              :is="entry.object_type === 'file' ? FileCard : TreeCard"
+            <Card
               v-for="entry in files" 
               :key="entry.id"
               :path="entry.path"
@@ -149,8 +148,7 @@
 <script setup>
 import { ref, watch, onMounted, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import FileCard from './FileCard.vue'
-import TreeCard from './TreeCard.vue'
+import Card from './Card.vue'
 import UploadModal from './UploadModal.vue'
 import CollectionDetails from './CollectionDetails.vue'
 import apiService from '../services/api.js'
@@ -324,7 +322,7 @@ function handleMoveEnd(item) {
 }
 
 function handleItemMoved(moveData) {
-  // Set global move block during TreeCard operations
+  // Set global move block during Card operations
   isMoveInProgress.value = true
   
   // Refresh the file list to reflect the changes
