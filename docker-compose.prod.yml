@@ -30,7 +30,9 @@ services:
       - "traefik.http.services.tagger-mapserver.loadbalancer.server.port=80"
       - "traefik.http.middlewares.tagger-mapserver-cors.headers.accesscontrolalloworiginlist=${FRONTEND_DOMAIN:-yourdomain.com}"
       - "traefik.http.middlewares.tagger-mapserver-cors.headers.addvaryheader=true"
-      - "traefik.http.routers.tagger-mapserver.middlewares=tagger-mapserver-cors"
+      - "traefik.http.middlewares.tagger-mapserver-cache.headers.customresponseheaders.Cache-Control=max-age=2592000,public"
+      - "traefik.http.middlewares.tagger-mapserver-cache.headers.customresponseheaders.Expires=+2592000"
+      - "traefik.http.routers.tagger-mapserver.middlewares=tagger-mapserver-cors,tagger-mapserver-cache"
       - "containers.group=${COMPOSE_PROJECT_NAME:-tagger}"
     restart: unless-stopped
 
