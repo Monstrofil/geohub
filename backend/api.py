@@ -372,7 +372,7 @@ async def init_chunked_upload(
     os.makedirs(temp_dir, exist_ok=True)
 
     # Set expiration time (24 hours from now)
-    expires_at = datetime.datetime.now() + datetime.timedelta(hours=24)
+    expires_at = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=24)
 
     # Create upload session in database
     upload_session = await ChunkedUploadSession.create(

@@ -4,7 +4,7 @@ import hashlib
 import secrets
 import os
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Any, Optional, Union
 
 
@@ -291,7 +291,7 @@ class ChunkedUploadSession(models.Model):
     def is_expired(self) -> bool:
         """Check if the upload session has expired"""
         from datetime import datetime
-        return datetime.utcnow() > self.expires_at
+        return datetime.now(timezone.utc) > self.expires_at
     
     def is_complete(self) -> bool:
         """Check if all chunks have been received"""
