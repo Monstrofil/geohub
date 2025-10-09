@@ -364,7 +364,7 @@ async def init_chunked_upload(
 
     # Generate upload ID and calculate chunks
     upload_id = str(uuid.uuid4())
-    chunk_size = 100 * 1024 * 1024  # 100MB chunks
+    chunk_size = 75 * 1024 * 1024  # 100MB chunks
     total_chunks = (request.file_size + chunk_size - 1) // chunk_size
 
     # Create temp directory for chunks
