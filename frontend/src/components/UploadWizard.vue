@@ -421,14 +421,16 @@ async function uploadFile() {
   uploadError.value = ''
   
   try {
-    // Create FormData for upload
-    const formData = new FormData()
-    formData.append('file', selectedFile.value)
-    formData.append('parent_path', props.parentPath)
+    // Prepare tags for the new file
+    const tags = {
+      name: selectedFile.value.name,
+    }
     
-    // Upload with progress tracking
-    const response = await apiService.uploadFileWithProgress(
-      formData,
+    // Upload with progress tracking (automatically uses chunked upload for large files)
+    const response = await apiService.uploadFile(
+      selectedFile.value,
+      tags,
+      props.parentPath,
       (progress) => {
         uploadProgress.value = Math.round(progress * 100)
       }

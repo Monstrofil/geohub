@@ -535,10 +535,17 @@ async function processFile(uploadFileObj) {
     const tags = {
       name: uploadFileObj.name,
     }
-    // Upload file via API
+    // Upload file via API with progress tracking
     // For collections, upload to the collection's path; for files, upload to root
     const parentPath = file.value?.object_type === 'collection' ? file.value.path : 'root'
-    const uploadedFile = await apiService.uploadFile(uploadFileObj, tags, parentPath)
+    const uploadedFile = await apiService.uploadFile(
+      uploadFileObj, 
+      tags, 
+      parentPath,
+      (progress) => {
+        uploadStatus.value = { state: 'uploading', progress: Math.round(progress * 100) }
+      }
+    )
     uploadStatus.value = { state: 'success' }
     emit('file-uploaded', uploadedFile)
     setTimeout(() => {

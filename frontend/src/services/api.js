@@ -192,6 +192,12 @@ class ApiService {
    * @returns {Promise<Object>} The uploaded file response
    */
   async uploadFile(file, tags = {}, parentPath = "root") {
+    // Check if file is larger than 100MB and use chunked upload
+    const CHUNK_SIZE_THRESHOLD = 100 * 1024 * 1024 // 100MB
+    if (file.size > CHUNK_SIZE_THRESHOLD) {
+      return await this.uploadFileChunked(file, tags, parentPath)
+    }
+
     const formData = new FormData()
     formData.append('file', file)
     formData.append('tags', JSON.stringify(tags))
@@ -204,6 +210,71 @@ class ApiService {
     })
 
     return response.data
+  }
+
+  /**
+   * Upload a file using chunked upload for large files
+   * @param {File} file - The file to upload
+   * @param {Object} tags - Tags to associate with the file
+   * @param {string} parentPath - The LTREE path where the file should be placed (default: "root")
+   * @param {Function} onProgress - Optional progress callback
+   * @returns {Promise<Object>} The uploaded file response
+   */
+  async uploadFileChunked(file, tags = {}, parentPath = "root", onProgress = null) {
+    const CHUNK_SIZE = 100 * 1024 * 1024 // 100MB chunks
+    
+    // Initialize chunked upload
+    const initResponse = await this.axios.post('/files/chunked/init', {
+      filename: file.name,
+      file_size: file.size,
+      mime_type: file.type,
+      tags: tags,
+      parent_path: parentPath
+    })
+    
+    const { upload_id, chunk_size, total_chunks } = initResponse.data
+    
+    try {
+      // Upload chunks
+      for (let chunkNumber = 0; chunkNumber < total_chunks; chunkNumber++) {
+        const start = chunkNumber * chunk_size
+        const end = Math.min(start + chunk_size, file.size)
+        const chunk = file.slice(start, end)
+        
+        const formData = new FormData()
+        formData.append('upload_id', upload_id)
+        formData.append('chunk_number', chunkNumber)
+        formData.append('chunk_data', chunk, `chunk_${chunkNumber}`)
+        
+        await this.axios.post('/files/chunked/upload', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          }
+        })
+        
+        // Report progress
+        if (onProgress) {
+          const progress = (chunkNumber + 1) / total_chunks
+          onProgress(progress)
+        }
+      }
+      
+      // Complete the upload
+      const completeResponse = await this.axios.post('/files/chunked/complete', {
+        upload_id: upload_id
+      })
+      
+      return completeResponse.data
+      
+    } catch (error) {
+      // Cancel upload on error
+      try {
+        await this.axios.delete(`/files/chunked/${upload_id}`)
+      } catch (cancelError) {
+        console.warn('Failed to cancel upload:', cancelError)
+      }
+      throw error
+    }
   }
 
   /**

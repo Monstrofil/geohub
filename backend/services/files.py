@@ -68,3 +68,28 @@ class FileService:
             
         await file_obj.delete()
         return True
+    
+    @classmethod
+    async def combine_chunks(cls, temp_dir: str, total_chunks: int, original_filename: str) -> str:
+        """Combine uploaded chunks into a single file"""
+        # Generate final upload path
+        upload_path = cls._generate_upload_path()
+        os.makedirs(upload_path, exist_ok=True)
+        
+        # Generate unique filename
+        file_extension = os.path.splitext(original_filename)[1] if original_filename else ""
+        unique_filename = f"{uuid.uuid4()}{file_extension}"
+        final_file_path = os.path.join(upload_path, unique_filename)
+        
+        # Combine chunks in order
+        async with aiofiles.open(final_file_path, 'wb') as final_file:
+            for chunk_number in range(total_chunks):
+                chunk_path = os.path.join(temp_dir, f"chunk_{chunk_number}")
+                if not os.path.exists(chunk_path):
+                    raise FileNotFoundError(f"Chunk {chunk_number} not found")
+                
+                async with aiofiles.open(chunk_path, 'rb') as chunk_file:
+                    chunk_data = await chunk_file.read()
+                    await final_file.write(chunk_data)
+        
+        return final_file_path

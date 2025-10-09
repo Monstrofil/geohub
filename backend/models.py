@@ -264,6 +264,45 @@ class TreeItem(models.Model):
         return result
 
 
+class ChunkedUploadSession(models.Model):
+    """Model for tracking chunked upload sessions"""
+    id = fields.UUIDField(pk=True)
+    upload_id = fields.CharField(max_length=255, unique=True, index=True)
+    user = fields.ForeignKeyField('models.User', related_name='upload_sessions')
+    filename = fields.CharField(max_length=255)
+    file_size = fields.BigIntField()
+    mime_type = fields.CharField(max_length=100, null=True)
+    tags = fields.JSONField(default=dict)
+    parent_path = fields.CharField(max_length=500, default="root")
+    chunk_size = fields.BigIntField()
+    total_chunks = fields.IntField()
+    chunks_received = fields.JSONField(default=list)  # List of chunk numbers received
+    temp_dir = fields.CharField(max_length=500)  # Path to temporary directory
+    created_at = fields.DatetimeField(auto_now_add=True)
+    updated_at = fields.DatetimeField(auto_now=True)
+    expires_at = fields.DatetimeField()  # Session expiration time
+    
+    class Meta:
+        table = "chunked_upload_sessions"
+    
+    def __str__(self):
+        return f"ChunkedUploadSession(id={self.id}, upload_id='{self.upload_id}', filename='{self.filename}')"
+    
+    def is_expired(self) -> bool:
+        """Check if the upload session has expired"""
+        from datetime import datetime
+        return datetime.now() > self.expires_at
+    
+    def is_complete(self) -> bool:
+        """Check if all chunks have been received"""
+        return len(self.chunks_received) == self.total_chunks
+    
+    def add_chunk(self, chunk_number: int):
+        """Add a chunk number to the received chunks list"""
+        if chunk_number not in self.chunks_received:
+            self.chunks_received.append(chunk_number)
+            self.chunks_received.sort()  # Keep sorted for easier debugging
+
 
 # Pydantic models for API
 User_Pydantic = pydantic_model_creator(User, name="User", exclude=("password_hash", "salt"))
@@ -272,6 +311,7 @@ TreeItem_Pydantic = pydantic_model_creator(TreeItem, name="TreeItem")
 RawFile_Pydantic = pydantic_model_creator(RawFile, name="RawFile")
 GeoRasterFile_Pydantic = pydantic_model_creator(GeoRasterFile, name="GeoRasterFile")
 Collection_Pydantic = pydantic_model_creator(Collection, name="Collection")
+ChunkedUploadSession_Pydantic = pydantic_model_creator(ChunkedUploadSession, name="ChunkedUploadSession")
 
 # Backward compatibility aliases
 File = TreeItem

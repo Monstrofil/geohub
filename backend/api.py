@@ -6,12 +6,13 @@ import datetime
 import json
 import uuid
 import shutil
+import aiofiles
 from pathlib import Path
 from pydantic import BaseModel, ConfigDict
 
 import models
 import models_factory
-from models import TreeItem, User
+from models import TreeItem, User, ChunkedUploadSession
 from services import FileService, CollectionsService, georeference
 from services.geo import analyze_raster_file
 from mapserver_service import MapServerService
@@ -99,6 +100,32 @@ class ControlPointsRequest(BaseModel):
 class GeoreferencingApplyRequest(BaseModel):
     control_points: List[ControlPointModel]
     control_points_srs: str = "EPSG:4326"
+
+
+# Chunked upload models
+class ChunkedUploadInitRequest(BaseModel):
+    filename: str
+    file_size: int
+    mime_type: Optional[str] = None
+    tags: Optional[Dict[str, Any]] = None
+    parent_path: Optional[str] = "root"
+
+
+class ChunkedUploadInitResponse(BaseModel):
+    upload_id: str
+    chunk_size: int
+    total_chunks: int
+
+
+class ChunkedUploadChunkRequest(BaseModel):
+    upload_id: str
+    chunk_number: int
+    chunk_data: bytes
+
+
+class ChunkedUploadCompleteRequest(BaseModel):
+    upload_id: str
+    checksum: Optional[str] = None
 
 # ======================
 # UNIFIED TREE ITEM ENDPOINTS
@@ -315,6 +342,169 @@ async def upload_file(
     file_obj.owner_user_id = current_user.id
     file_obj.permissions = 0o644
     await file_obj.save()
+    
+    return TreeItemResponse.model_validate(file_obj)
+
+
+# ======================
+# CHUNKED UPLOAD ENDPOINTS
+# ======================
+
+@router.post("/files/chunked/init", response_model=ChunkedUploadInitResponse)
+async def init_chunked_upload(
+    request: ChunkedUploadInitRequest,
+    current_user: Optional[User] = Depends(get_current_user)
+):
+    """Initialize a chunked upload session"""
+    collection = await CollectionsService.get_collection_by_path(request.parent_path or "root")
+    if not collection:
+        raise HTTPException(status_code=404, detail="Collection not found")
+
+    await require_permission(collection, current_user, Permission.WRITE)
+
+    # Generate upload ID and calculate chunks
+    upload_id = str(uuid.uuid4())
+    chunk_size = 100 * 1024 * 1024  # 100MB chunks
+    total_chunks = (request.file_size + chunk_size - 1) // chunk_size
+
+    # Create temp directory for chunks
+    temp_dir = os.path.join("uploads", "temp", upload_id)
+    os.makedirs(temp_dir, exist_ok=True)
+
+    # Set expiration time (24 hours from now)
+    expires_at = datetime.datetime.now() + datetime.timedelta(hours=24)
+
+    # Create upload session in database
+    upload_session = await ChunkedUploadSession.create(
+        upload_id=upload_id,
+        user=current_user,
+        filename=request.filename,
+        file_size=request.file_size,
+        mime_type=request.mime_type,
+        tags=request.tags or {},
+        parent_path=request.parent_path or "root",
+        chunk_size=chunk_size,
+        total_chunks=total_chunks,
+        chunks_received=[],
+        temp_dir=temp_dir,
+        expires_at=expires_at
+    )
+
+    return ChunkedUploadInitResponse(
+        upload_id=upload_id,
+        chunk_size=chunk_size,
+        total_chunks=total_chunks
+    )
+
+
+@router.post("/files/chunked/upload")
+async def upload_chunk(
+    upload_id: str = Form(...),
+    chunk_number: int = Form(...),
+    chunk_data: UploadFile = File(...),
+    current_user: Optional[User] = Depends(get_current_user)
+):
+    """Upload a single chunk"""
+    # Get upload session from database
+    session = await ChunkedUploadSession.get_or_none(upload_id=upload_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Upload session not found")
+    
+    # Check if session belongs to current user
+    if session.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    # Check if session has expired
+    if session.is_expired():
+        raise HTTPException(status_code=410, detail="Upload session has expired")
+    
+    if chunk_number < 0 or chunk_number >= session.total_chunks:
+        raise HTTPException(status_code=400, detail="Invalid chunk number")
+    
+    # Save chunk
+    chunk_path = os.path.join(session.temp_dir, f"chunk_{chunk_number}")
+    content = await chunk_data.read()
+    
+    async with aiofiles.open(chunk_path, 'wb') as f:
+        await f.write(content)
+    
+    # Mark chunk as received in database
+    session.add_chunk(chunk_number)
+    await session.save()
+    
+    return {
+        "message": "Chunk uploaded successfully",
+        "chunk_number": chunk_number,
+        "chunks_received": len(session.chunks_received),
+        "total_chunks": session.total_chunks
+    }
+
+
+@router.post("/files/chunked/complete", response_model=TreeItemResponse)
+async def complete_chunked_upload(
+    request: ChunkedUploadCompleteRequest,
+    current_user: Optional[User] = Depends(get_current_user)
+):
+    """Complete the chunked upload and create the file"""
+    # Get upload session from database
+    session = await ChunkedUploadSession.get_or_none(upload_id=request.upload_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Upload session not found")
+    
+    # Check if session belongs to current user
+    if session.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    # Check if session has expired
+    if session.is_expired():
+        # Clean up expired session
+        shutil.rmtree(session.temp_dir, ignore_errors=True)
+        await session.delete()
+        raise HTTPException(status_code=410, detail="Upload session has expired")
+    
+    # Check if all chunks are received
+    if not session.is_complete():
+        missing_chunks = set(range(session.total_chunks)) - set(session.chunks_received)
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Missing chunks: {sorted(missing_chunks)}"
+        )
+    
+    # Combine chunks into final file
+    final_file_path = await FileService.combine_chunks(
+        session.temp_dir, 
+        session.total_chunks, 
+        session.filename
+    )
+    
+    # Create file info
+    file_info = {
+        "original_name": session.filename,
+        "name": os.path.basename(final_file_path),
+        "file_path": final_file_path,
+        "file_size": session.file_size,
+        "mime_type": session.mime_type or "application/octet-stream"
+    }
+    
+    # Analyze file for georeferencing
+    analysis = analyze_raster_file(file_info["file_path"])
+    is_georeferenced = analysis.get("is_georeferenced", False)
+    
+    # Create file object
+    if is_georeferenced:
+        file_obj = await models_factory.create_geo_file(
+            file_info, session.tags, parent_path=session.parent_path)
+    else:
+        file_obj = await models_factory.create_file(
+            file_info, session.tags, parent_path=session.parent_path)
+    
+    file_obj.owner_user_id = current_user.id
+    file_obj.permissions = 0o644
+    await file_obj.save()
+    
+    # Clean up temp directory and session
+    shutil.rmtree(session.temp_dir, ignore_errors=True)
+    await session.delete()
     
     return TreeItemResponse.model_validate(file_obj)
 
