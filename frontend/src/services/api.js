@@ -192,8 +192,8 @@ class ApiService {
    * @returns {Promise<Object>} The uploaded file response
    */
   async uploadFile(file, tags = {}, parentPath = "root") {
-    // Check if file is larger than 100MB and use chunked upload
-    const CHUNK_SIZE_THRESHOLD = 100 * 1024 * 1024 // 100MB
+    // Check if file is larger than 75MB and use chunked upload
+    const CHUNK_SIZE_THRESHOLD = 75 * 1024 * 1024 // 100MB
     if (file.size > CHUNK_SIZE_THRESHOLD) {
       return await this.uploadFileChunked(file, tags, parentPath)
     }
@@ -221,7 +221,7 @@ class ApiService {
    * @returns {Promise<Object>} The uploaded file response
    */
   async uploadFileChunked(file, tags = {}, parentPath = "root", onProgress = null) {
-    const CHUNK_SIZE = 100 * 1024 * 1024 // 100MB chunks
+    const CHUNK_SIZE = 75 * 1024 * 1024 // 100MB chunks
     
     // Initialize chunked upload
     const initResponse = await this.axios.post('/files/chunked/init', {
