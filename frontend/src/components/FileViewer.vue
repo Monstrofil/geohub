@@ -1126,9 +1126,6 @@ async function handleTaskComplete(state) {
     
     // Reload the file to get the latest state
     await loadFile()
-    
-    // After conversion, automatically start the georeferencing process
-    startGeoreferencing()
   }, 1500)
 }
 
