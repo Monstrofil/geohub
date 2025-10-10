@@ -149,6 +149,7 @@ import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import apiService from '../services/api.js'
+import { useGeoreferencing } from '../composables/useBackgroundTasks.js'
 
 const props = defineProps({
   fileId: { type: String, required: true },
@@ -156,6 +157,9 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['close', 'completed'])
+
+// Georeferencing composable
+const { startGeoreferencing, getGeoreferencingStatus, isGeoreferencing } = useGeoreferencing()
 
 // State
 const imageContainer = ref(null)
@@ -183,7 +187,8 @@ const selectedMapLayer = ref('osm')
 const validationResults = ref(null)
 
 // Apply georeferencing loading state
-const isApplyingGeoreferencing = ref(false)
+// Use the georeferencing status from the composable
+const isApplyingGeoreferencing = computed(() => isGeoreferencing(props.fileId))
 
 // Computed
 const imageTransform = computed(() => {
@@ -595,24 +600,33 @@ async function validateControlPoints() {
 async function applyGeoreferencing() {
   if (!canApply.value || isApplyingGeoreferencing.value) return
   
-  isApplyingGeoreferencing.value = true
-  
   try {
-    const response = await apiService.applyGeoreferencing(props.fileId, {
+    const request = {
       control_points: controlPoints.value,
       control_points_srs: 'EPSG:4326'
-    })
+    }
     
-    emit('completed', {
-      message: 'Georeferencing applied successfully',
-      fileInfo: response.file.tags,
-      validationResults: response.validation_results
+    // Start the background georeferencing task
+    await startGeoreferencing(props.fileId, request, {
+      onProgress: (state) => {
+        console.log(`Georeferencing progress: ${state.progress}% - ${state.status}`)
+      },
+      onComplete: (state) => {
+        console.log('Georeferencing completed successfully')
+        emit('completed', {
+          message: 'Georeferencing applied successfully',
+          fileInfo: props.fileInfo, // Use current file info since the task doesn't return updated file info
+          validationResults: state.result?.validation_results
+        })
+      },
+      onError: (state) => {
+        console.error('Georeferencing failed:', state.error)
+        alert('Failed to apply georeferencing: ' + (state.error || 'Unknown error'))
+      }
     })
   } catch (error) {
-    console.error('Apply georeferencing failed:', error)
-    alert('Failed to apply georeferencing: ' + error.message)
-  } finally {
-    isApplyingGeoreferencing.value = false
+    console.error('Failed to start georeferencing:', error)
+    alert('Failed to start georeferencing: ' + error.message)
   }
 }
 

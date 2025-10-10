@@ -221,8 +221,7 @@ class ApiService {
    * @returns {Promise<Object>} The uploaded file response
    */
   async uploadFileChunked(file, tags = {}, parentPath = "root", onProgress = null) {
-    const CHUNK_SIZE = 75 * 1024 * 1024 // 100MB chunks
-    
+
     // Initialize chunked upload
     const initResponse = await this.axios.post('/files/chunked/init', {
       filename: file.name,
@@ -524,6 +523,15 @@ class ApiService {
   }
 
   /**
+   * Get active tasks for a file
+   * @param {string} fileId - The file ID
+   * @returns {Promise<Object>} Tasks data
+   */
+  async getFileTasks(fileId) {
+    return await this.request(`/files/${fileId}/tasks`)
+  }
+
+  /**
    * Clean up old MapServer configurations
    * @param {number} maxAgeHours - Maximum age in hours
    * @returns {Promise<Object>} Cleanup response
@@ -786,13 +794,46 @@ class ApiService {
   }
 
   /**
-   * Convert a tree item to geo-raster format for georeferencing
+   * Convert a tree item to geo-raster format for georeferencing (background task)
    * @param {string} itemId - The tree item ID
-   * @returns {Promise<Object>} Updated tree item object
+   * @returns {Promise<Object>} Task response with task_id
    */
   async convertToGeoRaster(itemId) {
     return await this.request(`/tree-items/${itemId}/convert-to-geo-raster`, {
       method: 'POST'
+    })
+  }
+
+  /**
+   * Get the status of a background task
+   * @param {string} taskId - The task ID
+   * @returns {Promise<Object>} Task status information
+   */
+  async getTaskStatus(taskId) {
+    return await this.request(`/tasks/${taskId}/status`, {
+      method: 'GET'
+    })
+  }
+
+  /**
+   * Cancel a background task
+   * @param {string} taskId - The task ID
+   * @returns {Promise<Object>} Cancellation result
+   */
+  async cancelTask(taskId) {
+    return await this.request(`/tasks/${taskId}/cancel`, {
+      method: 'POST'
+    })
+  }
+
+  /**
+   * Get the conversion status for a tree item
+   * @param {string} itemId - The tree item ID
+   * @returns {Promise<Object>} Conversion status information
+   */
+  async getConversionStatus(itemId) {
+    return await this.request(`/tree-items/${itemId}/conversion-status`, {
+      method: 'GET'
     })
   }
 

@@ -99,10 +99,25 @@ async def create_geo_file(file_info: Dict[str, str], tags: Dict[str, str] = None
     return file_obj
 
 
-async def convert_to_geo_raster(raw_file: RawFile, upload_dir: str = "uploads") -> TreeItem:
-    """Convert a RawFile to GeoRasterFile and create dummy georeferenced TIF if needed"""
+async def convert_to_geo_raster(raw_file: RawFile, upload_dir: str = "uploads", progress_callback=None) -> TreeItem:
+    """Convert a RawFile to GeoRasterFile and create dummy georeferenced TIF if needed
+    
+    Args:
+        raw_file: The RawFile object to convert
+        upload_dir: Upload directory (kept for compatibility)
+        progress_callback: Optional callback function that receives progress updates.
+                          Function signature: callback(progress: float, message: str)
+                          where progress is 0.0 to 1.0 and message is a status string.
+    """
         
+    # Notify start of conversion
+    if progress_callback:
+        progress_callback(0.0, "Starting raster conversion...")
+    
     # Analyze the raster file to make sure it's GDAL compatible and get dimensions
+    if progress_callback:
+        progress_callback(0.1, "Analyzing raster file...")
+    
     analysis = analyze_raster_file(raw_file.file_path)
     if not analysis["gdal_compatible"]:
         raise HTTPException(status_code=400, detail=f"File is not GDAL compatible: {analysis.get('error', 'Unknown error')}")
@@ -112,9 +127,26 @@ async def convert_to_geo_raster(raw_file: RawFile, upload_dir: str = "uploads") 
     image_height = analysis["height"]
     image_bands = analysis["bands"]
     
-    dummy_georeferenced_file_path = create_dummy_georeferenced_file(raw_file.file_path, upload_dir)
+    # Create progress callback for georeferencing that maps to overall progress
+    def georef_progress_callback(progress, message):
+        if progress_callback:
+            # Map georeferencing progress (0.0-1.0) to overall progress (0.2-0.7)
+            overall_progress = 0.2 + (progress * 0.5)
+            progress_callback(overall_progress, f"Georeferencing: {message}")
+    
+    if progress_callback:
+        progress_callback(0.2, "Creating georeferenced file...")
+    
+    dummy_georeferenced_file_path = create_dummy_georeferenced_file(raw_file.file_path, upload_dir, progress_callback=georef_progress_callback)
+    
+    if progress_callback:
+        progress_callback(0.7, "Creating map configuration...")
     
     map_config_path = mapserver_service._create_map_config(dummy_georeferenced_file_path)
+    
+    if progress_callback:
+        progress_callback(0.8, "Creating database records...")
+    
     geo_raster = await GeoRasterFile.create(
         original_name=raw_file.original_name,
         file_path=dummy_georeferenced_file_path,
@@ -125,9 +157,16 @@ async def convert_to_geo_raster(raw_file: RawFile, upload_dir: str = "uploads") 
         is_georeferenced=False
     )
     await geo_raster.save()
+    
+    if progress_callback:
+        progress_callback(0.9, "Cleaning up temporary files...")
+    
     await raw_file.delete()
     
     if os.path.exists(raw_file.file_path):
         os.remove(raw_file.file_path)
+    
+    if progress_callback:
+        progress_callback(1.0, "Raster conversion completed successfully")
     
     return geo_raster

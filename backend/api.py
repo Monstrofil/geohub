@@ -17,6 +17,8 @@ from services import FileService, CollectionsService, georeference
 from services.geo import analyze_raster_file
 from mapserver_service import MapServerService
 from auth import get_current_user, get_current_user_optional, require_permission, Permission
+from tasks import convert_to_geo_raster_task, apply_georeferencing_task, get_task_status, cancel_task
+from celery_app import celery_app
 
 
 router = APIRouter(tags=["files"])
@@ -126,6 +128,22 @@ class ChunkedUploadChunkRequest(BaseModel):
 class ChunkedUploadCompleteRequest(BaseModel):
     upload_id: str
     checksum: Optional[str] = None
+
+
+# Task management models
+class TaskResponse(BaseModel):
+    task_id: str
+    status: str
+    message: str
+
+
+class TaskStatusResponse(BaseModel):
+    task_id: str
+    state: str
+    status: str
+    progress: int
+    result: Optional[Dict[str, Any]] = None
+    error: Optional[str] = None
 
 # ======================
 # UNIFIED TREE ITEM ENDPOINTS
@@ -554,9 +572,9 @@ async def probe_tree_item(item_id: uuid.UUID, current_user: Optional[User] = Dep
     return result
 
 
-@router.post("/tree-items/{item_id}/convert-to-geo-raster", response_model=TreeItemResponse)
+@router.post("/tree-items/{item_id}/convert-to-geo-raster", response_model=TaskResponse)
 async def convert_to_geo_raster(item_id: uuid.UUID, current_user: Optional[User] = Depends(get_current_user_optional)):
-    """Convert a RawFile to GeoRasterFile for georeferencing"""
+    """Convert a RawFile to GeoRasterFile for georeferencing (background task)"""
     tree_item = await TreeItem.get_or_none(id=item_id)
     if not tree_item:
         raise HTTPException(status_code=404, detail="TreeItem not found")
@@ -566,19 +584,19 @@ async def convert_to_geo_raster(item_id: uuid.UUID, current_user: Optional[User]
     raw_file = await tree_item.get_object()
     if not raw_file:
         raise HTTPException(status_code=404, detail="Raw file not found")
-
-    geo_raster_file_obj = await models_factory.convert_to_geo_raster(raw_file, "uploads")
     
-    # Ensure the new geo raster file is marked as not georeferenced initially
-    geo_raster_file_obj.is_georeferenced = False
-    await geo_raster_file_obj.save()
+    # Check if it's already a geo raster file
+    if tree_item.object_type == "geo_raster_file":
+        raise HTTPException(status_code=400, detail="File is already a geo raster file")
 
-    # Update TreeItem to point to GeoRasterFile
-    tree_item.object_type = "geo_raster_file"
-    tree_item.object_id = geo_raster_file_obj.id
-    await tree_item.save()
-
-    return TreeItemResponse.model_validate(tree_item)
+    # Start background task
+    task = convert_to_geo_raster_task.delay(str(item_id), "uploads")
+    
+    return TaskResponse(
+        task_id=task.id,
+        status="STARTED",
+        message="Geo-raster conversion started in background"
+    )
 
 
 @router.get("/files/{file_id}/download")
@@ -705,55 +723,104 @@ async def validate_control_points(file_id: uuid.UUID, request: ControlPointsRequ
 
 @router.post("/files/{file_id}/apply-georeferencing")
 async def apply_georeferencing(file_id: uuid.UUID, request: GeoreferencingApplyRequest):
-    """Apply georeferencing to a file and update the database"""
+    """Apply georeferencing to a file using background task"""
     tree_obj = await models.TreeItem.get_or_none(id=file_id, object_type="geo_raster_file")
     if not tree_obj:
         raise HTTPException(status_code=404, detail="File not found")
     
-
     geo_raster_file = await tree_obj.get_object()
     file_path = geo_raster_file.file_path
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="File not found on disk")
     
-    # Convert Pydantic models to ControlPoint objects
-    control_points = [
-        georeference.ControlPoint(cp.image_x, cp.image_y, cp.world_x, cp.world_y)
+    # Convert Pydantic models to control point dictionaries for the task
+    control_points_data = [
+        {
+            "image_x": cp.image_x,
+            "image_y": cp.image_y,
+            "world_x": cp.world_x,
+            "world_y": cp.world_y
+        }
         for cp in request.control_points
     ]
     
-    # Validate control points
-    validation_results = georeference.validate_control_points(control_points)
-    
-    if not validation_results['valid']:
-        raise HTTPException(status_code=400, detail=f"Invalid control points: {validation_results['errors']}")
-    
-    # Create the final georeferenced file
-    georeferenced_path = georeference.warp_image_with_control_points(
-        file_path,
-        control_points,
+    # Start the background task
+    task = apply_georeferencing_task.delay(
+        str(file_id),
+        control_points_data,
         request.control_points_srs
     )
     
-    # save old file path
-    old_file_path = file_path
+    return {
+        "message": "Georeferencing task started",
+        "task_id": task.id,
+        "status": "PROGRESS"
+    }
 
-    # regenerate map config to clear cache on mapserver
-    map_config_path = mapserver_service._create_map_config(georeferenced_path)
-    geo_raster_file.map_config_path = map_config_path
-    geo_raster_file.file_path = georeferenced_path
-    geo_raster_file.is_georeferenced = True
-    
-    await geo_raster_file.save()
 
-    if os.path.exists(old_file_path) and old_file_path != geo_raster_file.original_file_path:
-        os.remove(old_file_path)
+@router.get("/files/{file_id}/tasks")
+async def get_file_tasks(file_id: uuid.UUID, current_user: Optional[User] = Depends(get_current_user_optional)):
+    """Get all active tasks for a specific file"""
+    tree_obj = await models.TreeItem.get_or_none(id=file_id)
+    if not tree_obj:
+        raise HTTPException(status_code=404, detail="File not found")
     
+    await require_permission(tree_obj, current_user, Permission.READ)
+    
+    # Get all active tasks from Celery
+    active_tasks = celery_app.control.inspect().active()
+    scheduled_tasks = celery_app.control.inspect().scheduled()
+    reserved_tasks = celery_app.control.inspect().reserved()
+    
+    file_tasks = []
+    
+    # Check active tasks
+    for worker, tasks in active_tasks.items():
+        for task in tasks:
+            if task.get('args') and len(task['args']) > 0:
+                # Check if the first argument matches our file_id
+                if str(task['args'][0]) == str(file_id):
+                    file_tasks.append({
+                        'task_id': task['id'],
+                        'name': task['name'],
+                        'state': 'PROGRESS',
+                        'status': 'Processing',
+                        'progress': 0,
+                        'worker': worker
+                    })
+    
+    # Check scheduled tasks
+    for worker, tasks in scheduled_tasks.items():
+        for task in tasks:
+            if task.get('args') and len(task['args']) > 0:
+                if str(task['args'][0]) == str(file_id):
+                    file_tasks.append({
+                        'task_id': task['id'],
+                        'name': task['name'],
+                        'state': 'PENDING',
+                        'status': 'Scheduled',
+                        'progress': 0,
+                        'worker': worker
+                    })
+    
+    # Check reserved tasks
+    for worker, tasks in reserved_tasks.items():
+        for task in tasks:
+            if task.get('args') and len(task['args']) > 0:
+                if str(task['args'][0]) == str(file_id):
+                    file_tasks.append({
+                        'task_id': task['id'],
+                        'name': task['name'],
+                        'state': 'PENDING',
+                        'status': 'Reserved',
+                        'progress': 0,
+                        'worker': worker
+                    })
     
     return {
-        "message": "Georeferencing applied successfully",
-        "file": TreeItemResponse.model_validate(tree_obj),
-        "validation_results": validation_results
+        "file_id": str(file_id),
+        "tasks": file_tasks,
+        "has_active_tasks": len(file_tasks) > 0
     }
 
 
@@ -806,4 +873,78 @@ async def reset_georeferencing(file_id: uuid.UUID, current_user: Optional[User] 
         "message": "Georeferencing reset successfully",
         "file": TreeItemResponse.model_validate(tree_obj)
     }
+
+
+# ======================
+# TASK MANAGEMENT ENDPOINTS
+# ======================
+
+@router.get("/tasks/{task_id}/status", response_model=TaskStatusResponse)
+async def get_task_status_endpoint(task_id: str):
+    """Get the status of a background task"""
+    try:
+        # Get task status using the Celery task
+        status_result = get_task_status.delay(task_id)
+        status_info = status_result.get(timeout=5)  # 5 second timeout
+        
+        return TaskStatusResponse(
+            task_id=task_id,
+            state=status_info.get("state", "UNKNOWN"),
+            status=status_info.get("status", "Unknown status"),
+            progress=status_info.get("progress", 0),
+            result=status_info.get("result"),
+            error=status_info.get("error")
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error retrieving task status: {str(e)}")
+
+
+@router.post("/tasks/{task_id}/cancel", response_model=TaskResponse)
+async def cancel_task_endpoint(task_id: str):
+    """Cancel a background task"""
+    try:
+        # Cancel task using the Celery task
+        cancel_result = cancel_task.delay(task_id)
+        cancel_info = cancel_result.get(timeout=5)  # 5 second timeout
+        
+        return TaskResponse(
+            task_id=task_id,
+            status=cancel_info.get("status", "UNKNOWN"),
+            message=cancel_info.get("message", "Task cancellation attempted")
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error cancelling task: {str(e)}")
+
+
+@router.get("/tree-items/{item_id}/conversion-status")
+async def get_conversion_status(item_id: uuid.UUID, current_user: Optional[User] = Depends(get_current_user_optional)):
+    """Get the current conversion status for a tree item"""
+    tree_item = await TreeItem.get_or_none(id=item_id)
+    if not tree_item:
+        raise HTTPException(status_code=404, detail="TreeItem not found")
+
+    await require_permission(tree_item, current_user, Permission.READ)
+    
+    # Check if it's already converted
+    if tree_item.object_type == "geo_raster_file":
+        return {
+            "item_id": str(item_id),
+            "status": "COMPLETED",
+            "object_type": "geo_raster_file",
+            "message": "File is already converted to geo raster"
+        }
+    elif tree_item.object_type == "raw_file":
+        return {
+            "item_id": str(item_id),
+            "status": "PENDING",
+            "object_type": "raw_file",
+            "message": "File is ready for conversion"
+        }
+    else:
+        return {
+            "item_id": str(item_id),
+            "status": "UNKNOWN",
+            "object_type": tree_item.object_type,
+            "message": "Unknown file type"
+        }
     

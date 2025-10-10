@@ -13,3 +13,5 @@ GDAL==3.10.3
 geopandas
 pytest
 pytest-asyncio
+celery[redis]
+redis

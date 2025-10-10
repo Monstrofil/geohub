@@ -13,6 +13,16 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   backend:
     build: ./backend
     volumes:
@@ -31,10 +41,49 @@ services:
       UVICORN_WORKERS: ${UVICORN_WORKERS:-1}
       DEBUG: ${DEBUG:-false}
       LOG_LEVEL: ${LOG_LEVEL:-info}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
     env_file:
       - .env
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  celery-worker:
+    build: ./backend
+    command: celery -A celery_app worker --loglevel=info --queues=geo_processing,default
+    volumes:
+      - ./backend:/app
+      - ./backend/uploads:/opt/shared/uploads
+      - mapserver_configs:/opt/shared/mapserver
+    environment:
+      DB_NAME: ${POSTGRES_DB:-tagger_db}
+      DB_USER: ${POSTGRES_USER:-tagger_user}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-tagger_password}
+      MAPSERVER_URL: ${MAPSERVER_URL:-http://mapserver}
+      MAPSERVER_SHARED_DIR: ${MAPSERVER_SHARED_DIR:-/opt/shared/mapserver}
+      DEBUG: ${DEBUG:-false}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      PYTHONPATH: /app
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  flower:
+    build: ./backend
+    command: celery -A celery_app flower --port=5555
+    ports:
+      - "5555:5555"
+    environment:
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+    depends_on:
+      redis:
         condition: service_healthy
 
   mapserver:
@@ -52,4 +101,5 @@ services:
 
 volumes:
   postgres_data:
+  redis_data:
   mapserver_configs:

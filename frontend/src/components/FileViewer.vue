@@ -63,6 +63,15 @@
         <button @click="goBack" class="back-btn">Go Back</button>
       </div>
       
+      <div v-else-if="hasActiveTasks" class="task-content">
+        <TaskStatusDisplay 
+          :file-id="file.id"
+          :tasks="fileTasks"
+          @task-completed="handleTaskCompleted"
+          @refresh-requested="handleRefreshRequested"
+        />
+      </div>
+      
       <div v-else class="file-content">
         <div class="content-layout">
           <!-- Left panel: Main content -->
@@ -426,13 +435,12 @@
                 <p>This file can be prepared for georeferencing. We'll convert it to a geo-raster format and then open the georeferencing interface where you can add control points.</p>
                 
                 <div class="georef-actions">
-                  <button class="btn btn-success convert-btn" @click="convertToGeoRaster" :disabled="isConverting">
-                    <div v-if="isConverting" class="spinner"></div>
-                    <svg v-else width="24" height="24" viewBox="0 0 24 24">
+                  <button class="btn btn-success convert-btn" @click="startConversion">
+                    <svg width="24" height="24" viewBox="0 0 24 24">
                       <path d="M9 12l2 2 4-4" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
                       <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/>
                     </svg>
-                    {{ isConverting ? 'Converting...' : 'Convert & Start Georeferencing' }}
+                    Convert & Start Georeferencing
                   </button>
                 </div>
                 
@@ -544,6 +552,17 @@
       @close="closeGeoreferencing"
       @completed="onGeoreferencingCompleted" 
     />
+
+    <!-- Task Progress Modal -->
+    <TaskProgressModal
+      v-if="showTaskProgress && currentTaskId"
+      :is-visible="showTaskProgress"
+      title="Converting to Geo-Raster"
+      :task-id="currentTaskId"
+      @close="handleTaskProgressClose"
+      @complete="handleTaskComplete"
+      @error="handleTaskError"
+    />
     
     <!-- Reset Georeferencing Confirmation Modal -->
     <div v-if="showResetConfirmation" class="modal-overlay" @click="showResetConfirmation = false">
@@ -586,6 +605,8 @@ import { useRoute, useRouter } from 'vue-router'
 import InteractiveMap from './InteractiveMap.vue'
 import CollectionFilesList from './CollectionFilesList.vue'
 import GeoreferencingModal from './GeoreferencingModal.vue'
+import TaskProgressModal from './TaskProgressModal.vue'
+import TaskStatusDisplay from './TaskStatusDisplay.vue'
 import { isAuthenticated } from '../stores/auth.js'
 import { matchTagsToPreset, getAllPresets } from '../utils/tagMatcher.js'
 import { loadFieldDefinitions, resolveFields } from '../utils/fieldResolver.js'
@@ -617,8 +638,14 @@ const probeResult = ref(null)
 const probeLoading = ref(false)
 const probeError = ref(null)
 
-// Conversion state
-const isConverting = ref(false)
+// Task checking state
+const fileTasks = ref([])
+const hasActiveTasks = ref(false)
+const checkingTasks = ref(false)
+
+// Task progress modal state
+const showTaskProgress = ref(false)
+const currentTaskId = ref(null)
 
 // Preview component state
 const previewComponent = ref(null)
@@ -1043,38 +1070,44 @@ async function probeFile() {
   }
 }
 
-async function convertToGeoRaster() {
+async function startConversion() {
   if (!file.value?.id) return
 
-  isConverting.value = true
-  
   try {
-    // Convert the file to geo-raster format
-    const updatedFile = await apiService.convertToGeoRaster(file.value.id)
-    
-    // Update the file object with the new data
-    file.value = updatedFile
-    
-    // Update the is_georeferenced field in the file object
-    if (file.value && file.value.object_details) {
-      file.value.object_details.is_georeferenced = false
-    }
-    
-    // Clear probe result since file is now converted
-    probeResult.value = null
+    // Start the background conversion task
+    const taskResponse = await apiService.convertToGeoRaster(file.value.id)
+    currentTaskId.value = taskResponse.task_id
+    showTaskProgress.value = true
+  } catch (err) {
+    console.error('Failed to start conversion:', err)
+    alert(`Failed to start conversion: ${err.message}`)
+  }
+}
+
+async function handleTaskComplete(state) {
+  console.log('Task completed successfully:', state)
+  
+  // Wait a moment to show completion
+  setTimeout(async () => {
+    showTaskProgress.value = false
+    currentTaskId.value = null
     
     // Reload the file to get the latest state
     await loadFile()
     
     // After conversion, automatically start the georeferencing process
-    // The file is now a geo-raster but needs control points to be properly georeferenced
     startGeoreferencing()
-  } catch (err) {
-    console.error('Failed to convert file:', err)
-    alert(`Failed to convert file: ${err.message}`)
-  } finally {
-    isConverting.value = false
-  }
+  }, 1500)
+}
+
+function handleTaskError(state) {
+  console.error('Task failed:', state)
+  // Modal will show the error, user can close it manually
+}
+
+function handleTaskProgressClose() {
+  showTaskProgress.value = false
+  currentTaskId.value = null
 }
 
 // Layer control functions
@@ -1154,6 +1187,34 @@ async function copyToClipboard(text, label) {
   setTimeout(() => { copyStatus.value = null }, 3000)
 }
 
+// Task checking functions
+async function checkFileTasks() {
+  if (!file.value?.id) return
+  
+  checkingTasks.value = true
+  try {
+    const response = await apiService.getFileTasks(file.value.id)
+    fileTasks.value = response.tasks || []
+    hasActiveTasks.value = response.has_active_tasks || false
+  } catch (error) {
+    console.error('Failed to check file tasks:', error)
+    fileTasks.value = []
+    hasActiveTasks.value = false
+  } finally {
+    checkingTasks.value = false
+  }
+}
+
+function handleTaskCompleted() {
+  // Refresh file data when task completes
+  loadFile()
+}
+
+function handleRefreshRequested() {
+  // Refresh task status
+  checkFileTasks()
+}
+
 // Lifecycle
 onMounted(async () => {
   // Load all field definitions and presets using centralized loading
@@ -1161,11 +1222,14 @@ onMounted(async () => {
   console.log('Loaded presets:', allPresets.value)
   allFieldDefinitions.value = await loadFieldDefinitions()
   await loadFile()
+  // Check for active tasks after loading file
+  await checkFileTasks()
 })
 
 // Watch for prop changes
-watch(() => props.treeItemId, () => {
-  loadFile()
+watch(() => props.treeItemId, async () => {
+  await loadFile()
+  await checkFileTasks()
 })
 </script>
 
@@ -1383,7 +1447,7 @@ watch(() => props.treeItemId, () => {
   }
 }
 
-.loading, .error, .not-found {
+.loading, .error, .not-found, .task-content {
   display: flex;
   flex-direction: column;
   align-items: center;

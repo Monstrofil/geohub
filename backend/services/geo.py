@@ -60,13 +60,16 @@ def analyze_raster_file(file_path: str) -> Dict[str, Any]:
         }
 
 
-def create_dummy_georeferenced_file(original_file_path: str, upload_dir: str, dpi: int = 300) -> str:
+def create_dummy_georeferenced_file(original_file_path: str, upload_dir: str, dpi: int = 300, progress_callback=None) -> str:
     """Create a dummy georeferenced GeoTIFF for MapServer compatibility
     
     Args:
         original_file_path: Path to the original file
         upload_dir: Upload directory (kept for compatibility)
         dpi: DPI setting for PDF conversion (default: 300)
+        progress_callback: Optional callback function that receives progress updates.
+                          Function signature: callback(progress: float, message: str)
+                          where progress is 0.0 to 1.0 and message is a status string.
     """
     
     # Set GDAL PDF DPI configuration option
@@ -138,49 +141,76 @@ def create_dummy_georeferenced_file(original_file_path: str, upload_dir: str, dp
     data_type = src_ds.GetRasterBand(1).DataType
     
     try:
-        # Create new dataset with optimized creation options
-        creation_options = [
-            'COMPRESS=LZW', 
-            'TILED=YES',
-            'INTERLEAVE=PIXEL',
-            'TILED=TRUE',
-            'BLOCKXSIZE=256',
-            'BLOCKYSIZE=256',
-            'ZLEVEL=1',
-            'BIGTIFF=IF_SAFER'
-        ]
-        dst_ds = driver.Create(georef_path, width, height, bands, data_type, options=creation_options)
+        # Create progress callback function for GDAL Translate
+        def gdal_progress_callback(progress, message, data):
+            """GDAL progress callback that forwards to user callback"""
+            if progress_callback:
+                progress_callback(progress, message or "Processing...")
+            return 1  # Return 1 to continue, 0 to cancel
         
-        # Copy all raster data using GDAL's internal methods (avoid ReadAsArray)
+        # Use GDAL's built-in Translate method for memory-efficient conversion
+        # This avoids loading entire bands into memory
+        translate_options = gdal.TranslateOptions(
+            format='GTiff',
+            creationOptions=[
+                'COMPRESS=LZW', 
+                'TILED=YES',
+                'INTERLEAVE=PIXEL',
+                'BLOCKXSIZE=256',
+                'BLOCKYSIZE=256',
+                'NUM_THREADS=8',
+                'ZLEVEL=1',
+                'BIGTIFF=IF_SAFER'
+            ],
+            # Preserve all bands and data type
+            bandList=list(range(1, bands + 1)),
+            outputType=data_type,
+            # Set geotransform and projection
+            outputSRS='EPSG:3857',
+            # Use a temporary file first, then apply geotransform
+            noData=None,  # Preserve original no-data values
+            # Add progress callback
+            callback=gdal_progress_callback
+        )
+        
+        # Notify start of translation
+        if progress_callback:
+            progress_callback(0.0, "Starting georeferencing conversion...")
+        
+        # First, translate to GeoTIFF with projection
+        temp_ds = gdal.Translate(georef_path, src_ds, options=translate_options)
+        
+        # Notify completion of translation phase
+        if progress_callback:
+            progress_callback(0.8, "Applying georeferencing parameters...")
+        
+        # Apply the custom geotransform
+        temp_ds.SetGeoTransform(geotransform)
+        
+        # Copy band metadata (no-data values, etc.)
         for band_idx in range(1, bands + 1):
             src_band = src_ds.GetRasterBand(band_idx)
-            dst_band = dst_ds.GetRasterBand(band_idx)
+            dst_band = temp_ds.GetRasterBand(band_idx)
             
-            # Use GDAL's RasterIO to copy data without needing numpy
-            # Read the entire band as binary data and write directly
-            band_data = src_band.ReadRaster(0, 0, width, height)
-            dst_band.WriteRaster(0, 0, width, height, band_data)
-            
-            # Copy band metadata
+            # Copy no-data value
             no_data_value = src_band.GetNoDataValue()
             if no_data_value is not None:
                 dst_band.SetNoDataValue(no_data_value)
         
-        # Apply geotransform
-        dst_ds.SetGeoTransform(geotransform)
+        print(f"Set projection on dummy georeferenced file: EPSG:3857")
         
-        # Set EPSG:3857 projection (Web Mercator)
-        srs = osr.SpatialReference()
-        srs.ImportFromEPSG(3857)
-        wkt = srs.ExportToWkt()
-        dst_ds.SetProjection(wkt)
-        
-        print(f"Set projection on dummy georeferenced file: {wkt[:100]}...")
+        # Notify finalization phase
+        if progress_callback:
+            progress_callback(0.95, "Finalizing georeferenced file...")
         
         # Flush and close datasets to ensure changes are written
-        dst_ds.FlushCache()
+        temp_ds.FlushCache()
+        temp_ds = None
         src_ds = None
-        dst_ds = None
+        
+        # Notify completion
+        if progress_callback:
+            progress_callback(1.0, "Georeferencing completed successfully")
         
         return georef_path
         
