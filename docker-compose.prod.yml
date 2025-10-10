@@ -84,8 +84,6 @@ services:
       - "traefik.http.routers.tagger-flower.rule=PathPrefix(`/flower`)"
       - "traefik.http.routers.tagger-flower.entrypoints=web"
       - "traefik.http.services.tagger-flower.loadbalancer.server.port=5555"
-      - "traefik.http.middlewares.tagger-flower-auth.basicAuth.users=${FLOWER_BASIC_AUTH:-admin:$$2y$$10$$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi}"
-      - "traefik.http.routers.tagger-flower.middlewares=tagger-flower-auth"
       - "containers.group=${COMPOSE_PROJECT_NAME:-tagger}"
     restart: unless-stopped
     environment:

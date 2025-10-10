@@ -77,7 +77,7 @@ services:
 
   flower:
     build: ./backend
-    command: celery -A celery_app flower --port=5555
+    command: celery -A celery_app flower --port=5555 --url-prefix=/flower
     ports:
       - "5555:5555"
     environment:
