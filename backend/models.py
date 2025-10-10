@@ -304,6 +304,25 @@ class ChunkedUploadSession(models.Model):
             self.chunks_received.sort()  # Keep sorted for easier debugging
 
 
+class TaskRecord(models.Model):
+    """Model for tracking background task metadata"""
+    task_id = fields.CharField(max_length=255, pk=True)  # Celery task ID
+    item_type = fields.CharField(max_length=255, index=True)  # Type of item (e.g., "tree_item", "raw_file", "geo_raster_file")
+    item_id = fields.CharField(max_length=255, index=True)  # ID of the item being processed
+    created_at = fields.DatetimeField(auto_now_add=True)
+    updated_at = fields.DatetimeField(auto_now=True)
+    
+    class Meta:
+        table = "task_records"
+        indexes = [
+            ("item_type", "item_id"),
+            ("created_at",),
+        ]
+    
+    def __str__(self):
+        return f"TaskRecord(task_id='{self.task_id}', item_type='{self.item_type}', item_id='{self.item_id}')"
+
+
 # Pydantic models for API
 User_Pydantic = pydantic_model_creator(User, name="User", exclude=("password_hash", "salt"))
 Group_Pydantic = pydantic_model_creator(Group, name="Group")
@@ -312,6 +331,7 @@ RawFile_Pydantic = pydantic_model_creator(RawFile, name="RawFile")
 GeoRasterFile_Pydantic = pydantic_model_creator(GeoRasterFile, name="GeoRasterFile")
 Collection_Pydantic = pydantic_model_creator(Collection, name="Collection")
 ChunkedUploadSession_Pydantic = pydantic_model_creator(ChunkedUploadSession, name="ChunkedUploadSession")
+TaskRecord_Pydantic = pydantic_model_creator(TaskRecord, name="TaskRecord")
 
 # Backward compatibility aliases
 File = TreeItem

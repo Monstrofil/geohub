@@ -93,3 +93,10 @@ const pdfUrl = computed(() => {
   border: none;
 }
 </style>
+
+<style>
+
+.pdf-app .toolbar {
+ z-index: 1 !important;
+}
+</style>

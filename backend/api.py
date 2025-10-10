@@ -12,12 +12,13 @@ from pydantic import BaseModel, ConfigDict
 
 import models
 import models_factory
-from models import TreeItem, User, ChunkedUploadSession
+from models import TreeItem, User, ChunkedUploadSession, TaskRecord
 from services import FileService, CollectionsService, georeference
 from services.geo import analyze_raster_file
 from mapserver_service import MapServerService
 from auth import get_current_user, get_current_user_optional, require_permission, Permission
-from tasks import convert_to_geo_raster_task, apply_georeferencing_task, get_task_status, cancel_task
+from tasks import convert_to_geo_raster_task, apply_georeferencing_task, cancel_task
+from task_records import get_task_records_by_item, get_task_record, create_task_record
 from celery_app import celery_app
 
 
@@ -144,6 +145,15 @@ class TaskStatusResponse(BaseModel):
     progress: int
     result: Optional[Dict[str, Any]] = None
     error: Optional[str] = None
+
+class TaskRecordResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    
+    task_id: str
+    item_type: str
+    item_id: str
+    created_at: datetime.datetime
+    updated_at: datetime.datetime
 
 # ======================
 # UNIFIED TREE ITEM ENDPOINTS
@@ -592,6 +602,13 @@ async def convert_to_geo_raster(item_id: uuid.UUID, current_user: Optional[User]
     # Start background task
     task = convert_to_geo_raster_task.delay(str(item_id), "uploads")
     
+    # Create TaskRecord for this task
+    await create_task_record(
+        task_id=task.id,
+        item_type="tree_item",
+        item_id=str(item_id)
+    )
+    
     return TaskResponse(
         task_id=task.id,
         status="STARTED",
@@ -751,6 +768,13 @@ async def apply_georeferencing(file_id: uuid.UUID, request: GeoreferencingApplyR
         request.control_points_srs
     )
     
+    # Create TaskRecord for this task
+    await create_task_record(
+        task_id=task.id,
+        item_type="tree_item",
+        item_id=str(file_id)
+    )
+    
     return {
         "message": "Georeferencing task started",
         "task_id": task.id,
@@ -758,70 +782,6 @@ async def apply_georeferencing(file_id: uuid.UUID, request: GeoreferencingApplyR
     }
 
 
-@router.get("/files/{file_id}/tasks")
-async def get_file_tasks(file_id: uuid.UUID, current_user: Optional[User] = Depends(get_current_user_optional)):
-    """Get all active tasks for a specific file"""
-    tree_obj = await models.TreeItem.get_or_none(id=file_id)
-    if not tree_obj:
-        raise HTTPException(status_code=404, detail="File not found")
-    
-    await require_permission(tree_obj, current_user, Permission.READ)
-    
-    # Get all active tasks from Celery
-    active_tasks = celery_app.control.inspect().active()
-    scheduled_tasks = celery_app.control.inspect().scheduled()
-    reserved_tasks = celery_app.control.inspect().reserved()
-    
-    file_tasks = []
-    
-    # Check active tasks
-    for worker, tasks in active_tasks.items():
-        for task in tasks:
-            if task.get('args') and len(task['args']) > 0:
-                # Check if the first argument matches our file_id
-                if str(task['args'][0]) == str(file_id):
-                    file_tasks.append({
-                        'task_id': task['id'],
-                        'name': task['name'],
-                        'state': 'PROGRESS',
-                        'status': 'Processing',
-                        'progress': 0,
-                        'worker': worker
-                    })
-    
-    # Check scheduled tasks
-    for worker, tasks in scheduled_tasks.items():
-        for task in tasks:
-            if task.get('args') and len(task['args']) > 0:
-                if str(task['args'][0]) == str(file_id):
-                    file_tasks.append({
-                        'task_id': task['id'],
-                        'name': task['name'],
-                        'state': 'PENDING',
-                        'status': 'Scheduled',
-                        'progress': 0,
-                        'worker': worker
-                    })
-    
-    # Check reserved tasks
-    for worker, tasks in reserved_tasks.items():
-        for task in tasks:
-            if task.get('args') and len(task['args']) > 0:
-                if str(task['args'][0]) == str(file_id):
-                    file_tasks.append({
-                        'task_id': task['id'],
-                        'name': task['name'],
-                        'state': 'PENDING',
-                        'status': 'Reserved',
-                        'progress': 0,
-                        'worker': worker
-                    })
-    
-    return {
-        "file_id": str(file_id),
-        "tasks": file_tasks,
-        "has_active_tasks": len(file_tasks) > 0
-    }
 
 
 @router.post("/files/{file_id}/reset-georeferencing")
@@ -883,9 +843,9 @@ async def reset_georeferencing(file_id: uuid.UUID, current_user: Optional[User] 
 async def get_task_status_endpoint(task_id: str):
     """Get the status of a background task"""
     try:
-        # Get task status using the Celery task
-        status_result = get_task_status.delay(task_id)
-        status_info = status_result.get(timeout=5)  # 5 second timeout
+        # Get task status directly using the synchronous function
+        from tasks.common import get_task_status_sync
+        status_info = get_task_status_sync(task_id)
         
         return TaskStatusResponse(
             task_id=task_id,
@@ -947,4 +907,113 @@ async def get_conversion_status(item_id: uuid.UUID, current_user: Optional[User]
             "object_type": tree_item.object_type,
             "message": "Unknown file type"
         }
+
+
+# TASK RECORD ENDPOINTS
+@router.get("/tree-items/{item_id}/task-records")
+async def get_item_task_records(
+    item_id: uuid.UUID, 
+    active_only: bool = False,
+    current_user: Optional[User] = Depends(get_current_user_optional)
+):
+    """Get task records for a specific tree item with current status"""
+    tree_item = await TreeItem.get_or_none(id=item_id)
+    if not tree_item:
+        raise HTTPException(status_code=404, detail="TreeItem not found")
+
+    await require_permission(tree_item, current_user, Permission.READ)
+    
+    # Get task records for this item
+    task_records = await get_task_records_by_item("tree_item", str(item_id))
+    
+    # Get current status for each task from Celery
+    from tasks.common import get_task_status_sync
+    
+    tasks_with_status = []
+    for record in task_records:
+        try:
+            # Get task status using the synchronous function
+            status_info = get_task_status_sync(record.task_id)
+            
+            task_data = {
+                "task_id": record.task_id,
+                "item_type": record.item_type,
+                "item_id": record.item_id,
+                "created_at": record.created_at,
+                "updated_at": record.updated_at,
+                "state": status_info.get("state", "UNKNOWN"),
+                "status": status_info.get("status", "Unknown status"),
+                "progress": status_info.get("progress", 0),
+                "result": status_info.get("result"),
+                "error": status_info.get("error")
+            }
+            
+            # If active_only is True, only include active tasks
+            if active_only:
+                if task_data["state"] in ["PENDING", "PROGRESS"]:
+                    tasks_with_status.append(task_data)
+            else:
+                tasks_with_status.append(task_data)
+                
+        except Exception as e:
+            # If we can't get status, include the record with unknown status
+            task_data = {
+                "task_id": record.task_id,
+                "item_type": record.item_type,
+                "item_id": record.item_id,
+                "created_at": record.created_at,
+                "updated_at": record.updated_at,
+                "state": "UNKNOWN",
+                "status": "Status unavailable",
+                "progress": 0,
+                "result": None,
+                "error": str(e)
+            }
+            
+            # If active_only is True, only include unknown tasks (they might be active)
+            if active_only:
+                tasks_with_status.append(task_data)
+            else:
+                tasks_with_status.append(task_data)
+    
+    return tasks_with_status
+
+
+@router.get("/task-records/{task_id}", response_model=TaskRecordResponse)
+async def get_task_record_endpoint(
+    task_id: str,
+    current_user: Optional[User] = Depends(get_current_user_optional)
+):
+    """Get a specific task record by task ID"""
+    task_record = await get_task_record(task_id)
+    if not task_record:
+        raise HTTPException(status_code=404, detail="Task record not found")
+    
+    # Check if user has permission to view the associated item
+    if task_record.item_type == "tree_item":
+        tree_item = await TreeItem.get_or_none(id=task_record.item_id)
+        if tree_item:
+            await require_permission(tree_item, current_user, Permission.READ)
+    
+    return TaskRecordResponse.model_validate(task_record)
+
+
+@router.get("/task-records", response_model=List[TaskRecordResponse])
+async def get_all_task_records(
+    item_type: Optional[str] = Query(None, description="Filter by item type"),
+    limit: int = Query(100, description="Maximum number of records to return"),
+    current_user: Optional[User] = Depends(get_current_user_optional)
+):
+    """Get all task records with optional filtering"""
+    if not current_user or not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    query = TaskRecord.all()
+    
+    if item_type:
+        query = query.filter(item_type=item_type)
+    
+    task_records = await query.order_by("-created_at").limit(limit).all()
+    
+    return [TaskRecordResponse.model_validate(record) for record in task_records]
     

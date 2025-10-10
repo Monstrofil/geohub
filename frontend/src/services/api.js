@@ -523,12 +523,13 @@ class ApiService {
   }
 
   /**
-   * Get active tasks for a file
-   * @param {string} fileId - The file ID
-   * @returns {Promise<Object>} Tasks data
+   * Get task records for a tree item
+   * @param {string} itemId - The tree item ID
+   * @returns {Promise<Array>} Task records data
    */
-  async getFileTasks(fileId) {
-    return await this.request(`/files/${fileId}/tasks`)
+  async getItemTaskRecords(itemId, activeOnly = false) {
+    const params = activeOnly ? '?active_only=true' : ''
+    return await this.request(`/tree-items/${itemId}/task-records${params}`)
   }
 
   /**

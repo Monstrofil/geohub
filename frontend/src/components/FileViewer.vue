@@ -63,14 +63,6 @@
         <button @click="goBack" class="back-btn">Go Back</button>
       </div>
       
-      <div v-else-if="hasActiveTasks" class="task-content">
-        <TaskStatusDisplay 
-          :file-id="file.id"
-          :tasks="fileTasks"
-          @task-completed="handleTaskCompleted"
-          @refresh-requested="handleRefreshRequested"
-        />
-      </div>
       
       <div v-else class="file-content">
         <div class="content-layout">
@@ -555,10 +547,11 @@
 
     <!-- Task Progress Modal -->
     <TaskProgressModal
-      v-if="showTaskProgress && currentTaskId"
+      v-if="showTaskProgress"
       :is-visible="showTaskProgress"
       title="Converting to Geo-Raster"
-      :task-id="currentTaskId"
+      :item-id="file?.id"
+      :task-id="activeTaskId"
       @close="handleTaskProgressClose"
       @complete="handleTaskComplete"
       @error="handleTaskError"
@@ -606,7 +599,6 @@ import InteractiveMap from './InteractiveMap.vue'
 import CollectionFilesList from './CollectionFilesList.vue'
 import GeoreferencingModal from './GeoreferencingModal.vue'
 import TaskProgressModal from './TaskProgressModal.vue'
-import TaskStatusDisplay from './TaskStatusDisplay.vue'
 import { isAuthenticated } from '../stores/auth.js'
 import { matchTagsToPreset, getAllPresets } from '../utils/tagMatcher.js'
 import { loadFieldDefinitions, resolveFields } from '../utils/fieldResolver.js'
@@ -638,14 +630,10 @@ const probeResult = ref(null)
 const probeLoading = ref(false)
 const probeError = ref(null)
 
-// Task checking state
-const fileTasks = ref([])
-const hasActiveTasks = ref(false)
-const checkingTasks = ref(false)
 
 // Task progress modal state
 const showTaskProgress = ref(false)
-const currentTaskId = ref(null)
+const activeTaskId = ref(null)
 
 // Preview component state
 const previewComponent = ref(null)
@@ -750,6 +738,9 @@ async function loadFile() {
       const matchedPreset = matchTagsToPreset(file.value.tags, allPresets.value, file.value.object_type)
       selectedType.value = matchedPreset
     }
+
+    // Check for active tasks
+    await checkActiveTasks()
 
     // Probe file if it's not already confirmed as georeferenced
     // This includes both regular files and geo-raster files that might need georeferencing
@@ -1019,6 +1010,12 @@ function checkPreviewComponent() {
   if (!isSizeAppropriate) {
     previewComponent.value = null
     console.log('❌ [FileViewer] File too large for preview:', fileSize, 'bytes (max:', MAX_FILE_SIZE, 'bytes)')
+    
+    // For large files that can be converted to geo-raster, start automatic conversion
+    if (file.value.object_type === 'raster_file' || file.value.object_type === 'image_file') {
+      console.log('🔄 [FileViewer] Starting automatic conversion for large file')
+      startConversion()
+    }
     return
   }
   
@@ -1070,27 +1067,62 @@ async function probeFile() {
   }
 }
 
-async function startConversion() {
+// Check for active tasks
+async function checkActiveTasks() {
   if (!file.value?.id) return
 
   try {
-    // Start the background conversion task
-    const taskResponse = await apiService.convertToGeoRaster(file.value.id)
-    currentTaskId.value = taskResponse.task_id
-    showTaskProgress.value = true
+    console.log('[FileViewer] Checking for active tasks for file:', file.value.id)
+    const tasks = await apiService.getItemTaskRecords(file.value.id, true) // activeOnly = true
+    console.log('[FileViewer] Active tasks:', tasks)
+    
+    if (tasks && tasks.length > 0) {
+      // Get the most recent active task
+      const activeTask = tasks[0]
+      console.log('[FileViewer] Found active task:', activeTask)
+      
+      if (activeTask.state === 'PROGRESS' || activeTask.state === 'PENDING') {
+        activeTaskId.value = activeTask.task_id
+        showTaskProgress.value = true
+        console.log('[FileViewer] Showing task progress modal for active task:', activeTask.task_id)
+      }
+    } else {
+      console.log('[FileViewer] No active tasks found')
+    }
   } catch (err) {
-    console.error('Failed to start conversion:', err)
+    console.error('[FileViewer] Failed to check active tasks:', err)
+  }
+}
+
+async function startConversion() {
+  if (!file.value?.id) {
+    console.error('Cannot start conversion: file.value.id is missing', file.value)
+    return
+  }
+
+  try {
+    console.log('[FileViewer] Starting new conversion for file:', file.value.id)
+    // Start the conversion task
+    const response = await apiService.convertToGeoRaster(file.value.id)
+    console.log('[FileViewer] Conversion started:', response)
+    
+    // Set the active task ID and show the modal
+    activeTaskId.value = response.task_id
+    showTaskProgress.value = true
+    console.log('[FileViewer] Task modal shown for new task:', response.task_id)
+  } catch (err) {
+    console.error('[FileViewer] Failed to start conversion:', err)
     alert(`Failed to start conversion: ${err.message}`)
   }
 }
 
 async function handleTaskComplete(state) {
-  console.log('Task completed successfully:', state)
+  console.log('[FileViewer] Task completed successfully:', state)
   
   // Wait a moment to show completion
   setTimeout(async () => {
     showTaskProgress.value = false
-    currentTaskId.value = null
+    activeTaskId.value = null
     
     // Reload the file to get the latest state
     await loadFile()
@@ -1101,13 +1133,14 @@ async function handleTaskComplete(state) {
 }
 
 function handleTaskError(state) {
-  console.error('Task failed:', state)
+  console.error('[FileViewer] Task failed:', state)
   // Modal will show the error, user can close it manually
 }
 
 function handleTaskProgressClose() {
+  console.log('[FileViewer] Closing task progress modal')
   showTaskProgress.value = false
-  currentTaskId.value = null
+  activeTaskId.value = null
 }
 
 // Layer control functions
@@ -1187,33 +1220,6 @@ async function copyToClipboard(text, label) {
   setTimeout(() => { copyStatus.value = null }, 3000)
 }
 
-// Task checking functions
-async function checkFileTasks() {
-  if (!file.value?.id) return
-  
-  checkingTasks.value = true
-  try {
-    const response = await apiService.getFileTasks(file.value.id)
-    fileTasks.value = response.tasks || []
-    hasActiveTasks.value = response.has_active_tasks || false
-  } catch (error) {
-    console.error('Failed to check file tasks:', error)
-    fileTasks.value = []
-    hasActiveTasks.value = false
-  } finally {
-    checkingTasks.value = false
-  }
-}
-
-function handleTaskCompleted() {
-  // Refresh file data when task completes
-  loadFile()
-}
-
-function handleRefreshRequested() {
-  // Refresh task status
-  checkFileTasks()
-}
 
 // Lifecycle
 onMounted(async () => {
@@ -1222,14 +1228,11 @@ onMounted(async () => {
   console.log('Loaded presets:', allPresets.value)
   allFieldDefinitions.value = await loadFieldDefinitions()
   await loadFile()
-  // Check for active tasks after loading file
-  await checkFileTasks()
 })
 
 // Watch for prop changes
 watch(() => props.treeItemId, async () => {
   await loadFile()
-  await checkFileTasks()
 })
 </script>
 
