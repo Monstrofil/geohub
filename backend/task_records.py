@@ -2,6 +2,7 @@
 Task record management utilities
 """
 import asyncio
+from datetime import timedelta, datetime, timezone
 from typing import Optional, Dict, Any
 from tortoise import Tortoise
 
@@ -51,7 +52,11 @@ async def get_task_records_by_item(
         List of TaskRecord instances
     """
     
-    return await TaskRecord.filter(item_type=item_type, item_id=item_id).order_by("-created_at").all()
+    return await TaskRecord.filter(
+        item_type=item_type,
+        item_id=item_id,
+        created_at__lte=datetime.now(timezone.utc) - timedelta(hours=24)
+    ).order_by("-created_at").all()
 
 
 async def get_task_record(task_id: str) -> Optional[TaskRecord]:
@@ -66,6 +71,9 @@ async def get_task_record(task_id: str) -> Optional[TaskRecord]:
     """
     
     try:
-        return await TaskRecord.get(task_id=task_id)
+        return await TaskRecord.get(
+            task_id=task_id,
+            created_at__lte=datetime.now(timezone.utc) - timedelta(hours=24)
+        )
     except TaskRecord.DoesNotExist:
         return None

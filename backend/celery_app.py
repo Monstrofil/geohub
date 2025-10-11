@@ -40,7 +40,7 @@ celery_app.conf.update(
     enable_utc=True,
     
     # Task result settings
-    result_expires=3600,  # 1 hour
+    result_expires=24 * 3600,  # 24 hour
     task_track_started=True,
     task_acks_late=True,
     worker_prefetch_multiplier=1,
