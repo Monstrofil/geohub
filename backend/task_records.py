@@ -55,7 +55,7 @@ async def get_task_records_by_item(
     return await TaskRecord.filter(
         item_type=item_type,
         item_id=item_id,
-        created_at__lte=datetime.now(timezone.utc) - timedelta(hours=24)
+        created_at__gte=datetime.now(timezone.utc) - timedelta(hours=24)
     ).order_by("-created_at").all()
 
 
@@ -73,7 +73,7 @@ async def get_task_record(task_id: str) -> Optional[TaskRecord]:
     try:
         return await TaskRecord.get(
             task_id=task_id,
-            created_at__lte=datetime.now(timezone.utc) - timedelta(hours=24)
+            created_at__gte=datetime.now(timezone.utc) - timedelta(hours=24)
         )
     except TaskRecord.DoesNotExist:
         return None
