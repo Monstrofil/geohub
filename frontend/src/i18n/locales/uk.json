@@ -98,5 +98,29 @@
     "analyzingGeoreference": "Аналіз можливості геоприв'язки файлу...",
     "fileAnalysisFailed": "Аналіз файлу не вдався",
     "georeferencingNeeded": "Потрібна геоприв'язка"
+  },
+  "mapService": {
+    "title": "Посилання на картографічні сервіси",
+    "description": "Скопіюйте ці URL-адреси для використання цього шару в ГІС-додатках, таких як QGIS, ArcGIS або інше картографічне програмне забезпечення:",
+    "wms": {
+      "title": "WMS (Web Map Service)",
+      "description": "Використовуйте цю URL-адресу для додавання шару до QGIS, ArcGIS або інших ГІС-додатків",
+      "layerName": "Назва шару:",
+      "layerValue": "geotiff_layer",
+      "bestFor": "Найкраще для:",
+      "bestForValue": "Додавання до настільних ГІС-додатків",
+      "copyUrl": "Копіювати WMS URL",
+      "addToJosm": "Додати WMS до JOSM",
+      "addToId": "Додати WMS до iD"
+    },
+    "tms": {
+      "title": "TMS (Tile Map Service)",
+      "description": "Плитковий картографічний сервіс для веб-картографічних додатків (у стилі Google Maps)",
+      "format": "Формат:",
+      "formatValue": "Схема плиток Google Maps (TMS)",
+      "copyUrl": "Копіювати TMS URL",
+      "addToJosm": "Додати TMS до JOSM",
+      "addToId": "Додати TMS до iD"
+    }
   }
 }

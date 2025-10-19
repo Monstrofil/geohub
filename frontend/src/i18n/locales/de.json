@@ -98,5 +98,29 @@
     "analyzingGeoreference": "Analyse der Georeferenzierungsmöglichkeit...",
     "fileAnalysisFailed": "Dateianalyse fehlgeschlagen",
     "georeferencingNeeded": "Georeferenzierung erforderlich"
+  },
+  "mapService": {
+    "title": "Kartendienst-Links",
+    "description": "Kopieren Sie diese URLs, um diese Ebene in GIS-Anwendungen wie QGIS, ArcGIS oder anderen Kartierungssoftware zu verwenden:",
+    "wms": {
+      "title": "WMS (Web Map Service)",
+      "description": "Verwenden Sie diese URL, um die Ebene zu QGIS, ArcGIS oder anderen GIS-Anwendungen hinzuzufügen",
+      "layerName": "Ebenenname:",
+      "layerValue": "geotiff_layer",
+      "bestFor": "Am besten für:",
+      "bestForValue": "Hinzufügen zu Desktop-GIS-Anwendungen",
+      "copyUrl": "WMS-URL kopieren",
+      "addToJosm": "WMS zu JOSM hinzufügen",
+      "addToId": "WMS zu iD hinzufügen"
+    },
+    "tms": {
+      "title": "TMS (Tile Map Service)",
+      "description": "Kachelkartendienst für Web-Kartierungsanwendungen (Google Maps-Stil)",
+      "format": "Format:",
+      "formatValue": "Google Maps Kachelschema (TMS)",
+      "copyUrl": "TMS-URL kopieren",
+      "addToJosm": "TMS zu JOSM hinzufügen",
+      "addToId": "TMS zu iD hinzufügen"
+    }
   }
 }

@@ -98,5 +98,29 @@
     "analyzingGeoreference": "Analyzing if this file can be georeferenced...",
     "fileAnalysisFailed": "File Analysis Failed",
     "georeferencingNeeded": "Georeferencing needed"
+  },
+  "mapService": {
+    "title": "Map Service Links",
+    "description": "Copy these URLs to use this layer in GIS applications like QGIS, ArcGIS, or other mapping software:",
+    "wms": {
+      "title": "WMS (Web Map Service)",
+      "description": "Use this URL to add the layer to QGIS, ArcGIS, or other GIS applications",
+      "layerName": "Layer Name:",
+      "layerValue": "geotiff_layer",
+      "bestFor": "Best for:",
+      "bestForValue": "Adding to desktop GIS applications",
+      "copyUrl": "Copy WMS URL",
+      "addToJosm": "Add WMS to JOSM",
+      "addToId": "Add WMS to iD"
+    },
+    "tms": {
+      "title": "TMS (Tile Map Service)",
+      "description": "Tiled map service for web mapping applications (Google Maps style)",
+      "format": "Format:",
+      "formatValue": "Google Maps tile scheme (TMS)",
+      "copyUrl": "Copy TMS URL",
+      "addToJosm": "Add TMS to JOSM",
+      "addToId": "Add TMS to iD"
+    }
   }
 }

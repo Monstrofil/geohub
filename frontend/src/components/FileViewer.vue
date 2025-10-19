@@ -194,8 +194,8 @@
             <!-- WMS/TMS Links section for georeferenced files -->
             <div v-if="file && isFileGeoreferenced" class="map-links-section">
               <div class="links-header">
-                <h3>Map Service Links</h3>
-                <p>Copy these URLs to use this layer in GIS applications like QGIS, ArcGIS, or other mapping software:</p>
+                <h3>{{ $t('mapService.title') }}</h3>
+                <p>{{ $t('mapService.description') }}</p>
               </div>
               
               <div class="links-grid">
@@ -209,16 +209,16 @@
                         </svg>
                       </div>
                       <div class="link-info">
-                        <h4>WMS (Web Map Service) <span class="type">wms</span></h4>
-                        <p>Use this URL to add the layer to QGIS, ArcGIS, or other GIS applications</p>
+                        <h4>{{ $t('mapService.wms.title') }} <span class="type">wms</span></h4>
+                        <p>{{ $t('mapService.wms.description') }}</p>
                       </div>
                     </div>
                     <div class="remote-control-links">
                       <span class="remote-control">
-                        <a :href="josmWmsUrl" title="Add WMS to JOSM" target="_blank" class="remote-control-btn">JOSM</a>
+                        <a :href="josmWmsUrl" :title="$t('mapService.wms.addToJosm')" target="_blank" class="remote-control-btn">JOSM</a>
                       </span>
                       <span class="remote-control">
-                        <a :href="idWmsUrl" title="Add WMS to iD" target="_blank" class="remote-control-btn">iD</a>
+                        <a :href="idWmsUrl" :title="$t('mapService.wms.addToId')" target="_blank" class="remote-control-btn">iD</a>
                       </span>
                     </div>
                   </div>
@@ -230,15 +230,15 @@
                       class="link-url"
                       ref="wmsUrlInput"
                     />
-                    <button @click="copyToClipboard(wmsUrl, 'WMS URL')" class="copy-btn" title="Copy WMS URL">
+                    <button @click="copyToClipboard(wmsUrl, $t('mapService.wms.copyUrl'))" class="copy-btn" :title="$t('mapService.wms.copyUrl')">
                       <svg width="16" height="16" viewBox="0 0 24 24">
                         <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z" fill="currentColor"/>
                       </svg>
                     </button>
                   </div>
                   <div class="link-details">
-                    <div><strong>Layer Name:</strong> geotiff_layer</div>
-                    <div><strong>Best for:</strong> Adding to desktop GIS applications</div>
+                    <div><strong>{{ $t('mapService.wms.layerName') }}</strong> {{ $t('mapService.wms.layerValue') }}</div>
+                    <div><strong>{{ $t('mapService.wms.bestFor') }}</strong> {{ $t('mapService.wms.bestForValue') }}</div>
                   </div>
                 </div>
                 
@@ -252,16 +252,16 @@
                         </svg>
                       </div>
                       <div class="link-info">
-                        <h4>TMS (Tile Map Service) <span class="type">tms</span></h4>
-                        <p>Tiled map service for web mapping applications (Google Maps style)</p>
+                        <h4>{{ $t('mapService.tms.title') }} <span class="type">tms</span></h4>
+                        <p>{{ $t('mapService.tms.description') }}</p>
                       </div>
                     </div>
                     <div class="remote-control-links">
                       <span class="remote-control">
-                        <a :href="josmTmsUrl" title="Add TMS to JOSM" target="_blank" class="remote-control-btn">JOSM</a>
+                        <a :href="josmTmsUrl" :title="$t('mapService.tms.addToJosm')" target="_blank" class="remote-control-btn">JOSM</a>
                       </span>
                       <span class="remote-control">
-                        <a :href="idTmsUrl" title="Add TMS to iD" target="_blank" class="remote-control-btn">iD</a>
+                        <a :href="idTmsUrl" :title="$t('mapService.tms.addToId')" target="_blank" class="remote-control-btn">iD</a>
                       </span>
                     </div>
                   </div>
@@ -273,14 +273,14 @@
                       class="link-url"
                       ref="tmsUrlInput"
                     />
-                    <button @click="copyToClipboard(tmsUrl, 'TMS URL')" class="copy-btn" title="Copy TMS URL">
+                    <button @click="copyToClipboard(tmsUrl, $t('mapService.tms.copyUrl'))" class="copy-btn" :title="$t('mapService.tms.copyUrl')">
                       <svg width="16" height="16" viewBox="0 0 24 24">
                         <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z" fill="currentColor"/>
                       </svg>
                     </button>
                   </div>
                   <div class="link-details">
-                    <div><strong>Format:</strong> Google Maps tile scheme (TMS)</div>
+                    <div><strong>{{ $t('mapService.tms.format') }}</strong> {{ $t('mapService.tms.formatValue') }}</div>
                   </div>
                 </div>
               </div>
