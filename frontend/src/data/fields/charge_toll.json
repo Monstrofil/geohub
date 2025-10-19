@@ -1,6 +1,0 @@
-{
-    "key": "charge_toll",
-    "type": "text",
-    "label": "Toll Charge",
-    "placeholder": "Amount in local currency"
-} 
