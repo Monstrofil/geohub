@@ -121,7 +121,7 @@
     "modified": "Змінено:",
     "notSet": "Не встановлено",
     "unknown": "Невідомо",
-    "descriptionNotSet": "Опис не встановлено",
+    "descriptionNotSet": "Немає опису",
     "fileDetails": "Деталі файлу:",
     "checkingCompatibility": "Перевірка сумісності файлу...",
     "analyzingGeoreference": "Аналіз можливості геоприв'язки файлу...",

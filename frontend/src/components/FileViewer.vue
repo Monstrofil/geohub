@@ -307,6 +307,10 @@
                   />
                 </div>
               </div>
+              
+              <div v-else-if="!isFileGeoreferenced && !previewComponent" class="file-preview-section">
+                Preview is not available for this file type.
+              </div>
             </div>
           </div>
 
@@ -637,7 +641,6 @@ const activeTaskId = ref(null)
 
 // Preview component state
 const previewComponent = ref(null)
-const previewComponentLoading = ref(false)
 
 // Layer controls state
 const layerPanelOpen = ref(true)
