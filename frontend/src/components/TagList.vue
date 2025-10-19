@@ -7,10 +7,11 @@
     <div class="disclosure-wrap">
       <form class="pure-form pure-form-stacked">
         <!-- Preset-defined fields -->
-        <div v-for="(field, idx) in fields" :key="field.name" class="field-row">
+        <div v-for="(field, idx) in fields" :key="field.name" class="field-row" :class="{ 'related-field': isRelatedField(field.name) }">
           <label :for="'field-' + field.name" class="field-label">
             <span class="label-text">{{ field.label || field.name }}</span>
-            <button type="button" class="remove-btn" title="вилучити" @click="clearField(field.name)">
+            <span v-if="isRelatedField(field.name)" class="related-badge">автоматично</span>
+            <button v-if="!isRelatedField(field.name)" type="button" class="remove-btn" title="вилучити" @click="clearField(field.name)">
               <svg width="16" height="16" viewBox="0 0 16 16">
                 <line x1="4" y1="4" x2="12" y2="12" stroke="#c00" stroke-width="2"/>
                 <line x1="12" y1="4" x2="4" y2="12" stroke="#c00" stroke-width="2"/>
@@ -20,8 +21,13 @@
           <FieldRenderer 
             :field="field" 
             :model-value="values[field.name]" 
+            :disabled="isRelatedField(field.name)"
             @update:model-value="value => setField(field.name, value)"
+            @update:related-fields="handleRelatedFields"
           />
+          <div v-if="isRelatedField(field.name)" class="related-note">
+            Це поле автоматично заповнюється при виборі {{ getRelatedFieldSource(field.name) }}
+          </div>
         </div>
 
         <!-- Additional fields -->
@@ -40,6 +46,7 @@
             :field="moreField" 
             :model-value="values[moreField.name]" 
             @update:model-value="value => setField(moreField.name, value)"
+            @update:related-fields="handleRelatedFields"
           />
         </div>
 
@@ -273,6 +280,58 @@ function setField(name, value) {
   emitTagsUpdate()
 }
 
+function handleRelatedFields({ fieldName, relatedData }) {
+  // Find the field definition to get relatedFields mapping
+  const fieldDef = props.allFieldDefinitions[fieldName]
+  if (!fieldDef || !fieldDef.relatedFields) {
+    return
+  }
+  
+  // Update related fields based on the mapping
+  Object.entries(fieldDef.relatedFields).forEach(([sourceKey, targetFieldName]) => {
+    if (relatedData[sourceKey] !== undefined) {
+      setField(targetFieldName, relatedData[sourceKey])
+    }
+  })
+}
+
+function isRelatedField(fieldName) {
+  // Only check fields that are actually present in the current preset
+  const currentFieldNames = props.fields.map(f => f.name)
+  
+  // Check if this field is controlled by any other field's relatedFields
+  return currentFieldNames.some(sourceFieldName => {
+    const fieldDef = props.allFieldDefinitions[sourceFieldName]
+    if (!fieldDef || !fieldDef.relatedFields) {
+      return false
+    }
+    
+    // Check if this field is mapped by the source field
+    const isMapped = Object.values(fieldDef.relatedFields).includes(fieldName)
+    
+    // Only disable if the source field has a value
+    if (isMapped) {
+      const sourceValue = values[sourceFieldName]
+      return sourceValue !== null && sourceValue !== '' && sourceValue !== undefined
+    }
+    
+    return false
+  })
+}
+
+function getRelatedFieldSource(fieldName) {
+  // Find which field controls this related field (only from current preset)
+  const currentFieldNames = props.fields.map(f => f.name)
+  
+  for (const sourceFieldName of currentFieldNames) {
+    const fieldDef = props.allFieldDefinitions[sourceFieldName]
+    if (fieldDef && fieldDef.relatedFields && Object.values(fieldDef.relatedFields).includes(fieldName)) {
+      return fieldDef.label || sourceFieldName
+    }
+  }
+  return 'іншого поля'
+}
+
 function addMoreField(fieldKey) {
   values[fieldKey] = ''
   addedMoreFields.value.add(fieldKey)
@@ -412,6 +471,51 @@ watch(
   gap: 0.5rem;
   margin-bottom: 0.25rem;
   font-weight: 500;
+}
+
+.related-field {
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.related-field .field-label {
+  color: #666;
+}
+
+.related-field input,
+.related-field select,
+.related-field textarea {
+  background-color: #f8f9fa !important;
+  color: #495057 !important;
+  border-color: #dee2e6 !important;
+}
+
+.related-field input:disabled,
+.related-field select:disabled,
+.related-field textarea:disabled {
+  background-color: #f8f9fa !important;
+  color: #495057 !important;
+  opacity: 1 !important;
+}
+
+.related-badge {
+  font-size: 0.7em;
+  background: #6c757d;
+  color: white;
+  padding: 0.1rem 0.3rem;
+  border-radius: 3px;
+  margin-left: 0.5rem;
+}
+
+.related-note {
+  font-size: 0.8em;
+  color: #666;
+  font-style: italic;
+  margin-top: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  background: #f8f9fa;
+  border-radius: 3px;
+  border-left: 3px solid #6c757d;
 }
 
 .label-text {

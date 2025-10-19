@@ -2,5 +2,9 @@
     "key": "koatoth",
     "type": "koatoth",
     "label": "KOATOTH",
-    "placeholder": "Select a location from KOATOTH database"
+    "placeholder": "Select a location from KOATOTH database",
+    "relatedFields": {
+        "name": "name",
+        "location": "location"
+    }
 }

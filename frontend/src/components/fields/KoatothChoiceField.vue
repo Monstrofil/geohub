@@ -10,6 +10,7 @@
         @input="handleInput"
         @focus="showDropdown = true"
         @blur="handleBlur"
+        :disabled="disabled"
         autocomplete="off"
       />
       <div v-if="selectedOption" class="decoded-value">
@@ -50,10 +51,14 @@ const props = defineProps({
   modelValue: {
     type: String,
     default: null
+  },
+  disabled: {
+    type: Boolean,
+    default: false
   }
 })
 
-const emit = defineEmits(['update:modelValue'])
+const emit = defineEmits(['update:modelValue', 'update:relatedFields'])
 
 const fieldId = `field-${props.field.name}`
 const koatothData = ref([])
@@ -174,6 +179,7 @@ watch(() => props.modelValue, (newValue) => {
 }, { immediate: true })
 
 function handleInput(event) {
+  if (props.disabled) return
   searchTerm.value = event.target.value
   selectedOption.value = null
   showDropdown.value = true
@@ -181,10 +187,17 @@ function handleInput(event) {
 }
 
 function selectOption(option) {
+  if (props.disabled) return
   selectedOption.value = option
   searchTerm.value = option.id
   showDropdown.value = false
   emit('update:modelValue', option.id)
+  
+  // Emit related field updates
+  emit('update:relatedFields', {
+    name: option.name,
+    location: option.parents || option.name
+  })
 }
 
 function handleBlur() {

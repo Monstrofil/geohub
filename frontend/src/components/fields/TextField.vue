@@ -6,6 +6,7 @@
     :value="modelValue ?? ''" 
     @blur="handleBlur"
     :placeholder="field.placeholder"
+    :disabled="disabled"
   />
 </template>
 
@@ -18,6 +19,10 @@ const props = defineProps({
   modelValue: {
     type: [String, Number],
     default: null
+  },
+  disabled: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -26,6 +31,7 @@ const emit = defineEmits(['update:modelValue'])
 const fieldId = `field-${props.field.name}`
 
 function handleBlur(event) {
+  if (props.disabled) return
   const newValue = event.target.value
   if (newValue !== (props.modelValue ?? '')) {
     emit('update:modelValue', newValue)

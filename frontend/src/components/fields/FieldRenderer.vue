@@ -3,7 +3,9 @@
     :is="fieldComponent" 
     :field="field" 
     :model-value="modelValue" 
+    :disabled="disabled"
     @update:model-value="handleUpdate"
+    @update:related-fields="handleRelatedFields"
   />
 </template>
 
@@ -24,10 +26,14 @@ const props = defineProps({
   modelValue: {
     type: [String, Number, Boolean],
     default: null
+  },
+  disabled: {
+    type: Boolean,
+    default: false
   }
 })
 
-const emit = defineEmits(['update:modelValue'])
+const emit = defineEmits(['update:modelValue', 'update:relatedFields'])
 
 const fieldComponent = computed(() => {
   switch (props.field.type) {
@@ -50,5 +56,12 @@ const fieldComponent = computed(() => {
 
 function handleUpdate(value) {
   emit('update:modelValue', value)
+}
+
+function handleRelatedFields(relatedData) {
+  emit('update:relatedFields', {
+    fieldName: props.field.name,
+    relatedData: relatedData
+  })
 }
 </script> 
