@@ -10,21 +10,22 @@
           <line x1="16" y1="17" x2="8" y2="17"/>
           <polyline points="10,9 9,9 8,9"/>
         </svg>
-        <span class="app-title">GeoDocs Hub</span>
+        <span class="app-title">{{ $t('navigation.appTitle') }}</span>
       </router-link>
       
       <!-- Collections button -->
-      <router-link :to="{'name': 'FileList'}" class="collections-btn" title="Переглянути колекції">
+      <router-link :to="{'name': 'FileList'}" class="collections-btn" :title="$t('navigation.viewCollections')">
         <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path d="M3 6a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V6z" stroke="currentColor" stroke-width="1.5" fill="none"/>
           <path d="M7 6v12M13 6v12" stroke="currentColor" stroke-width="1.5"/>
         </svg>
-        <span class="collections-text">Колекції</span>
+        <span class="collections-text">{{ $t('navigation.collections') }}</span>
       </router-link>
     </div>
 
-    <!-- Right side: Auth -->
+    <!-- Right side: Language Switcher and Auth -->
     <div class="toolbar-right">
+      <LanguageSwitcher />
       <AuthHeader />
     </div>
   </div>
@@ -32,6 +33,7 @@
 
 <script setup>
 import AuthHeader from './AuthHeader.vue'
+import LanguageSwitcher from './LanguageSwitcher.vue'
 </script>
 
 <style scoped>

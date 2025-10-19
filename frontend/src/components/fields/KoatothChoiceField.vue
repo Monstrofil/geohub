@@ -39,7 +39,7 @@
     </div>
     
     <div v-if="field.description" class="field-description">
-      {{ field.description }}
+      {{ $t(`fields.${field.key}.description`, field.description) }}
     </div>
   </div>
 </template>

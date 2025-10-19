@@ -10,12 +10,13 @@
       :disabled="disabled"
     />
     <div v-if="field.description" class="field-description">
-      {{ field.description }}
+      {{ $t(`fields.${field.key}.description`, field.description) }}
     </div>
   </div>
 </template>
 
 <script setup>
+
 const props = defineProps({
   field: {
     type: Object,

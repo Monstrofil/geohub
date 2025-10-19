@@ -50,7 +50,7 @@
           <h4>Properties</h4>
           <div v-if="selectedFields.length > 0" class="properties-grid">
             <div v-for="field in selectedFields" :key="field.key || field.name" class="property-item">
-              <span class="property-label">{{ field.label || field.key || field.name }}:</span>
+              <span class="property-label">{{ $t(`fields.${field.key || field.name}.label`, field.label || field.key || field.name) }}:</span>
               <div class="property-value">
                 <span class="field-display" :class="getFieldDisplayClass(field)">
                   {{ formatFieldValue(field, collection.tags[field.key || field.name]) }}

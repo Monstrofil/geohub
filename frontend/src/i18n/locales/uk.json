@@ -1,0 +1,102 @@
+{
+  "fields": {
+    "name": {
+      "label": "Назва",
+      "description": "Назва або заголовок об'єкта, документа або ресурсу"
+    },
+    "description": {
+      "label": "Опис",
+      "description": "Детальний опис або резюме документа або ресурсу"
+    },
+    "content": {
+      "label": "Зміст",
+      "description": "Основний зміст або текст документа"
+    },
+    "year": {
+      "label": "Рік",
+      "description": "Рік створення або публікації документа"
+    },
+    "koatoth": {
+      "label": "КОАТОТГ Класифікація",
+      "description": "кодифікатор адміністративно-територіальних одиниць та територій територіальних громад"
+    },
+    "fieldsTitle": "Поля",
+    "collapse": "згорнути",
+    "fieldTypes": {
+      "text": "текст",
+      "number": "число",
+      "check": "так/ні",
+      "combo": "вибір",
+      "textarea": "текст"
+    }
+  },
+  "presets": {
+    "generic_file": {
+      "name": "Файл"
+    },
+    "collection": {
+      "name": "Колекція"
+    },
+    "master_plan": {
+      "name": "Матеріали генерального плану"
+    },
+    "detail_plan": {
+      "name": "Детальний план теориторії"
+    },
+    "maps_collection": {
+      "name": "Колекція карт"
+    },
+    "word_document": {
+      "name": "Документ Word"
+    },
+    "generic_raster_graphic": {
+      "name": "Георастровий файл"
+    }
+  },
+  "ui": {
+    "automatic": "автоматично",
+    "additional": "додатково",
+    "remove": "вилучити",
+    "addField": "Додати поле",
+    "selectAdditionalField": "Виберіть додаткове поле:",
+    "tags": "Теґи",
+    "keyValuePlaceholder": "ключ=значення",
+    "autoFilledFrom": "Це поле автоматично заповнюється при виборі",
+    "anotherField": "іншого поля"
+  },
+  "navigation": {
+    "appTitle": "GeoDocs Hub",
+    "collections": "Колекції",
+    "viewCollections": "Переглянути колекції"
+  },
+  "objectType": {
+    "title": "Тип об'єкта",
+    "incompatibleWithCollection": "Несумісний з типом колекції",
+    "incompatibleWithFile": "Несумісний з типом файлу",
+    "information": "інформація",
+    "searchObjects": "Пошук об'єктів",
+    "search": "Пошук",
+    "noAvailableTypesForCollection": "Немає доступних типів для колекції",
+    "noCompatibleTypesForObject": "Немає сумісних типів для об'єкту типу",
+    "unknown": "невідомий"
+  },
+  "fileInfo": {
+    "title": "Інформація про файл",
+    "objectInformation": "Інформація про об'єкт",
+    "properties": "Властивості",
+    "name": "Назва:",
+    "type": "Тип:",
+    "mimeType": "MIME Тип:",
+    "size": "Розмір:",
+    "created": "Створено:",
+    "modified": "Змінено:",
+    "notSet": "Не встановлено",
+    "unknown": "Невідомо",
+    "descriptionNotSet": "Опис не встановлено",
+    "fileDetails": "Деталі файлу:",
+    "checkingCompatibility": "Перевірка сумісності файлу...",
+    "analyzingGeoreference": "Аналіз можливості геоприв'язки файлу...",
+    "fileAnalysisFailed": "Аналіз файлу не вдався",
+    "georeferencingNeeded": "Потрібна геоприв'язка"
+  }
+}

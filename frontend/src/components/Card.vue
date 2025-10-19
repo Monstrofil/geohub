@@ -16,7 +16,7 @@
         <div class="card-header">
           <div class="card-icon-section">
             <div class="card-icon" v-html="icon"></div>
-            <div class="preset-name" v-if="matchedPreset?.name">{{ matchedPreset.name }}</div>
+            <div class="preset-name" v-if="matchedPreset?.name">{{ $t(`presets.${getPresetKey(matchedPreset.name)}.name`, matchedPreset.name) }}</div>
           </div>
           <div class="card-actions" v-if="isAuthenticated">
             <router-link v-if="props.file?.id" :to="{name: 'FileEditor', query: { id: props.file.id }}" class="action-btn edit-btn" :title="`Edit ${itemType}`" @click.stop>
@@ -47,7 +47,7 @@
               :key="field.key" 
               class="preview-field"
             >
-              <span class="field-label">{{ field.label }}</span>
+              <span class="field-label">{{ $t(`fields.${field.key}.label`, field.label) }}</span>
               <span class="field-value">{{ field.value || 'undefined' }}</span>
             </div>
           </div>
@@ -102,6 +102,14 @@ import { matchTagsToPreset } from '../utils/tagMatcher.js'
 import { loadFieldDefinitions } from '../utils/fieldResolver.js'
 import { isAuthenticated } from '../stores/auth.js'
 import MoveModal from './MoveModal.vue'
+
+// Function to get preset key for translation
+function getPresetKey(presetName) {
+  if (!presetName) return ''
+  
+  // Map preset names to translation keys
+  return presetName.toLowerCase().replace(/\s+/g, '_').replace(/\W/g, '')
+}
 
 const props = defineProps({
   name: { type: String, required: true },

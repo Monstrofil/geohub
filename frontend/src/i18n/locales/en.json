@@ -1,0 +1,102 @@
+{
+  "fields": {
+    "name": {
+      "label": "Name",
+      "description": "Name or title of the item, document, or resource"
+    },
+    "description": {
+      "label": "Description", 
+      "description": "Detailed description or summary of the document or resource"
+    },
+    "content": {
+      "label": "Content",
+      "description": "Main content or text of the document"
+    },
+    "year": {
+      "label": "Year",
+      "description": "Year when the document was created or published"
+    },
+    "koatoth": {
+      "label": "KOATOTH Classification",
+      "description": "Official Austrian classification system for documents"
+    },
+    "fieldsTitle": "Fields",
+    "collapse": "collapse",
+    "fieldTypes": {
+      "text": "text",
+      "number": "number",
+      "check": "yes/no",
+      "combo": "choice",
+      "textarea": "text"
+    }
+  },
+  "presets": {
+    "generic_file": {
+      "name": "File"
+    },
+    "collection": {
+      "name": "Collection"
+    },
+    "master_plan": {
+      "name": "Master Plan Materials"
+    },
+    "detail_plan": {
+      "name": "Detailed Territory Plan"
+    },
+    "maps_collection": {
+      "name": "Maps Collection"
+    },
+    "word_document": {
+      "name": "Word Document"
+    },
+    "generic_raster_graphic": {
+      "name": "Georaster File"
+    }
+  },
+  "ui": {
+    "automatic": "automatic",
+    "additional": "additional",
+    "remove": "remove",
+    "addField": "Add field",
+    "selectAdditionalField": "Select additional field:",
+    "tags": "Tags",
+    "keyValuePlaceholder": "key=value",
+    "autoFilledFrom": "This field is automatically filled when selecting",
+    "anotherField": "another field"
+  },
+  "navigation": {
+    "appTitle": "GeoDocs Hub",
+    "collections": "Collections",
+    "viewCollections": "View collections"
+  },
+  "objectType": {
+    "title": "Object Type",
+    "incompatibleWithCollection": "Incompatible with collection type",
+    "incompatibleWithFile": "Incompatible with file type",
+    "information": "Please note that some types may not be compatible with your current file type. Incompatible types are disabled.",
+    "searchObjects": "Search Objects",
+    "search": "Search",
+    "noAvailableTypesForCollection": "No available types for collection",
+    "noCompatibleTypesForObject": "No compatible types for object type",
+    "unknown": "unknown"
+  },
+  "fileInfo": {
+    "title": "File Information",
+    "objectInformation": "Object Information",
+    "properties": "Properties",
+    "name": "Name:",
+    "type": "Type:",
+    "mimeType": "MIME Type:",
+    "size": "Size:",
+    "created": "Created:",
+    "modified": "Modified:",
+    "notSet": "Not set",
+    "unknown": "Unknown",
+    "descriptionNotSet": "Description not set",
+    "fileDetails": "File details:",
+    "checkingCompatibility": "Checking file compatibility...",
+    "analyzingGeoreference": "Analyzing if this file can be georeferenced...",
+    "fileAnalysisFailed": "File Analysis Failed",
+    "georeferencingNeeded": "Georeferencing needed"
+  }
+}

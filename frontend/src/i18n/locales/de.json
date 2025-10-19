@@ -1,0 +1,102 @@
+{
+  "fields": {
+    "name": {
+      "label": "Name",
+      "description": "Name oder Titel des Objekts, Dokuments oder der Ressource"
+    },
+    "description": {
+      "label": "Beschreibung",
+      "description": "Detaillierte Beschreibung oder Zusammenfassung des Dokuments oder der Ressource"
+    },
+    "content": {
+      "label": "Inhalt",
+      "description": "Hauptinhalt oder Text des Dokuments"
+    },
+    "year": {
+      "label": "Jahr",
+      "description": "Jahr, in dem das Dokument erstellt oder veröffentlicht wurde"
+    },
+    "koatoth": {
+      "label": "KOATOTH-Klassifizierung",
+      "description": "Offizielles österreichisches Klassifizierungssystem für Dokumente"
+    },
+    "fieldsTitle": "Felder",
+    "collapse": "einklappen",
+    "fieldTypes": {
+      "text": "Text",
+      "number": "Zahl",
+      "check": "Ja/Nein",
+      "combo": "Auswahl",
+      "textarea": "Text"
+    }
+  },
+  "presets": {
+    "generic_file": {
+      "name": "Datei"
+    },
+    "collection": {
+      "name": "Sammlung"
+    },
+    "master_plan": {
+      "name": "Masterplan-Materialien"
+    },
+    "detail_plan": {
+      "name": "Detaillierter Gebietsplan"
+    },
+    "maps_collection": {
+      "name": "Kartensammlung"
+    },
+    "word_document": {
+      "name": "Word-Dokument"
+    },
+    "generic_raster_graphic": {
+      "name": "Georaster-Datei"
+    }
+  },
+  "ui": {
+    "automatic": "automatisch",
+    "additional": "zusätzlich",
+    "remove": "entfernen",
+    "addField": "Feld hinzufügen",
+    "selectAdditionalField": "Zusätzliches Feld auswählen:",
+    "tags": "Tags",
+    "keyValuePlaceholder": "schlüssel=wert",
+    "autoFilledFrom": "Dieses Feld wird automatisch ausgefüllt bei der Auswahl von",
+    "anotherField": "einem anderen Feld"
+  },
+  "navigation": {
+    "appTitle": "GeoDocs Hub",
+    "collections": "Sammlungen",
+    "viewCollections": "Sammlungen anzeigen"
+  },
+  "objectType": {
+    "title": "Objekttyp",
+    "incompatibleWithCollection": "Nicht kompatibel mit Sammlungstyp",
+    "incompatibleWithFile": "Nicht kompatibel mit Dateityp",
+    "information": "Information",
+    "searchObjects": "Objekte suchen",
+    "search": "Suchen",
+    "noAvailableTypesForCollection": "Keine verfügbaren Typen für Sammlung",
+    "noCompatibleTypesForObject": "Keine kompatiblen Typen für Objekttyp",
+    "unknown": "unbekannt"
+  },
+  "fileInfo": {
+    "title": "Dateiinformationen",
+    "objectInformation": "Objektinformationen",
+    "properties": "Eigenschaften",
+    "name": "Name:",
+    "type": "Typ:",
+    "mimeType": "MIME-Typ:",
+    "size": "Größe:",
+    "created": "Erstellt:",
+    "modified": "Geändert:",
+    "notSet": "Nicht gesetzt",
+    "unknown": "Unbekannt",
+    "descriptionNotSet": "Beschreibung nicht gesetzt",
+    "fileDetails": "Dateidetails:",
+    "checkingCompatibility": "Dateikompatibilität wird überprüft...",
+    "analyzingGeoreference": "Analyse der Georeferenzierungsmöglichkeit...",
+    "fileAnalysisFailed": "Dateianalyse fehlgeschlagen",
+    "georeferencingNeeded": "Georeferenzierung erforderlich"
+  }
+}

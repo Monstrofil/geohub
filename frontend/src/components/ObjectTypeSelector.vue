@@ -1,7 +1,7 @@
 <template>
   <div class="section section-feature-type">
     <h3>
-      <span>Тип об'єкта</span>
+      <span>{{ $t('objectType.title') }}</span>
     </h3>
     <div class="disclosure-wrap disclosure-wrap-feature_type preset-list-item">
       <div class="preset-list-button-wrap">
@@ -11,20 +11,20 @@
           </div>
           <div class="label">
             <div class="label-inner">
-              <div class="namepart">{{ currentType ? currentType.name : '' }}</div>
+              <div class="namepart">{{ currentType ? $t(`presets.${getPresetKey(currentType.name)}.name`, currentType.name) : '' }}</div>
               <div v-if="!isCurrentTypeCompatible" class="incompatible-warning">
                 <span v-if="props.currentFile?.object_type === 'collection'">
-                  Несумісний з типом колекції
+                  {{ $t('objectType.incompatibleWithCollection') }}
                 </span>
                 <span v-else>
-                  Несумісний з типом файлу
+                  {{ $t('objectType.incompatibleWithFile') }}
                 </span>
               </div>
             </div>
           </div>
         </button>
         <div class="accessory-buttons">
-          <button class="tag-reference-button" title="інформація">
+          <button class="tag-reference-button" :title="$t('objectType.information')">
             <svg width="16" height="16" viewBox="0 0 16 16"><circle cx="8" cy="8" r="7" stroke="#888" stroke-width="2" fill="none"/><text x="8" y="12" text-anchor="middle" font-size="10" fill="#888">i</text></svg>
           </button>
         </div>
@@ -32,24 +32,24 @@
     </div>
     <div v-if="openMenu" class="type-search-area">
       <div class="type-modal-header">
-        <h2>Пошук об'єктів</h2>
+        <h2>{{ $t('objectType.searchObjects') }}</h2>
         <button class="close-btn" @click="closeMenu">×</button>
       </div>
       <div class="type-modal-search">
-        <input type="search" v-model="search" placeholder="Пошук" class="pure-input-1" />
+        <input type="search" v-model="search" :placeholder="$t('objectType.search')" class="pure-input-1" />
       </div>
       <div v-if="filteredTypes.length === 0" class="no-compatible-types">
         <p v-if="props.currentFile?.object_type === 'collection'">
-          Немає доступних типів для колекції
+          {{ $t('objectType.noAvailableTypesForCollection') }}
         </p>
         <p v-else>
-          Немає сумісних типів для об'єкту типу "{{ props.currentFile?.object_type || 'невідомий' }}"
+          {{ $t('objectType.noCompatibleTypesForObject') }} "{{ props.currentFile?.object_type || $t('objectType.unknown') }}"
         </p>
       </div>
       <div v-else class="type-modal-list">
         <button v-for="(type, idx) in filteredTypes" :key="type.name" class="type-modal-item" @click="selectType(idx)">
           <span v-html="type.icon" class="preset-icon"></span>
-          <span>{{ type.name }}</span>
+          <span>{{ $t(`presets.${getPresetKey(type.name)}.name`, type.name) }}</span>
         </button>
       </div>
     </div>
@@ -60,6 +60,14 @@
 import { ref, onMounted, watch, computed } from 'vue'
 import { loadFieldDefinitions } from '../utils/fieldResolver.js'
 import { matchTagsToPreset, getAllPresets } from '../utils/tagMatcher.js'
+
+// Function to get preset key for translation
+function getPresetKey(presetName) {
+  if (!presetName) return ''
+  
+  // Map preset names to translation keys
+  return presetName.toLowerCase().replace(/\s+/g, '_').replace(/\W/g, '')
+}
 
 const props = defineProps({
   modelValue: Object,

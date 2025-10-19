@@ -1,7 +1,7 @@
 <template>
   <div class="section tag-editor">
     <h3>
-      <span>Поля ({{ fields.length }})</span>
+      <span>{{ $t('fields.fieldsTitle') }} ({{ fields.length }})</span>
       <span v-if="currentFile" class="file-info"> - {{ currentFile.name }}</span>
     </h3>
     <div class="disclosure-wrap">
@@ -9,9 +9,9 @@
         <!-- Preset-defined fields -->
         <div v-for="(field, idx) in fields" :key="field.name" class="field-row" :class="{ 'related-field': isRelatedField(field.name) }">
           <label :for="'field-' + field.name" class="field-label">
-            <span class="label-text">{{ field.label || field.name }}</span>
-            <span v-if="isRelatedField(field.name)" class="related-badge">автоматично</span>
-            <button v-if="!isRelatedField(field.name)" type="button" class="remove-btn" title="вилучити" @click="clearField(field.name)">
+            <span class="label-text">{{ $t(`fields.${field.key || field.name}.label`, field.label || field.name) }}</span>
+            <span v-if="isRelatedField(field.name)" class="related-badge">{{ $t('ui.automatic') }}</span>
+            <button v-if="!isRelatedField(field.name)" type="button" class="remove-btn" :title="$t('ui.remove')" @click="clearField(field.name)">
               <svg width="16" height="16" viewBox="0 0 16 16">
                 <line x1="4" y1="4" x2="12" y2="12" stroke="#c00" stroke-width="2"/>
                 <line x1="12" y1="4" x2="4" y2="12" stroke="#c00" stroke-width="2"/>
@@ -26,16 +26,16 @@
             @update:related-fields="handleRelatedFields"
           />
           <div v-if="isRelatedField(field.name)" class="related-note">
-            Це поле автоматично заповнюється при виборі {{ getRelatedFieldSource(field.name) }}
+            {{ $t('ui.autoFilledFrom') }} {{ getRelatedFieldSource(field.name) }}
           </div>
         </div>
 
         <!-- Additional fields -->
         <div v-for="(moreField, idx) in activeMoreFields" :key="moreField.name" class="field-row additional-field">
           <label :for="'field-' + moreField.name" class="field-label">
-            <span class="label-text">{{ moreField.label || moreField.name }}</span>
-            <span class="additional-badge">додатково</span>
-            <button type="button" class="remove-btn" title="вилучити" @click="clearField(moreField.name)">
+            <span class="label-text">{{ $t(`fields.${moreField.key || moreField.name}.label`, moreField.label || moreField.name) }}</span>
+            <span class="additional-badge">{{ $t('ui.additional') }}</span>
+            <button type="button" class="remove-btn" :title="$t('ui.remove')" @click="clearField(moreField.name)">
               <svg width="16" height="16" viewBox="0 0 16 16">
                 <line x1="4" y1="4" x2="12" y2="12" stroke="#c00" stroke-width="2"/>
                 <line x1="12" y1="4" x2="4" y2="12" stroke="#c00" stroke-width="2"/>
@@ -57,13 +57,13 @@
               <line x1="8" y1="2" x2="8" y2="14" stroke="#007bff" stroke-width="2"/>
               <line x1="2" y1="8" x2="14" y2="8" stroke="#007bff" stroke-width="2"/>
             </svg>
-            Додати поле
+            {{ $t('ui.addField') }}
           </button>
           
           <!-- Dropdown for selecting additional fields -->
           <div v-if="showMoreFieldsDropdown" class="field-dropdown">
             <div class="dropdown-header">
-              <span>Виберіть додаткове поле:</span>
+              <span>{{ $t('ui.selectAdditionalField') }}</span>
               <button type="button" class="close-btn" @click="showMoreFieldsDropdown = false">×</button>
             </div>
             <div class="dropdown-options">
@@ -74,7 +74,7 @@
                 class="dropdown-option"
                 @click="addMoreField(field.key)"
               >
-                <span class="option-label">{{ field.label || field.key }}</span>
+                <span class="option-label">{{ $t(`fields.${field.key}.label`, field.label || field.key) }}</span>
                 <span class="option-type">{{ getFieldTypeLabel(field.type) }}</span>
               </button>
             </div>
@@ -87,11 +87,11 @@
   <!-- Raw Tag Editor for Experienced Users -->
   <div class="section raw-tag-editor">
     <h3>
-      <button class="toggle-btn" :class="{ expanded: showRawEditor }" @click="showRawEditor = !showRawEditor" title="згорнути">
+      <button class="toggle-btn" :class="{ expanded: showRawEditor }" @click="showRawEditor = !showRawEditor" :title="$t('fields.collapse')">
         <svg class="toggle-icon" width="12" height="12" viewBox="0 0 12 12">
           <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
-        <span class="toggle-text">Теґи ({{ allTagsCount }})</span>
+        <span class="toggle-text">{{ $t('ui.tags') }} ({{ allTagsCount }})</span>
       </button>
     </h3>
     
@@ -104,7 +104,7 @@
         autocorrect="off" 
         autocapitalize="off" 
         spellcheck="false" 
-        placeholder="ключ=значення"
+        :placeholder="$t('ui.keyValuePlaceholder')"
         style="height: 200px;"
       ></textarea>
     </div>
@@ -113,9 +113,12 @@
 
 <script setup>
 import { reactive, watch, nextTick, ref, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { resolveFields } from '../utils/fieldResolver.js'
 import FieldRenderer from './fields/FieldRenderer.vue'
 import apiService from '../services/api.js'
+
+const { t } = useI18n()
 
 const props = defineProps({
   fields: {
@@ -209,13 +212,13 @@ function formatFieldLabel(key) {
 
 function getFieldTypeLabel(fieldType) {
   const typeLabels = {
-    'text': 'текст',
-    'number': 'число',
-    'check': 'так/ні',
-    'combo': 'вибір',
-    'textarea': 'текст'
+    'text': t('fields.fieldTypes.text'),
+    'number': t('fields.fieldTypes.number'),
+    'check': t('fields.fieldTypes.check'),
+    'combo': t('fields.fieldTypes.combo'),
+    'textarea': t('fields.fieldTypes.textarea')
   }
-  return typeLabels[fieldType] || 'текст'
+  return typeLabels[fieldType] || t('fields.fieldTypes.text')
 }
 
 // Raw tag editor functions
@@ -329,7 +332,7 @@ function getRelatedFieldSource(fieldName) {
       return fieldDef.label || sourceFieldName
     }
   }
-  return 'іншого поля'
+  return t('ui.anotherField', 'another field')
 }
 
 function addMoreField(fieldKey) {

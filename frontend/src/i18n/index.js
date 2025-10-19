@@ -1,0 +1,17 @@
+import { createI18n } from 'vue-i18n'
+import uk from './locales/uk.json'
+import en from './locales/en.json'
+import de from './locales/de.json'
+
+const i18n = createI18n({
+  legacy: false,
+  locale: 'uk', // default locale - Ukrainian
+  fallbackLocale: 'en',
+  messages: {
+    uk,
+    en,
+    de
+  }
+})
+
+export default i18n

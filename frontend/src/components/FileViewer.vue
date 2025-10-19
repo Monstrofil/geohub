@@ -314,7 +314,7 @@
           <div class="content-sidebar">
             <!-- Unified Object Type and Properties section -->
             <div v-if="selectedType || (file.tags && Object.keys(file.tags).length > 0)" class="unified-properties-section">
-              <h3>Object Information</h3>
+              <h3>{{ $t('fileInfo.objectInformation') }}</h3>
               
               <!-- Object type display -->
               <div v-if="selectedType" class="object-type-display">
@@ -324,18 +324,18 @@
                 <div class="object-type-info">
                   <div class="object-type-name">{{ selectedType.name }}</div>
                   <div class="object-type-description">
-                    {{ selectedType.description || 'Description not set' }}
+                    {{ selectedType.description || $t('fileInfo.descriptionNotSet') }}
                   </div>
                 </div>
               </div>
 
               <!-- Object properties using field definitions -->
               <div v-if="file.tags && Object.keys(file.tags).length > 0" class="properties-section">
-                <h4>Properties</h4>
+                <h4>{{ $t('fileInfo.properties') }}</h4>
                 <div v-if="selectedFields.length > 0" class="properties-grid">
                   <div v-for="field in selectedFields" :key="field.key" class="property-item">
-                    <span class="property-label">{{ field.label || field.key }}:</span>
-                    <span class="property-value">{{ file.tags[field.key] || 'Not set' }}</span>
+                    <span class="property-label">{{ $t(`fields.${field.key}.label`, field.label || field.key) }}:</span>
+                    <span class="property-value">{{ file.tags[field.key] || $t('fileInfo.notSet') }}</span>
                   </div>
                 </div>
                 <div v-else class="tags-grid">
@@ -349,30 +349,30 @@
 
             <!-- File Information section -->
             <div class="file-info-section">
-              <h3>File Information</h3>
+              <h3>{{ $t('fileInfo.title') }}</h3>
               <div class="info-grid">
                 <div class="info-item">
-                  <span class="info-label">Name:</span>
+                  <span class="info-label">{{ $t('fileInfo.name') }}</span>
                   <span class="info-value">{{ getOriginalName(file) }}</span>
                 </div>
                 <div class="info-item">
-                  <span class="info-label">Type:</span>
+                  <span class="info-label">{{ $t('fileInfo.type') }}</span>
                   <span class="info-value">{{ fileTypeLabel }}</span>
                 </div>
                 <div class="info-item">
-                  <span class="info-label">MIME Type:</span>
-                  <span class="info-value">{{ getMimeType(file) || 'Unknown' }}</span>
+                  <span class="info-label">{{ $t('fileInfo.mimeType') }}</span>
+                  <span class="info-value">{{ getMimeType(file) || $t('fileInfo.unknown') }}</span>
                 </div>
                 <div class="info-item" v-if="getFileSize(file)">
-                  <span class="info-label">Size:</span>
+                  <span class="info-label">{{ $t('fileInfo.size') }}</span>
                   <span class="info-value">{{ formatSize(getFileSize(file)) }}</span>
                 </div>
                 <div class="info-item" v-if="file.created_at">
-                  <span class="info-label">Created:</span>
+                  <span class="info-label">{{ $t('fileInfo.created') }}</span>
                   <span class="info-value">{{ formatDate(file.created_at) }}</span>
                 </div>
                 <div class="info-item" v-if="file.updated_at">
-                  <span class="info-label">Modified:</span>
+                  <span class="info-label">{{ $t('fileInfo.modified') }}</span>
                   <span class="info-value">{{ formatDate(file.updated_at) }}</span>
                 </div>
               </div>
@@ -384,8 +384,8 @@
               <!-- Probing status -->
               <div v-if="probeLoading" class="probe-status">
                 <div class="spinner"></div>
-                <h3>Checking file compatibility...</h3>
-                <p>Analyzing if this file can be georeferenced...</p>
+                <h3>{{ $t('fileInfo.checkingCompatibility') }}</h3>
+                <p>{{ $t('fileInfo.analyzingGeoreference') }}</p>
               </div>
 
               <!-- Probe error -->
@@ -396,7 +396,7 @@
                     <path d="M20 20l24 24M44 20l-24 24" stroke="white" stroke-width="4" fill="none" stroke-linecap="round"/>
                   </svg>
                 </div>
-                <h3>File Analysis Failed</h3>
+                <h3>{{ $t('fileInfo.fileAnalysisFailed') }}</h3>
                 <p>{{ probeError }}</p>
               </div>
 
@@ -437,7 +437,7 @@
                 </div>
                 
                 <div class="file-info">
-                  <p><strong>File details:</strong> {{ probeResult.image_info?.width }}×{{ probeResult.image_info?.height }} pixels, {{ probeResult.image_info?.bands }} bands</p>
+                  <p><strong>{{ $t('fileInfo.fileDetails') }}</strong> {{ probeResult.image_info?.width }}×{{ probeResult.image_info?.height }} pixels, {{ probeResult.image_info?.bands }} bands</p>
                 </div>
               </div>
 
@@ -465,7 +465,7 @@
                 </div>
                 
                 <div class="file-info">
-                  <p><strong>File details:</strong> {{ probeResult.image_info?.width }}×{{ probeResult.image_info?.height }} pixels, {{ probeResult.image_info?.bands }} bands</p>
+                  <p><strong>{{ $t('fileInfo.fileDetails') }}</strong> {{ probeResult.image_info?.width }}×{{ probeResult.image_info?.height }} pixels, {{ probeResult.image_info?.bands }} bands</p>
                 </div>
               </div>
 
