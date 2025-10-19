@@ -4,13 +4,31 @@ let loadedPresets = null
 
 /**
  * Get all loaded presets
- * @returns {Array} Array of preset objects
+ * @returns {Array} Array of preset objects with translation keys
  */
 export function getAllPresets() {
   if (!loadedPresets) {
-    loadedPresets = Object.values(presetModules).map(module => module.default || module)
+    loadedPresets = Object.entries(presetModules).map(([path, module]) => {
+      const preset = module.default || module
+      // Generate translation key from filename
+      preset.translationKey = generateTranslationKey(path)
+      return preset
+    })
   }
   return loadedPresets
+}
+
+/**
+ * Generate translation key from file path
+ * @param {string} filePath - The file path
+ * @returns {string} Translation key
+ */
+function generateTranslationKey(filePath) {
+  if (!filePath) return ''
+  
+  // Extract filename without extension from path
+  const filename = filePath.split('/').pop().replace(/\.json$/, '')
+  return filename
 }
 
 export function matchTagsToPreset(fileTags, allPresets = null, objectType = null) {

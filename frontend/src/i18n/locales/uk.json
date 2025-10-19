@@ -31,26 +31,26 @@
     }
   },
   "presets": {
-    "generic_file": {
-      "name": "Файл"
-    },
     "collection": {
       "name": "Колекція"
     },
     "master_plan": {
       "name": "Матеріали генерального плану"
     },
-    "detail_plan": {
-      "name": "Детальний план теориторії"
+    "detailed_plan": {
+      "name": "Детальний план території"
     },
-    "maps_collection": {
+    "georaster": {
+      "name": "Георастровий файл"
+    },
+    "maps": {
       "name": "Колекція карт"
     },
-    "word_document": {
+    "word": {
       "name": "Документ Word"
     },
-    "generic_raster_graphic": {
-      "name": "Георастровий файл"
+    "generic": {
+      "name": "Загальний файл"
     },
     "settlement_location_scheme": {
       "name": "Схема розташування населеного пункту в системі розселення"

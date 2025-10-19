@@ -322,7 +322,7 @@
                   <span v-html="selectedType.icon" class="preset-icon"></span>
                 </div>
                 <div class="object-type-info">
-                  <div class="object-type-name">{{ selectedType.name }}</div>
+                  <div class="object-type-name">{{ $t(`presets.${selectedType.translationKey}.name`, selectedType.name) }}</div>
                   <div class="object-type-description">
                     {{ selectedType.description || $t('fileInfo.descriptionNotSet') }}
                   </div>

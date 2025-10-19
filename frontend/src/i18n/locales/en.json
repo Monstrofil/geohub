@@ -31,26 +31,26 @@
     }
   },
   "presets": {
-    "generic_file": {
-      "name": "File"
-    },
     "collection": {
       "name": "Collection"
     },
     "master_plan": {
       "name": "Master Plan Materials"
     },
-    "detail_plan": {
+    "detailed_plan": {
       "name": "Detailed Territory Plan"
     },
-    "maps_collection": {
+    "georaster": {
+      "name": "Georaster File"
+    },
+    "maps": {
       "name": "Maps Collection"
     },
-    "word_document": {
+    "word": {
       "name": "Word Document"
     },
-    "generic_raster_graphic": {
-      "name": "Georaster File"
+    "generic": {
+      "name": "Generic File"
     },
     "settlement_location_scheme": {
       "name": "Settlement Location Scheme"

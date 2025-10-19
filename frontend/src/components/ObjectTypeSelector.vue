@@ -11,7 +11,7 @@
           </div>
           <div class="label">
             <div class="label-inner">
-              <div class="namepart">{{ currentType ? $t(`presets.${getPresetKey(currentType.name)}.name`, currentType.name) : '' }}</div>
+              <div class="namepart">{{ currentType ? $t(`presets.${currentType.translationKey}.name`, currentType.name) : '' }}</div>
               <div v-if="!isCurrentTypeCompatible" class="incompatible-warning">
                 <span v-if="props.currentFile?.object_type === 'collection'">
                   {{ $t('objectType.incompatibleWithCollection') }}
@@ -49,7 +49,7 @@
       <div v-else class="type-modal-list">
         <button v-for="(type, idx) in filteredTypes" :key="type.name" class="type-modal-item" @click="selectType(idx)">
           <span v-html="type.icon" class="preset-icon"></span>
-          <span class="preset-name">{{ $t(`presets.${getPresetKey(type.name)}.name`, type.name) }}</span>
+          <span class="preset-name">{{ $t(`presets.${type.translationKey}.name`, type.name) }}</span>
         </button>
       </div>
     </div>
@@ -60,14 +60,6 @@
 import { ref, onMounted, watch, computed } from 'vue'
 import { loadFieldDefinitions } from '../utils/fieldResolver.js'
 import { matchTagsToPreset, getAllPresets } from '../utils/tagMatcher.js'
-
-// Function to get preset key for translation
-function getPresetKey(presetName) {
-  if (!presetName) return ''
-  
-  // Map preset names to translation keys
-  return presetName.toLowerCase().replace(/\s+/g, '_').replace(/\W/g, '')
-}
 
 const props = defineProps({
   modelValue: Object,
