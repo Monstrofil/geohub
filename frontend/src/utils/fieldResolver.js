@@ -75,7 +75,8 @@ function mapFieldType(fieldType) {
     'textarea': 'richtext',
     'check': 'bool',
     'combo': 'enum',
-    'number': 'number'
+    'number': 'number',
+    'koatoth': 'koatoth'
   }
   
   return typeMap[fieldType] || 'str'

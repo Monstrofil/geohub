@@ -14,6 +14,7 @@ import NumberField from './NumberField.vue'
 import BoolField from './BoolField.vue'
 import EnumField from './EnumField.vue'
 import RichTextField from './RichTextField.vue'
+import KoatothChoiceField from './KoatothChoiceField.vue'
 
 const props = defineProps({
   field: {
@@ -40,6 +41,8 @@ const fieldComponent = computed(() => {
       return EnumField
     case 'richtext':
       return RichTextField
+    case 'koatoth':
+      return KoatothChoiceField
     default:
       return TextField // fallback to text field
   }
