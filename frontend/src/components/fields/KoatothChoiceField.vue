@@ -37,6 +37,10 @@
     <div v-if="showDropdown && searchTerm && filteredOptions.length === 0" class="no-results">
       No locations found
     </div>
+    
+    <div v-if="field.description" class="field-description">
+      {{ field.description }}
+    </div>
   </div>
 </template>
 
@@ -345,5 +349,12 @@ function handleBlur() {
 
 .dropdown::-webkit-scrollbar-thumb:hover {
   background: #a8a8a8;
+}
+
+.field-description {
+  font-size: 0.85em;
+  color: #666;
+  margin-top: 0.25rem;
+  line-height: 1.3;
 }
 </style>

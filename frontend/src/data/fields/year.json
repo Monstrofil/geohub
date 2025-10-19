@@ -1,5 +1,6 @@
 {
     "key": "year",
     "type": "number",
-    "label": "Year"
+    "label": "Year",
+    "description": "Year of creation, publication, or relevant date for the document or resource"
 } 

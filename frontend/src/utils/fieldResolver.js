@@ -43,14 +43,17 @@ export function resolveFields(fieldKeys, allFieldDefinitions) {
     }
 
     // Map field definition format to our component format
-    return {
+    // Start with all properties from the field definition
+    const resolvedField = {
+      ...fieldDef,
       name: fieldDef.key,
       key: fieldDef.key,
       type: mapFieldType(fieldDef.type),
-      label: fieldDef.label,
-      values: fieldDef.strings?.options ? Object.keys(fieldDef.strings.options) : undefined,
-      placeholder: fieldDef.placeholder
+      label: fieldDef.label || formatFieldLabel(fieldDef.key),
+      values: fieldDef.strings?.options ? Object.keys(fieldDef.strings.options) : undefined
     }
+    
+    return resolvedField
   })
 }
 

@@ -2,6 +2,7 @@
     "key": "koatoth",
     "type": "koatoth",
     "label": "KOATOTH",
+    "description": "Official Ukraine administrative territory code",
     "placeholder": "Select a location from KOATOTH database",
     "relatedFields": {
         "name": "name",

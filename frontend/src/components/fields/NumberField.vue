@@ -1,15 +1,20 @@
 <template>
-  <input 
-    :id="fieldId" 
-    type="number" 
-    class="pure-input-1" 
-    :value="modelValue ?? ''" 
-    @blur="handleBlur"
-    :placeholder="field.placeholder"
-    :min="field.min"
-    :max="field.max"
-    :step="field.step"
-  />
+  <div class="number-field">
+    <input 
+      :id="fieldId" 
+      type="number" 
+      class="pure-input-1" 
+      :value="modelValue ?? ''" 
+      @blur="handleBlur"
+      :placeholder="field.placeholder"
+      :min="field.min"
+      :max="field.max"
+      :step="field.step"
+    />
+    <div v-if="field.description" class="field-description">
+      {{ field.description }}
+    </div>
+  </div>
 </template>
 
 <script setup>
@@ -34,4 +39,13 @@ function handleBlur(event) {
     emit('update:modelValue', newValue)
   }
 }
-</script> 
+</script>
+
+<style scoped>
+.field-description {
+  font-size: 0.85em;
+  color: #666;
+  margin-top: 0.25rem;
+  line-height: 1.3;
+}
+</style> 

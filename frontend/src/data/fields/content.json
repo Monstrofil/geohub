@@ -1,5 +1,6 @@
 {
     "key": "content",
     "type": "text",
-    "label": "Content"
+    "label": "Content",
+    "description": "Main content or title of the document or resource"
 } 

@@ -1,5 +1,6 @@
 {
     "key": "description",
     "type": "textarea",
-    "label": "Description"
+    "label": "Description",
+    "description": "Detailed description or summary of the document or resource"
 } 

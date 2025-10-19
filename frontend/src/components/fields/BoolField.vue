@@ -1,14 +1,19 @@
 <template>
   <div class="bool-field">
-    <input 
-      :id="fieldId" 
-      type="checkbox" 
-      :checked="modelValue === true" 
-      :indeterminate="modelValue === null" 
-      @change="handleChange"
-      ref="checkboxRef"
-    />
-    <span class="bool-label">{{ labelText }}</span>
+    <div class="bool-input-container">
+      <input 
+        :id="fieldId" 
+        type="checkbox" 
+        :checked="modelValue === true" 
+        :indeterminate="modelValue === null" 
+        @change="handleChange"
+        ref="checkboxRef"
+      />
+      <span class="bool-label">{{ labelText }}</span>
+    </div>
+    <div v-if="field.description" class="field-description">
+      {{ field.description }}
+    </div>
   </div>
 </template>
 
@@ -53,6 +58,12 @@ watch(() => props.modelValue, async () => {
 <style scoped>
 .bool-field {
   display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.bool-input-container {
+  display: flex;
   align-items: center;
   gap: 0.5rem;
 }
@@ -60,5 +71,12 @@ watch(() => props.modelValue, async () => {
 .bool-label {
   font-size: 0.95em;
   color: #666;
+}
+
+.field-description {
+  font-size: 0.85em;
+  color: #666;
+  line-height: 1.3;
+  margin-left: 1.5rem;
 }
 </style> 

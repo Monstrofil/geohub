@@ -1,5 +1,6 @@
 {
     "key": "name",
     "type": "text",
-    "label": "Name"
+    "label": "Name",
+    "description": "Name or title of the item, document, or resource"
 } 
