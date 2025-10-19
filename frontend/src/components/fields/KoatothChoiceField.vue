@@ -199,8 +199,8 @@ function selectOption(option) {
   
   // Emit related field updates
   emit('update:relatedFields', {
-    name: option.name,
-    location: option.parents || option.name
+    place: option.name,
+    location: option.parents
   })
 }
 

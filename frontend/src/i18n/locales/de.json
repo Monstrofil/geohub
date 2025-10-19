@@ -20,6 +20,14 @@
       "label": "KOATOTH-Klassifizierung",
       "description": "Offizielles österreichisches Klassifizierungssystem für Dokumente"
     },
+    "place": {
+      "label": "Ort",
+      "description": "Ortsname oder Standortkennung"
+    },
+    "location": {
+      "label": "Standort",
+      "description": "Geografische Lage oder Gebietsbeschreibung"
+    },
     "fieldsTitle": "Felder",
     "collapse": "einklappen",
     "fieldTypes": {

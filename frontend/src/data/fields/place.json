@@ -1,0 +1,7 @@
+{
+    "key": "place",
+    "type": "text",
+    "label": "Place",
+    "description": "Place name or location identifier",
+    "placeholder": "Enter place name"
+}

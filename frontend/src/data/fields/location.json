@@ -1,0 +1,7 @@
+{
+    "key": "location",
+    "type": "text",
+    "label": "Location",
+    "description": "Geographic location or area description",
+    "placeholder": "Enter location description"
+}

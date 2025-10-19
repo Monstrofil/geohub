@@ -20,6 +20,14 @@
       "label": "KOATOTH Classification",
       "description": "Official Austrian classification system for documents"
     },
+    "place": {
+      "label": "Place",
+      "description": "Place name or location identifier"
+    },
+    "location": {
+      "label": "Location",
+      "description": "Geographic location or area description"
+    },
     "fieldsTitle": "Fields",
     "collapse": "collapse",
     "fieldTypes": {

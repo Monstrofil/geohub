@@ -1789,6 +1789,8 @@ watch(() => props.treeItemId, async () => {
   color: #666;
   word-break: break-word;
   font-size: 1rem;
+  flex-grow: 1;
+  text-align: right;
 }
 
 /* Fallback for raw tags */

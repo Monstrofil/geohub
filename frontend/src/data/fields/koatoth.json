@@ -5,7 +5,7 @@
     "description": "Official Ukraine administrative territory code",
     "placeholder": "Select a location from KOATOTH database",
     "relatedFields": {
-        "name": "name",
+        "place": "place",
         "location": "location"
     }
 }
