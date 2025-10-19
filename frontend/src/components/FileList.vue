@@ -100,26 +100,30 @@
           @dragleave="handleMainDragLeave"
           :class="{ 'drop-zone-active': isMainDropZone, 'moving': isMovingToMain }"
         >
-          <div class="feature-list">
-            <Card
+          <div class="pure-g feature-list">
+            <div 
               v-for="entry in files" 
               :key="entry.id"
-              :path="entry.path"
-              :file="entry.object"
-              :name="getDisplayName(entry.object)"
-              :tree-path="treePathString"
-              :ref-name="entry.object?.name || entry.id"
-              :selected="selectedEntry && selectedEntry.object && selectedEntry.object.id === entry.object?.id"
-              :move-blocked="isMoveInProgress"
-              @click="selectFile(entry.object)"
-              @file-selected="handleFileSelected"
-              @removed="handleObjectRemoved"
-              @cloned="handleObjectCloned"
-              @move-start="handleMoveStart"
-              @move-end="handleMoveEnd"
-              @item-moved="handleItemMoved"
-              @moved="handleModalMoved"
-            />
+              class="pure-u-1 pure-u-lg-1-2 pure-u-xl-1-3"
+            >
+              <Card
+                :path="entry.path"
+                :file="entry.object"
+                :name="getDisplayName(entry.object)"
+                :tree-path="treePathString"
+                :ref-name="entry.object?.name || entry.id"
+                :selected="selectedEntry && selectedEntry.object && selectedEntry.object.id === entry.object?.id"
+                :move-blocked="isMoveInProgress"
+                @click="selectFile(entry.object)"
+                @file-selected="handleFileSelected"
+                @removed="handleObjectRemoved"
+                @cloned="handleObjectCloned"
+                @move-start="handleMoveStart"
+                @move-end="handleMoveEnd"
+                @item-moved="handleItemMoved"
+                @moved="handleModalMoved"
+              />
+            </div>
           </div>
         </div>
         
@@ -621,17 +625,13 @@ watch(() => props.treePath, loadFiles)
 }
 
 .feature-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 0.5rem;
-  align-items: start;
+  /* Pure CSS grid - no additional spacing needed */
 }
 
 /* Mobile file card layout */
 @media (max-width: 768px) {
   .feature-list {
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 0.75rem;
+    /* Mobile spacing handled by Pure CSS */
   }
 }
 

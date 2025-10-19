@@ -416,8 +416,11 @@ const handleMoved = (moveData) => {
 <style scoped>
 .card-wrapper {
   position: relative;
-  display: inline-block;
-  margin: 1rem;
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0.5rem;
+  box-sizing: border-box;
 }
 
 .card-link {
@@ -432,7 +435,7 @@ const handleMoved = (moveData) => {
   border-radius: 16px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
   width: 100%;
-  flex: 1 1 240px;
+  min-height: 240px;
   transition: all 0.2s ease;
   cursor: pointer;
   position: relative;
@@ -751,8 +754,6 @@ const handleMoved = (moveData) => {
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .card {
-    min-width: 180px;
-    max-width: 300px;
     min-height: 140px;
   }
   
