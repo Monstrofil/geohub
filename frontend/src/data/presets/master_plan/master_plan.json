@@ -11,5 +11,5 @@
   "description": "Матеріали генерального плану. Текстова або графічна інформація.",
   "terms": ["master", "plan"],
   "name": "Master Plan",
-  "matchScore": 0.9
+  "matchScore": 0.2
 } 

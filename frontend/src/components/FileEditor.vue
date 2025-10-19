@@ -677,7 +677,7 @@ function onGeoreferencingCompleted(result) {
 }
 
 .left-panel {
-  width: 320px;
+  width: 420px;
   background: #f8f9fa;
   border-right: 1px solid #eee;
   overflow-y: auto;

@@ -49,7 +49,7 @@
       <div v-else class="type-modal-list">
         <button v-for="(type, idx) in filteredTypes" :key="type.name" class="type-modal-item" @click="selectType(idx)">
           <span v-html="type.icon" class="preset-icon"></span>
-          <span>{{ $t(`presets.${getPresetKey(type.name)}.name`, type.name) }}</span>
+          <span class="preset-name">{{ $t(`presets.${getPresetKey(type.name)}.name`, type.name) }}</span>
         </button>
       </div>
     </div>
@@ -284,6 +284,10 @@ watch(() => props.currentFile?.object_type, (newFileType) => {
   background: #fafbfc;
   cursor: pointer;
   transition: background 0.15s;
+}
+.type-modal-item .preset-name { 
+  text-align: right;
+  flex-grow: 1;
 }
 .type-modal-item:hover {
   background: #e6f0fa;

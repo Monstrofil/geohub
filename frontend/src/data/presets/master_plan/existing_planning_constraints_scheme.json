@@ -1,0 +1,16 @@
+{
+  "icon": "<svg width='24' height='24' viewBox='0 0 24 24'><rect x='2' y='2' width='20' height='20' rx='2' fill='#fff3e0' stroke='#f57c00' stroke-width='2'/><rect x='4' y='4' width='16' height='16' rx='1' fill='none' stroke='#f57c00' stroke-width='1' stroke-dasharray='2,2'/><circle cx='8' cy='8' r='2' fill='#ff5722'/><circle cx='16' cy='8' r='2' fill='#ff5722'/><circle cx='8' cy='16' r='2' fill='#ff5722'/><circle cx='16' cy='16' r='2' fill='#ff5722'/><text x='12' y='20' text-anchor='middle' font-size='8' fill='#f57c00'>Constraints</text></svg>",
+  "fields": ["name", "koatoth", "year", "description"],
+  "previewFields": ["name", "koatoth"],
+  "moreFields": ["content"],
+  "object_type": ["geo_raster_file", "vector"],
+  "tags": {
+    "mbd": "plan",
+    "plan": "master_plan",
+    "type": "existing_planning_constraints"
+  },
+  "description": "Схема існуючих планувальних обмежень. Показує обмеження та заборони для планування території населеного пункту.",
+  "terms": ["existing", "planning", "constraints", "restrictions", "limitations", "обмеження", "планувальні"],
+  "name": "Existing Planning Constraints Scheme",
+  "matchScore": 0.9
+}

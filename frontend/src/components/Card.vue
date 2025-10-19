@@ -521,6 +521,7 @@ const handleMoved = (moveData) => {
   align-items: center;
   gap: 0.5rem;
   flex-shrink: 0;
+  flex-grow: 1;
 }
 
 .card-icon {
@@ -535,7 +536,7 @@ const handleMoved = (moveData) => {
   font-weight: 600;
   color: #6b7280;
   text-align: center;
-  max-width: 100px;
+  max-width: 70%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

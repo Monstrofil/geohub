@@ -1430,7 +1430,7 @@ watch(() => props.treeItemId, async () => {
 }
 
 .content-sidebar {
-  width: 350px;
+  width: 400px;
   flex-shrink: 0;
 }
 

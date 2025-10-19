@@ -51,6 +51,27 @@
     },
     "generic_raster_graphic": {
       "name": "Georaster File"
+    },
+    "settlement_location_scheme": {
+      "name": "Settlement Location Scheme"
+    },
+    "existing_territory_use_plan": {
+      "name": "Existing Territory Use Plan"
+    },
+    "existing_planning_constraints_scheme": {
+      "name": "Existing Planning Constraints Scheme"
+    },
+    "prospective_development_model": {
+      "name": "Prospective Development Model"
+    },
+    "general_plan_main_drawing": {
+      "name": "General Plan Main Drawing"
+    },
+    "project_planning_constraints_scheme": {
+      "name": "Project Planning Constraints Scheme"
+    },
+    "transport_scheme": {
+      "name": "Street-Road Network and Transport Scheme"
     }
   },
   "ui": {

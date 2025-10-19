@@ -51,6 +51,27 @@
     },
     "generic_raster_graphic": {
       "name": "Georaster-Datei"
+    },
+    "settlement_location_scheme": {
+      "name": "Siedlungsstandort-Schema"
+    },
+    "existing_territory_use_plan": {
+      "name": "Plan der bestehenden Gebietsnutzung"
+    },
+    "existing_planning_constraints_scheme": {
+      "name": "Schema der bestehenden Planungsbeschränkungen"
+    },
+    "prospective_development_model": {
+      "name": "Prospektives Entwicklungsmodell"
+    },
+    "general_plan_main_drawing": {
+      "name": "Generalplan (Hauptzeichnung)"
+    },
+    "project_planning_constraints_scheme": {
+      "name": "Schema der Projektplanungsbeschränkungen"
+    },
+    "transport_scheme": {
+      "name": "Straßen- und Verkehrsnetz-Schema"
     }
   },
   "ui": {
