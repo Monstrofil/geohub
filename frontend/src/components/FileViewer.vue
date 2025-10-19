@@ -293,7 +293,7 @@
             </div>
               
               <!-- File Preview Section - displays regardless of georeferencing ability -->
-              <div v-if="previewComponent" class="file-preview-section">
+              <div v-if="!isFileGeoreferenced && previewComponent" class="file-preview-section">
                 <div class="file-preview-container">
                   <div class="preview-header">
                     <h3>File Preview</h3>
