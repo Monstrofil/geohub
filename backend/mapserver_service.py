@@ -177,6 +177,7 @@ MAP
     NAME "geotiff_layer"
     TYPE RASTER
     STATUS ON
+    PROCESSING "RESAMPLE=BILINEAR"
     DATA "/opt/mapserver/{filepath}"
 
     PROJECTION
