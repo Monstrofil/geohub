@@ -317,39 +317,9 @@
           <!-- Right panel: Object Information -->
           <div class="content-sidebar">
             <!-- Unified Object Type and Properties section -->
-            <div v-if="selectedType || (file.tags && Object.keys(file.tags).length > 0)" class="unified-properties-section">
-              <h3>{{ $t('fileInfo.objectInformation') }}</h3>
-              
-              <!-- Object type display -->
-              <div v-if="selectedType" class="object-type-display">
-                <div class="preset-icon-container">
-                  <span v-html="selectedType.icon" class="preset-icon"></span>
-                </div>
-                <div class="object-type-info">
-                  <div class="object-type-name">{{ $t(`presets.${selectedType.translationKey}.name`, selectedType.name) }}</div>
-                  <div class="object-type-description">
-                    {{ selectedType.description || $t('fileInfo.descriptionNotSet') }}
-                  </div>
-                </div>
-              </div>
-
-              <!-- Object properties using field definitions -->
-              <div v-if="file.tags && Object.keys(file.tags).length > 0" class="properties-section">
-                <h4>{{ $t('fileInfo.properties') }}</h4>
-                <div v-if="selectedFields.length > 0" class="properties-grid">
-                  <div v-for="field in selectedFields" :key="field.key" class="property-item">
-                    <span class="property-label">{{ $t(`fields.${field.key}.label`, field.label || field.key) }}:</span>
-                    <span class="property-value">{{ file.tags[field.key] || $t('fileInfo.notSet') }}</span>
-                  </div>
-                </div>
-                <div v-else class="tags-grid">
-                  <div v-for="(value, key) in file.tags" :key="key" class="tag-item">
-                    <span class="tag-key">{{ key }}:</span>
-                    <span class="tag-value">{{ value }}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <ObjectInformation 
+              :file="file"
+            />
 
             <!-- File Information section -->
             <div class="file-info-section">
@@ -603,9 +573,8 @@ import InteractiveMap from './InteractiveMap.vue'
 import CollectionFilesList from './CollectionFilesList.vue'
 import GeoreferencingModal from './GeoreferencingModal.vue'
 import TaskProgressModal from './TaskProgressModal.vue'
+import ObjectInformation from './ObjectInformation.vue'
 import { isAuthenticated } from '../stores/auth.js'
-import { matchTagsToPreset, getAllPresets } from '../utils/tagMatcher.js'
-import { loadFieldDefinitions, resolveFields } from '../utils/fieldResolver.js'
 import apiService from '../services/api.js'
 import { getFileSize, getBaseFileType, getMimeType, getOriginalName, getDisplayName as getFileDisplayName, formatFileSize as formatSize } from '../utils/fileHelpers.js'
 import { findPreviewComponent, previewComponents } from './previews/index.js'
@@ -660,10 +629,6 @@ const interactiveMapRef = ref(null)
 const mapUrl = ref(null)
 const copyStatus = ref(null)
 
-// Field definitions and presets (reused from FileEditor)
-const allPresets = ref([])
-const allFieldDefinitions = ref({})
-const selectedType = ref(null)
 
 const props = defineProps({
   treeItemId: {
@@ -736,11 +701,6 @@ async function loadFile() {
     // Store the object type for UI rendering
     file.value.object_type = response.object_type || response.type
 
-    // Set initial type based on file tags
-    if (file.value && file.value.tags) {
-      const matchedPreset = matchTagsToPreset(file.value.tags, allPresets.value, file.value.object_type)
-      selectedType.value = matchedPreset
-    }
 
     // Check for active tasks
     await checkActiveTasks()
@@ -841,13 +801,6 @@ function handleCollectionFilesUpdated(files) {
   }
 }
 
-// Resolve field keys to full field definitions (reused from FileEditor)
-const selectedFields = computed(() => {
-  if (!selectedType.value || !selectedType.value.fields) {
-    return []
-  }
-  return resolveFields(selectedType.value.fields, allFieldDefinitions.value)
-})
 
 // WMS URL computed property (GetCapabilities)
 const wmsUrl = computed(() => {
@@ -1223,10 +1176,6 @@ async function copyToClipboard(text, label) {
 
 // Lifecycle
 onMounted(async () => {
-  // Load all field definitions and presets using centralized loading
-  allPresets.value = getAllPresets()
-  console.log('Loaded presets:', allPresets.value)
-  allFieldDefinitions.value = await loadFieldDefinitions()
   await loadFile()
 })
 
@@ -1703,106 +1652,6 @@ watch(() => props.treeItemId, async () => {
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
-/* Unified properties section */
-.unified-properties-section {
-  background: white;
-  border-radius: 8px;
-  padding: 1.5rem;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-  top: 1rem;
-}
-
-.unified-properties-section h3 {
-  margin: 0 0 1rem 0;
-  font-size: 1.2rem;
-  color: #333;
-}
-
-.object-type-display {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  margin-bottom: 1.5rem;
-  padding: 1rem;
-  background: #f8f9fa;
-  border-radius: 8px;
-  border: 1px solid #e9ecef;
-}
-
-.preset-icon-container {
-  flex-shrink: 0;
-}
-
-.preset-icon {
-  display: block;
-  width: 32px;
-  height: 32px;
-}
-
-.object-type-info {
-  flex: 1;
-}
-
-.object-type-name {
-  font-weight: 600;
-  font-size: 1.1rem;
-  color: #212529;
-  margin-bottom: 0.25rem;
-}
-
-.object-type-description {
-  font-size: 0.9rem;
-  color: #6c757d;
-}
-
-.properties-section {
-  margin-top: 1.5rem;
-}
-
-.properties-section h4 {
-  margin: 0 0 1rem 0;
-  font-size: 1rem;
-  color: #333;
-  font-weight: 600;
-}
-
-.properties-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.property-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  padding: 0.75rem;
-  background: #f8f9fa;
-  border-radius: 6px;
-  border: 1px solid #e9ecef;
-}
-
-.property-label {
-  font-weight: 500;
-  color: #333;
-  font-size: 0.9rem;
-}
-
-.property-value {
-  color: #666;
-  word-break: break-word;
-  font-size: 1rem;
-  flex-grow: 1;
-  text-align: right;
-}
-
-/* Fallback for raw tags */
-.object-tags {
-  background: white;
-  border-radius: 8px;
-  padding: 2rem;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
 
 /* Interactive map container */
 .interactive-map-container {
