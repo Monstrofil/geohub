@@ -322,35 +322,7 @@
             />
 
             <!-- File Information section -->
-            <div class="file-info-section">
-              <h3>{{ $t('fileInfo.title') }}</h3>
-              <div class="info-grid">
-                <div class="info-item">
-                  <span class="info-label">{{ $t('fileInfo.name') }}</span>
-                  <span class="info-value">{{ getOriginalName(file) }}</span>
-                </div>
-                <div class="info-item">
-                  <span class="info-label">{{ $t('fileInfo.type') }}</span>
-                  <span class="info-value">{{ fileTypeLabel }}</span>
-                </div>
-                <div class="info-item">
-                  <span class="info-label">{{ $t('fileInfo.mimeType') }}</span>
-                  <span class="info-value">{{ getMimeType(file) || $t('fileInfo.unknown') }}</span>
-                </div>
-                <div class="info-item" v-if="getFileSize(file)">
-                  <span class="info-label">{{ $t('fileInfo.size') }}</span>
-                  <span class="info-value">{{ formatSize(getFileSize(file)) }}</span>
-                </div>
-                <div class="info-item" v-if="file.created_at">
-                  <span class="info-label">{{ $t('fileInfo.created') }}</span>
-                  <span class="info-value">{{ formatDate(file.created_at) }}</span>
-                </div>
-                <div class="info-item" v-if="file.updated_at">
-                  <span class="info-label">{{ $t('fileInfo.modified') }}</span>
-                  <span class="info-value">{{ formatDate(file.updated_at) }}</span>
-                </div>
-              </div>
-            </div>
+            <FileInfoSection :file="file" />
 
             <!-- Georeferencing needed for raster files -->
             <div v-if="file && !isFileGeoreferenced" class="georeferencing-needed">
@@ -574,6 +546,7 @@ import CollectionFilesList from './CollectionFilesList.vue'
 import GeoreferencingModal from './GeoreferencingModal.vue'
 import TaskProgressModal from './TaskProgressModal.vue'
 import ObjectInformation from './ObjectInformation.vue'
+import FileInfoSection from './FileInfoSection.vue'
 import { isAuthenticated } from '../stores/auth.js'
 import apiService from '../services/api.js'
 import { getFileSize, getBaseFileType, getMimeType, getOriginalName, getDisplayName as getFileDisplayName, formatFileSize as formatSize } from '../utils/fileHelpers.js'
@@ -1595,51 +1568,6 @@ watch(() => props.treeItemId, async () => {
   width: 100%;
 }
 
-/* File info section in sidebar */
-.file-info-section {
-  background: white;
-  border-radius: 8px;
-  padding: 1.5rem;
-  margin-top: 1.5rem;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-.file-info-section h3 {
-  margin: 0 0 1rem 0;
-  font-size: 1.2rem;
-  color: #333;
-}
-
-.info-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.info-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  padding: 0.75rem;
-  background: #f8f9fa;
-  border-radius: 6px;
-  border: 1px solid #e9ecef;
-}
-
-.info-label {
-  font-size: 0.9rem;
-  color: #495057;
-  font-weight: 500;
-  min-width: 80px;
-}
-
-.info-value {
-  font-size: 0.9rem;
-  color: #212529;
-  text-align: right;
-  word-break: break-word;
-  max-width: 200px;
-}
 
 /* Content sections */
 .raster-content,
