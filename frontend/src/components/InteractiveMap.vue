@@ -279,7 +279,7 @@ export default {
             [[minLng, minLat], [maxLng, maxLat]],
             {
               padding: 50, // Add some padding around the bounds
-              duration: 2000,
+              duration: 0,
               essential: true
             }
           )
