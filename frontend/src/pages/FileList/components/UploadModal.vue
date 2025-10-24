@@ -403,7 +403,7 @@ async function uploadFolder() {
     try {
       const response = await apiService.createCollection(
         folderName,
-        {},
+        {name: folderName},
         parentCollectionPath
       )
       
