@@ -179,9 +179,9 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { matchTagsToPreset, getAllPresets } from '../utils/tagMatcher.js'
-import { loadFieldDefinitions, resolveFields } from '../utils/fieldResolver.js'
-import apiService from '../services/api.js'
+import { matchTagsToPreset, getAllPresets } from '../../../utils/tagMatcher.js'
+import { loadFieldDefinitions, resolveFields } from '../../../utils/fieldResolver.js'
+import apiService from '../../../services/api.js'
 
 const props = defineProps({
   item: {

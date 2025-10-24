@@ -7,7 +7,7 @@
         <svg width="16" height="16" viewBox="0 0 16 16">
           <path d="M10 2L4 8L10 14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
-        Назад до списку
+        {{ $t('fileEditor.backButton') }}
       </button>
     </div>
 
@@ -33,19 +33,19 @@
 
         <!-- Permissions Editor -->
         <div v-if="!menuOpen && file" class="permissions-editor-section">
-          <h3>Permissions</h3>
+          <h3>{{ $t('fileEditor.permissions.title') }}</h3>
           <div class="permissions-editor">
             <table class="permissions-edit-table">
               <thead>
                 <tr>
-                  <th>Role</th>
-                  <th>Read</th>
-                  <th>Write</th>
+                  <th>{{ $t('fileEditor.permissions.role') }}</th>
+                  <th>{{ $t('fileEditor.permissions.read') }}</th>
+                  <th>{{ $t('fileEditor.permissions.write') }}</th>
                 </tr>
               </thead>
               <tbody>
                 <tr>
-                  <td class="role-label">Owner</td>
+                  <td class="role-label">{{ $t('fileEditor.permissions.owner') }}</td>
                   <td>
                     <input 
                       type="checkbox" 
@@ -64,7 +64,7 @@
                   </td>
                 </tr>
                 <tr>
-                  <td class="role-label">Group</td>
+                  <td class="role-label">{{ $t('fileEditor.permissions.group') }}</td>
                   <td>
                     <input 
                       type="checkbox" 
@@ -83,7 +83,7 @@
                   </td>
                 </tr>
                 <tr>
-                  <td class="role-label">Others</td>
+                  <td class="role-label">{{ $t('fileEditor.permissions.others') }}</td>
                   <td>
                     <input 
                       type="checkbox" 
@@ -168,7 +168,7 @@
         <div class="right-panel-header">
           <div class="panel-actions">
             <div v-if="changeTracker.hasChanges.value" class="changes-info">
-              <span class="changes-count">{{ changeTracker.changeCount.value }} change{{ changeTracker.changeCount.value !== 1 ? 's' : '' }} pending</span>
+              <span class="changes-count">{{ $t('fileEditor.changes.pending', { count: changeTracker.changeCount.value, plural: changeTracker.changeCount.value !== 1 ? 's' : '' }) }}</span>
             </div>
             
             <button 
@@ -179,11 +179,11 @@
             >
               <i v-if="changeTracker.isCommitting.value" class="fas fa-spinner fa-spin"></i>
               <i v-else class="fas fa-check"></i>
-              {{ changeTracker.isCommitting.value ? 'Committing...' : 'Commit Changes' }}
+              {{ changeTracker.isCommitting.value ? $t('fileEditor.changes.committing') : $t('fileEditor.changes.commitButton') }}
             </button>
             
             <div v-else class="no-changes">
-              <span>No pending changes</span>
+              <span>{{ $t('fileEditor.changes.noChanges') }}</span>
             </div>
           </div>
         </div>
@@ -202,19 +202,47 @@
             <div class="collection-header">
               <div class="collection-icon" v-html="selectedType?.icon || ''"></div>
               <div class="collection-info">
-                <h3>Колекція: {{ file.name }}</h3>
-                <p>Кількість елементів: {{ file.entries?.length || 0 }}</p>
+                <h3>{{ $t('fileEditor.collection.title', { name: file.name }) }}</h3>
+                <p>{{ $t('fileEditor.collection.itemCount', { count: file.entries?.length || 0 }) }}</p>
               </div>
             </div>
             <div class="collection-content">
-              <p>Це колекція файлів. Ви можете редагувати теги колекції в панелі зліва.</p>
+              <div class="collection-description">
+                <h4>{{ $t('fileEditor.collection.aboutTitle') }}</h4>
+                <p>{{ $t('fileEditor.collection.aboutDescription', { count: file.entries?.length || 0 }) }}</p>
+              </div>
               
-              <!-- Collection files list -->
-              <CollectionFilesList 
-                :collection-id="props.treeItemId"
-                @files-updated="handleCollectionFilesUpdated"
-                ref="collectionFilesList"
-              />
+              <div class="collection-info-sections">
+                <div class="info-section">
+                  <div class="info-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" stroke-width="2" fill="none"/>
+                      <polyline points="14,2 14,8 20,8" stroke="currentColor" stroke-width="2" fill="none"/>
+                      <line x1="16" y1="13" x2="8" y2="13" stroke="currentColor" stroke-width="2"/>
+                      <line x1="16" y1="17" x2="8" y2="17" stroke="currentColor" stroke-width="2"/>
+                      <polyline points="10,9 9,9 8,9" stroke="currentColor" stroke-width="2"/>
+                    </svg>
+                  </div>
+                  <div class="info-content">
+                    <h5>{{ $t('fileEditor.collection.propertiesTitle') }}</h5>
+                    <p>{{ $t('fileEditor.collection.propertiesDescription') }}</p>
+                  </div>
+                </div>
+                
+                <div class="info-section">
+                  <div class="info-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" stroke="currentColor" stroke-width="2" fill="none"/>
+                      <polyline points="7,10 12,15 17,10" stroke="currentColor" stroke-width="2" fill="none"/>
+                      <line x1="12" y1="15" x2="12" y2="3" stroke="currentColor" stroke-width="2"/>
+                    </svg>
+                  </div>
+                  <div class="info-content">
+                    <h5>{{ $t('fileEditor.collection.browseTitle') }}</h5>
+                    <p>{{ $t('fileEditor.collection.browseDescription') }}</p>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
           
@@ -226,9 +254,32 @@
                 <path d="M20 24h24M20 32h16M20 40h12" stroke="#6c757d" stroke-width="2" fill="none"/>
               </svg>
             </div>
-            <h3>Редактор файлу</h3>
-            <p>Тут буде розміщено інлайн редактор для файлу {{ file.value?.name }}</p>
-            <p class="placeholder-note">Функціональність редактора буде додана пізніше</p>
+            <h3>{{ $t('fileEditor.title') }}</h3>
+            <p>{{ $t('fileEditor.file.editTitle', { name: file?.name || 'this file' }) }}</p>
+            <div class="placeholder-info">
+              <div class="info-item">
+                <div class="info-icon">
+                  <svg width="20" height="20" viewBox="0 0 24 24">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" stroke-width="2" fill="none"/>
+                    <polyline points="14,2 14,8 20,8" stroke="currentColor" stroke-width="2" fill="none"/>
+                    <line x1="16" y1="13" x2="8" y2="13" stroke="currentColor" stroke-width="2"/>
+                    <line x1="16" y1="17" x2="8" y2="17" stroke="currentColor" stroke-width="2"/>
+                  </svg>
+                </div>
+                <span>{{ $t('fileEditor.file.editTagsDescription') }}</span>
+              </div>
+              <div class="info-item">
+                <div class="info-icon">
+                  <svg width="20" height="20" viewBox="0 0 24 24">
+                    <path d="M12 15l-3-3h6l-3 3z" stroke="currentColor" stroke-width="2" fill="none"/>
+                    <path d="M12 9l3 3h-6l3-3z" stroke="currentColor" stroke-width="2" fill="none"/>
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="none"/>
+                  </svg>
+                </div>
+                <span>{{ $t('fileEditor.file.permissionsDescription') }}</span>
+              </div>
+            </div>
+            <p class="placeholder-note">{{ $t('fileEditor.file.contentNote') }}</p>
           </div>
         </div>
       </div>
@@ -238,14 +289,12 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { useModal } from 'vue-final-modal'
-import ObjectTypeSelector from './ObjectTypeSelector.vue'
-import TagList from './TagList.vue'
-import InteractiveMap from './InteractiveMap.vue'
-import CollectionFilesList from './CollectionFilesList.vue'
-import { matchTagsToPreset, getAllPresets } from '../utils/tagMatcher.js'
-import { loadFieldDefinitions, resolveFields } from '../utils/fieldResolver.js'
-import apiService from '../services/api.js'
+import ObjectTypeSelector from '../../components/ObjectTypeSelector.vue'
+import TagList from '../../components/TagList.vue'
+import InteractiveMap from '../../components/InteractiveMap.vue'
+import { matchTagsToPreset, getAllPresets } from '../../utils/tagMatcher.js'
+import { loadFieldDefinitions, resolveFields } from '../../utils/fieldResolver.js'
+import apiService from '../../services/api.js'
 import { watch } from 'vue'
 import { useRouter } from 'vue-router'
 
@@ -270,8 +319,6 @@ const loading = ref(false)
 const error = ref(null)
 
 
-// Collection files list ref
-const collectionFilesList = ref(null)
 
 // Tags editor state
 const selectedType = ref(null)
@@ -546,13 +593,6 @@ async function handleCommit() {
 }
 
 
-// Handle collection files updates
-function handleCollectionFilesUpdated(files) {
-  // Update the collection entries count if needed
-  if (file.value && isCollection.value) {
-    file.value.entries = files
-  }
-}
 
 </script>
 
@@ -716,6 +756,42 @@ function handleCollectionFilesUpdated(files) {
   font-size: 0.9rem;
   font-style: italic;
   color: #999;
+}
+
+.placeholder-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin: 2rem 0;
+  max-width: 400px;
+}
+
+.info-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  background: #f8f9fa;
+  border-radius: 6px;
+  border: 1px solid #e9ecef;
+}
+
+.info-item .info-icon {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  background: white;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #6c757d;
+  border: 1px solid #e9ecef;
+}
+
+.info-item span {
+  color: #666;
+  font-size: 0.9rem;
 }
 
 .upload-section {
@@ -975,6 +1051,69 @@ function handleCollectionFilesUpdated(files) {
 
 .collection-content p {
   margin: 0 0 1rem 0;
+}
+
+.collection-description {
+  margin-bottom: 2rem;
+  padding: 1.5rem;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border-left: 4px solid #007bff;
+}
+
+.collection-description h4 {
+  margin: 0 0 0.75rem 0;
+  color: #333;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.collection-description p {
+  margin: 0;
+  color: #666;
+  font-size: 0.95rem;
+}
+
+.collection-info-sections {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1.5rem;
+}
+
+.info-section {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1.5rem;
+  background: white;
+  border: 1px solid #e9ecef;
+  border-radius: 8px;
+}
+
+.info-icon {
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #6c757d;
+}
+
+.info-content h5 {
+  margin: 0 0 0.5rem 0;
+  color: #333;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.info-content p {
+  margin: 0;
+  color: #666;
+  font-size: 0.9rem;
+  line-height: 1.4;
 }
 
 .collection-note {

@@ -146,12 +146,12 @@
 import { ref, watch, onMounted, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useModal } from 'vue-final-modal'
-import Card from './Card.vue'
-import UploadModal from './UploadModal.vue'
-import CollectionDetails from './CollectionDetails.vue'
-import apiService from '../services/api.js'
-import { getDisplayName } from '../utils/fileHelpers.js'
-import { isAuthenticated } from '../stores/auth.js'
+import Card from './components/Card.vue'
+import UploadModal from './components/UploadModal.vue'
+import CollectionDetails from './components/CollectionDetails.vue'
+import apiService from '../../services/api.js'
+import { getDisplayName } from '../../utils/fileHelpers.js'
+import { isAuthenticated } from '../../stores/auth.js'
 
 const props = defineProps({
   treePath: {type: [String, Array], required: false},

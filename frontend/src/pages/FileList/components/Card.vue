@@ -86,12 +86,12 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { useModal } from 'vue-final-modal'
-import apiService from '../services/api.js'
-import { getBaseFileType } from '../utils/fileHelpers.js'
-import { matchTagsToPreset } from '../utils/tagMatcher.js'
-import { loadFieldDefinitions } from '../utils/fieldResolver.js'
-import { isAuthenticated } from '../stores/auth.js'
-import MoveModal from './MoveModal.vue'
+import apiService from '../../../services/api.js'
+import { getBaseFileType } from '../../../utils/fileHelpers.js'
+import { matchTagsToPreset } from '../../../utils/tagMatcher.js'
+import { loadFieldDefinitions } from '../../../utils/fieldResolver.js'
+import { isAuthenticated } from '../../../stores/auth.js'
+import MoveModal from '../../../components/MoveModal.vue'
 
 const props = defineProps({
   name: { type: String, required: true },

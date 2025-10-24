@@ -178,5 +178,40 @@
     "regeoreferenceFile": "Georeferenzierung zurücksetzen und neu durchführen",
     "viewOnMapTooltip": "Diese Datei auf der interaktiven Karte anzeigen",
     "addToCollectionTooltip": "Diese Datei zu einer Sammlung hinzufügen"
+  },
+  "fileEditor": {
+    "title": "Datei-Editor",
+    "backButton": "Zurück zur Liste",
+    "collection": {
+      "title": "Sammlung: {name}",
+      "itemCount": "{count} Elemente",
+      "aboutTitle": "Über diese Sammlung",
+      "aboutDescription": "Diese Sammlung enthält {count} Elemente. Verwenden Sie das linke Panel, um Metadaten und Tags zu bearbeiten.",
+      "propertiesTitle": "Sammlungseigenschaften",
+      "propertiesDescription": "Bearbeiten Sie Tags, Berechtigungen und Metadaten im linken Panel",
+      "browseTitle": "Sammlung durchsuchen",
+      "browseDescription": "Verwenden Sie den Dateibrowser, um Sammlungselemente zu durchsuchen und zu verwalten"
+    },
+    "file": {
+      "editTitle": "Metadaten und Eigenschaften für {name} bearbeiten",
+      "editTagsDescription": "Bearbeiten Sie Tags und Metadaten im linken Panel",
+      "permissionsDescription": "Verwalten Sie Berechtigungen und Zugriffskontrollen",
+      "contentNote": "Dateiinhalt-Bearbeitung wird in zukünftigen Updates verfügbar sein"
+    },
+    "permissions": {
+      "title": "Berechtigungen",
+      "role": "Rolle",
+      "read": "Lesen",
+      "write": "Schreiben",
+      "owner": "Besitzer",
+      "group": "Gruppe",
+      "others": "Andere"
+    },
+    "changes": {
+      "pending": "{count} Änderung{plural} ausstehend",
+      "noChanges": "Keine ausstehenden Änderungen",
+      "committing": "Speichern...",
+      "commitButton": "Änderungen speichern"
+    }
   }
 }

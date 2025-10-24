@@ -237,7 +237,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { isAuthenticated } from '../stores/auth.js'
+import { isAuthenticated } from '../../stores/auth.js'
 
 const router = useRouter()
 const route = useRoute()

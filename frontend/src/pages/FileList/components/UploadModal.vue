@@ -161,7 +161,7 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { VueFinalModal } from 'vue-final-modal'
-import apiService from '../services/api.js'
+import apiService from '../../../services/api.js'
 
 const props = defineProps({
   show: { type: Boolean, default: false },

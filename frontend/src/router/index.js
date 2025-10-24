@@ -1,9 +1,9 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import LandingPage from '../components/LandingPage.vue'
-import Login from '../components/Login.vue'
+import LandingPage from '../pages/LangingPage/LandingPage.vue'
+import Login from '../pages/Login/Login.vue'
 import Explorer from '../components/Explorer.vue'
-import FileEditor from '../components/FileEditor.vue'
-import FileList from '../components/FileList.vue'
+import FileEditor from '../pages/FileEditor/FileEditor.vue'
+import FileList from '../pages/FileList/FileList.vue'
 import FileViewer from '../pages/FileViewer/FileViewer.vue'
 import { isAuthenticated, initializeAuth } from '../stores/auth.js'
 

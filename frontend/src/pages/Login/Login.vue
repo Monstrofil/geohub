@@ -53,7 +53,7 @@
 <script setup>
 import { ref, reactive } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { login, isLoading } from '../stores/auth.js'
+import { login, isLoading } from '../../stores/auth.js'
 
 const router = useRouter()
 const route = useRoute()

@@ -178,5 +178,40 @@
     "regeoreferenceFile": "Reset and re-georeference this file",
     "viewOnMapTooltip": "View this file on the interactive map",
     "addToCollectionTooltip": "Add this file to a collection"
+  },
+  "fileEditor": {
+    "title": "File Editor",
+    "backButton": "Back to list",
+    "collection": {
+      "title": "Collection: {name}",
+      "itemCount": "{count} items",
+      "aboutTitle": "About this Collection",
+      "aboutDescription": "This collection contains {count} items. Use the left panel to edit metadata and tags.",
+      "propertiesTitle": "Collection Properties",
+      "propertiesDescription": "Edit tags, permissions, and metadata in the left panel",
+      "browseTitle": "Browse Collection",
+      "browseDescription": "Use the file browser to explore and manage collection items"
+    },
+    "file": {
+      "editTitle": "Edit metadata and properties for {name}",
+      "editTagsDescription": "Edit tags and metadata in the left panel",
+      "permissionsDescription": "Manage permissions and access controls",
+      "contentNote": "File content editing will be available in future updates"
+    },
+    "permissions": {
+      "title": "Permissions",
+      "role": "Role",
+      "read": "Read",
+      "write": "Write",
+      "owner": "Owner",
+      "group": "Group",
+      "others": "Others"
+    },
+    "changes": {
+      "pending": "{count} change{plural} pending",
+      "noChanges": "No pending changes",
+      "committing": "Saving...",
+      "commitButton": "Save Changes"
+    }
   }
 }
