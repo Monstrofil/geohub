@@ -262,18 +262,12 @@
         </div>
       </div>
     </div>
-
-    <!-- Georeferencing Modal -->
-    <GeoreferencingModal v-if="showGeoreferencingModal"
-                        :file-id="uploadedFileId"
-                        :file-info="fileInfo"
-                        @close="closeGeoreferencing"
-                        @completed="onGeoreferencingCompleted" />
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useModal } from 'vue-final-modal'
 import apiService from '../services/api.js'
 import GeoreferencingModal from './GeoreferencingModal.vue'
 
@@ -293,8 +287,24 @@ const uploadError = ref('')
 const uploadedFileId = ref(null)
 const fileInfo = ref(null)
 const skipGeoreferencingMode = ref(false)
-const showGeoreferencingModal = ref(false)
 const completing = ref(false)
+
+// Georeferencing Modal
+const { open: openGeoreferencingModal, close: closeGeoreferencingModal } = useModal({
+  component: GeoreferencingModal,
+  attrs: {
+    "file-id": uploadedFileId,
+    "file-info": fileInfo,
+    onClose() {
+      handleGeoreferencingClose()
+      close()
+    },
+    onCompleted(result) {
+      handleGeoreferencingCompleted(result)
+      close()
+    },
+  },
+})
 
 // Drag and drop
 const isDragOver = ref(false)
@@ -330,7 +340,6 @@ function resetWizard() {
   uploadedFileId.value = null
   fileInfo.value = null
   skipGeoreferencingMode.value = false
-  showGeoreferencingModal.value = false
   completing.value = false
   
   // Clear file input
@@ -454,20 +463,18 @@ async function uploadFile() {
 }
 
 function startGeoreferencing() {
-  showGeoreferencingModal.value = true
+  openGeoreferencingModal()
 }
 
 function skipGeoreferencing() {
   skipGeoreferencingMode.value = true
 }
 
-function closeGeoreferencing() {
+function handleGeoreferencingClose() {
   console.log('Closing georeferencing modal')
-  showGeoreferencingModal.value = false
 }
 
-function onGeoreferencingCompleted(result) {
-  showGeoreferencingModal.value = false
+function handleGeoreferencingCompleted(result) {
   fileInfo.value = { ...fileInfo.value, ...result.fileInfo }
   goToStep(3)
 }

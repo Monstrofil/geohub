@@ -137,13 +137,6 @@
       </div>
     </div>
 
-    <!-- Upload Modal -->
-    <UploadModal 
-      :show="showUploadModal"
-      :tree-path="treePathString"
-      @close="closeModal"
-      @upload-success="handleUploadSuccess"
-    />
 
 
   </div>
@@ -152,6 +145,7 @@
 <script setup>
 import { ref, watch, onMounted, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import { useModal } from 'vue-final-modal'
 import Card from './Card.vue'
 import UploadModal from './UploadModal.vue'
 import CollectionDetails from './CollectionDetails.vue'
@@ -181,8 +175,21 @@ const leaf = ref({})
 const loading = ref(false)
 const error = ref(null)
 
-// Upload modal state
-const showUploadModal = ref(false)
+// Upload modal setup
+const { open: openUploadModal, close: closeUploadModal } = useModal({
+  component: UploadModal,
+  attrs: {
+    'tree-path': computed(() => treePathString.value),
+    onClose() {
+      handleUploadClose()
+      close()
+    },
+    onUploadSuccess(response) {
+      handleUploadSuccess(response)
+      close()
+    },
+  },
+})
 
 // Drag and drop state
 const isMainDropZone = ref(false)
@@ -464,12 +471,12 @@ async function handleRootDrop(event) {
 }
 
 // Upload modal functions
-function closeModal() {
-  showUploadModal.value = false
+function startUpload() {
+  openUploadModal()
 }
 
-function startUpload() {
-  showUploadModal.value = true
+function handleUploadClose() {
+  closeUploadModal()
 }
 
 function handleUploadSuccess(response) {

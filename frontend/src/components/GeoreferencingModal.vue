@@ -1,17 +1,27 @@
 <template>
-  <div class="georeferencing-modal-overlay">
-    <div class="georeferencing-modal" @click.stop>
-      <!-- Header -->
-      <div class="modal-header">
-        <h2>Georeference Image</h2>
-        <div class="header-actions">
-          <div class="control-points-count">
-            <span class="label">Control Points:</span>
-            <span class="count">{{ controlPoints.length }}/{{ minControlPoints }}</span>
+  <VueFinalModal
+    :click-to-close="false"
+    :esc-to-close="false"
+    classes="georeferencing-modal-wrapper"
+    content-class="pure-g overflow-auto"
+    overlay-transition="vfm-fade"
+    content-transition="vfm-scale"
+    @closed="handleClose"
+  >
+    <div class="pure-u-1 pure-u-md-1-1 pure-u-lg-1-4"></div>
+    <div class="pure-u-1 pure-u-md-1-1 pure-u-lg-1-2">
+      <div class="georeferencing-modal">
+        <!-- Header -->
+        <div class="modal-header">
+          <h2>Georeference Image</h2>
+          <div class="header-actions">
+            <div class="control-points-count">
+              <span class="label">Control Points:</span>
+              <span class="count">{{ controlPoints.length }}/{{ minControlPoints }}</span>
+            </div>
+            <button class="close-btn" @click="closeModal">×</button>
           </div>
-          <button class="close-btn" @click="closeModal">×</button>
         </div>
-      </div>
 
       <!-- Instructions -->
       <div class="instructions-bar">
@@ -140,12 +150,14 @@
           {{ isApplyingGeoreferencing ? 'Applying Georeferencing...' : 'Apply Georeferencing' }}
         </button>
       </div>
+      </div>
     </div>
-  </div>
+  </VueFinalModal>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import { VueFinalModal } from 'vue-final-modal'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import apiService from '../services/api.js'
@@ -202,6 +214,10 @@ const canApply = computed(() => controlPoints.value.length >= minControlPoints &
 
 // Methods
 function closeModal() {
+  emit('close')
+}
+
+function handleClose() {
   emit('close')
 }
 
@@ -681,24 +697,21 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.georeferencing-modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.9);
-  z-index: 3000;
-  display: flex;
+
+
+.georeferencing-modal {
+  margin-top: 10vh;
+}
+
+.georeferencing-modal-wrapper {
   align-items: center;
-  justify-content: center;
 }
 
 .georeferencing-modal {
   background: white;
   border-radius: 12px;
-  width: 95vw;
-  height: 90vh;
+  width: 100%;
+  max-height: 100%;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -805,6 +818,7 @@ onUnmounted(() => {
 .split-container {
   display: flex;
   flex: 1;
+  min-height: 500px;
   overflow: hidden;
 }
 

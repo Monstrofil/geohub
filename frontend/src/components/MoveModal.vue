@@ -1,10 +1,20 @@
 <template>
-  <div v-if="show" class="move-modal-overlay" @click="handleOverlayClick">
-    <div class="move-modal" @click.stop>
-      <div class="move-modal-header">
-        <h3>Move "{{ itemName }}"</h3>
-        <button class="close-btn" @click="close">×</button>
-      </div>
+  <VueFinalModal
+    :click-to-close="true"
+    :esc-to-close="true"
+    classes="move-modal-wrapper"
+    content-class="pure-g"
+    overlay-transition="vfm-fade"
+    content-transition="vfm-scale"
+    @closed="handleClose"
+  >
+    <div class="pure-u-1 pure-u-md-1-4 pure-u-lg-1-3"></div>
+    <div class="pure-u-1 pure-u-md-1-2 pure-u-lg-1-3">
+      <div class="move-modal">
+        <div class="move-modal-header">
+          <h3>Move "{{ itemName }}"</h3>
+          <button class="close-btn" @click="close">×</button>
+        </div>
       
       <div class="move-modal-body">
         <div class="current-location">
@@ -118,17 +128,18 @@
           {{ isMoving ? 'Moving...' : 'Move Here' }}
         </button>
       </div>
+      </div>
     </div>
-  </div>
+  </VueFinalModal>
 </template>
 
 <script setup>
 import { ref, watch, computed } from 'vue'
+import { VueFinalModal } from 'vue-final-modal'
 import apiService from '../services/api.js'
 import TreeNodeRecursive from './TreeNodeRecursive.vue'
 
 const props = defineProps({
-  show: { type: Boolean, default: false },
   itemId: { type: String, required: false },
   itemName: { type: String, required: false },
   itemType: { type: String, required: false }, // 'file' or 'collection'
@@ -174,8 +185,6 @@ const disabledPaths = computed(() => {
 
 // Methods
 const loadCollections = async () => {
-  if (!props.show) return
-  
   loading.value = true
   try {
     // Load only root level collections initially
@@ -310,39 +319,24 @@ const close = () => {
   emit('close')
 }
 
-const handleOverlayClick = () => {
+const handleClose = () => {
   close()
 }
 
-// Watch for modal open to load collections
-watch(() => props.show, (newShow) => {
-  if (newShow) {
-    loadCollections()
-  }
-})
+// Load collections when component mounts
+loadCollections()
 </script>
 
 
 <style scoped>
-.move-modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
+.move-modal-wrapper {
   align-items: center;
-  justify-content: center;
-  z-index: 1000;
 }
 
 .move-modal {
   background: white;
   border-radius: 12px;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
-  width: 90%;
-  max-width: 500px;
   max-height: 80vh;
   display: flex;
   flex-direction: column;

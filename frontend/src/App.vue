@@ -1,9 +1,10 @@
 <template>
   <RouterView />
+  <ModalsContainer />
 </template>
 
 <script setup>
-// App.vue is now just a simple router container
+import { ModalsContainer } from 'vue-final-modal'
 </script>
 
 <style>

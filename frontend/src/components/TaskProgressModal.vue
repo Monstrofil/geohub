@@ -1,56 +1,57 @@
 <template>
-  <div class="task-progress-modal">
-    <!-- Modal Mode -->
-    <Teleport to="body">
-      <Transition name="modal">
-        <div v-if="isModal && isVisible" class="modal-overlay" @click="handleOverlayClick">
-          <div class="modal-content" @click.stop>
-            <div class="modal-header">
-              <h3>{{ title }}</h3>
-            </div>
-            
-            <div class="modal-body">
-              <TaskContent 
-                v-if="currentTask"
-                :task="currentTask" 
-                :is-modal="true" 
-                :refreshing="isRefreshing"
-                @refresh="handleRefresh"
-              />
-              <div v-else class="loading-task">
-                <div class="spinner"></div>
-                <p>Starting task...</p>
-              </div>
-            </div>
-            
-            <div class="modal-footer">
-              <button 
-                v-if="isComplete || isError" 
-                class="btn btn-primary" 
-                @click="handleClose"
-              >
-                {{ isError ? 'Close' : 'Continue' }}
-              </button>
-            </div>
-          </div>
-        </div>
-      </Transition>
-    </Teleport>
+  <VueFinalModal
+    :click-to-close="false"
+    :esc-to-close="false"
+    classes="task-progress-modal-wrapper"
+    content-class="pure-g"
+    overlay-transition="vfm-fade"
+    content-transition="vfm-scale"
+    @closed="handleClose"
+  >
 
-  </div>
+    <div class="pure-u-1 pure-u-md-1-4 pure-u-lg-1-3"></div>
+      <div class="pure-u-1 pure-u-md-1-2 pure-u-lg-1-3">
+        <div class="task-progress-modal">
+      <div class="modal-header">
+        <h3>{{ title }}</h3>
+      </div>
+      
+      <div class="modal-body">
+        <TaskContent 
+          v-if="currentTask"
+          :task="currentTask" 
+          :is-modal="true" 
+          :refreshing="isRefreshing"
+          @refresh="handleRefresh"
+        />
+        <div v-else class="loading-task">
+          <div class="spinner"></div>
+          <p>Starting task...</p>
+        </div>
+      </div>
+      
+      <div class="modal-footer">
+        <button 
+          v-if="isComplete || isError" 
+          class="btn btn-primary" 
+          @click="handleClose"
+        >
+          {{ isError ? 'Close' : 'Continue' }}
+        </button>
+      </div>
+        </div>
+      </div>
+  </VueFinalModal>
 </template>
 
 <script setup>
 import { ref, computed, watch, onUnmounted } from 'vue'
+import { VueFinalModal } from 'vue-final-modal'
 import TaskContent from './TaskContent.vue'
 import apiService from '../services/api.js'
 
 // Props
 const props = defineProps({
-  isVisible: {
-    type: Boolean,
-    default: false
-  },
   title: {
     type: String,
     default: 'Processing Task'
@@ -204,13 +205,6 @@ const stopPolling = () => {
   }
 }
 
-const handleOverlayClick = () => {
-  // Prevent closing modal by clicking overlay during task execution
-  if (isComplete.value || isError.value) {
-    handleClose()
-  }
-}
-
 const handleClose = () => {
   stopPolling()
   emit('close')
@@ -251,15 +245,12 @@ watch(isError, (newValue) => {
   }
 })
 
-watch([() => props.isVisible, () => props.itemId, () => props.taskId], ([isVisible, itemId, taskId], [oldIsVisible, oldItemId, oldTaskId]) => {
-  console.log('[TaskProgressModal] Watcher triggered:', { isVisible, itemId, taskId, oldIsVisible, oldItemId, oldTaskId, isModal: props.isModal })
+watch([() => props.itemId, () => props.taskId], ([itemId, taskId], [oldItemId, oldTaskId]) => {
+  console.log('[TaskProgressModal] Watcher triggered:', { itemId, taskId, oldItemId, oldTaskId, isModal: props.isModal })
   
-  if (isVisible && (itemId || taskId) && props.isModal) {
+  if ((itemId || taskId) && props.isModal) {
     console.log('[TaskProgressModal] Starting/monitoring task - itemId:', itemId, 'taskId:', taskId)
     startTask()
-  } else if (!isVisible) {
-    console.log('[TaskProgressModal] Modal not visible, stopping polling')
-    stopPolling()
   }
 }, { immediate: true })
 
@@ -271,8 +262,13 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+
+.task-progress-modal-wrapper {
+  align-items: center;
+}
+
 /* Modal Styles */
-.modal-overlay {
+.task-progress-modal {
   /* CSS Custom Properties for this component */
   --color-primary: #3b82f6;
   --color-primary-hover: #2563eb;
@@ -323,30 +319,14 @@ onUnmounted(() => {
   --transition-normal: 0.2s ease;
   --transition-slow: 0.3s ease;
   
-  /* Modal overlay positioning and appearance */
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  backdrop-filter: blur(2px);
-}
-
-.modal-content {
   background: var(--color-bg-primary);
   border-radius: var(--border-radius-lg);
   box-shadow: var(--shadow-lg);
-  max-width: 500px;
-  width: 90%;
-  max-height: 80vh;
+  width: 100%;
+  max-height: 100%;
   overflow-y: auto;
-  transform: scale(1);
-  transition: transform var(--transition-normal);
+
+  margin-top: 10vh;
 }
 
 .modal-header {
@@ -482,21 +462,6 @@ onUnmounted(() => {
   to { transform: rotate(360deg); }
 }
 
-/* Modal Transitions */
-.modal-enter-active,
-.modal-leave-active {
-  transition: all var(--transition-slow);
-}
-
-.modal-enter-from,
-.modal-leave-to {
-  opacity: 0;
-}
-
-.modal-enter-from .modal-content,
-.modal-leave-to .modal-content {
-  transform: scale(0.9) translateY(-20px);
-}
 
 /* Fade Transitions */
 .fade-enter-active,
@@ -509,39 +474,6 @@ onUnmounted(() => {
   opacity: 0;
 }
 
-/* Responsive Design */
-@media (max-width: 640px) {
-  .modal-content {
-    width: 95%;
-    margin: var(--spacing-md);
-  }
-  
-  .modal-header,
-  .modal-body,
-  .modal-footer {
-    padding: var(--spacing-md);
-  }
-  
-  .task-status-display {
-    padding: var(--spacing-md);
-  }
-  
-  .task-status-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: var(--spacing-sm);
-  }
-  
-  .modal-footer {
-    flex-direction: column;
-    gap: var(--spacing-sm);
-  }
-  
-  .btn {
-    width: 100%;
-    justify-content: center;
-  }
-}
 
 /* Dark mode support (if needed) */
 @media (prefers-color-scheme: dark) {

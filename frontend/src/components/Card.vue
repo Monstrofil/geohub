@@ -80,22 +80,12 @@
         </div>
       </div>
     </router-link>
-    
-    <!-- Move Modal -->
-    <MoveModal
-      :show="showMoveModal"
-      :item-id="file?.id"
-      :item-name="name"
-      :item-type="itemType"
-      :current-path="currentPath"
-      @close="showMoveModal = false"
-      @moved="handleMoved"
-    />
   </div>
 </template>
 
 <script setup>
 import { computed, ref, watch } from 'vue'
+import { useModal } from 'vue-final-modal'
 import apiService from '../services/api.js'
 import { getBaseFileType } from '../utils/fileHelpers.js'
 import { matchTagsToPreset } from '../utils/tagMatcher.js'
@@ -121,8 +111,24 @@ const isDropTarget = ref(false)
 const dragCounter = ref(0)
 const isMoving = ref(false)
 
-// Move modal state
-const showMoveModal = ref(false)
+// Move modal setup
+const { open: openMoveModal, close: closeMoveModal } = useModal({
+  component: MoveModal,
+  attrs: {
+    'item-id': computed(() => props.file?.id),
+    'item-name': computed(() => props.name),
+    'item-type': computed(() => itemType.value),
+    'current-path': computed(() => currentPath.value),
+    onClose() {
+      handleMoveClose()
+      close()
+    },
+    onMoved(moveData) {
+      handleMoved(moveData)
+      close()
+    },
+  },
+})
 
 // Determine if this is a file or collection
 const isFile = computed(() => props.file?.object_type === 'file')
@@ -404,11 +410,14 @@ const handleDrop = async (event) => {
 
 // Move modal handlers
 const handleMove = () => {
-  showMoveModal.value = true
+  openMoveModal()
+}
+
+const handleMoveClose = () => {
+  closeMoveModal()
 }
 
 const handleMoved = (moveData) => {
-  showMoveModal.value = false
   emit('moved', moveData)
 }
 </script>

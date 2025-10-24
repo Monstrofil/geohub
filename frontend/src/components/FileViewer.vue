@@ -482,27 +482,6 @@
       </div>
     </div>
     
-    <!-- Georeferencing Modal -->
-    <GeoreferencingModal 
-      v-if="showGeoreferencingModal && file"
-      :file-id="file.id"
-      :file-info="file.tags"
-      @close="closeGeoreferencing"
-      @completed="onGeoreferencingCompleted" 
-    />
-
-    <!-- Task Progress Modal -->
-    <TaskProgressModal
-      v-if="showTaskProgress"
-      :is-visible="showTaskProgress"
-      title="Converting to Geo-Raster"
-      :item-id="file?.id"
-      :task-id="activeTaskId"
-      @close="handleTaskProgressClose"
-      @complete="handleTaskComplete"
-      @error="handleTaskError"
-    />
-    
     <!-- Reset Georeferencing Confirmation Modal -->
     <div v-if="showResetConfirmation" class="modal-overlay" @click="showResetConfirmation = false">
       <div class="modal-content" @click.stop>
@@ -551,6 +530,7 @@ import { isAuthenticated } from '../stores/auth.js'
 import apiService from '../services/api.js'
 import { getFileSize, getBaseFileType, getMimeType, getOriginalName, getDisplayName as getFileDisplayName, formatFileSize as formatSize } from '../utils/fileHelpers.js'
 import { findPreviewComponent, previewComponents } from './previews/index.js'
+import { useModal } from 'vue-final-modal'
 
 const route = useRoute()
 const router = useRouter()
@@ -567,7 +547,6 @@ const loading = ref(false)
 const error = ref(null)
 
 // Georeferencing state
-const showGeoreferencingModal = ref(false)
 const georeferencingStatus = ref(null)
 const showResetConfirmation = ref(false)
 
@@ -578,7 +557,6 @@ const probeError = ref(null)
 
 
 // Task progress modal state
-const showTaskProgress = ref(false)
 const activeTaskId = ref(null)
 
 // Preview component state
@@ -609,6 +587,45 @@ const props = defineProps({
     required: true // Tree item ID for direct API access
   }
 })
+
+
+const { open: openTaskProgressModal, close: closeTaskProgressModal } = useModal({
+    component: TaskProgressModal,
+    attrs: {
+      title: "Converting to Geo-Raster",
+      "item-id": file?.id,
+      "task-id": activeTaskId,
+      onComplete() {
+        handleTaskProgressClose()
+        close()
+      },
+      onError() {
+        handleTaskError()
+      },
+      onClose() {
+        handleTaskProgressClose()
+      },
+    },
+    slots: {
+      default: '<p>UseModal: The content of the modal</p>',
+    },
+  })
+
+const { open: openGeoreferencingModal, close: closeGeoreferencingModal } = useModal({
+    component: GeoreferencingModal,
+    attrs: {
+      "file-id": computed(() => file.value.id),
+      "file-info": computed(() => file.value.tags),
+      onClose() {
+        handleGeoreferencingClose()
+        close()
+      },
+      onCompleted(result) {
+        handleGeoreferencingCompleted(result)
+        close()
+      },
+    },
+  })
 
 
 // Computed
@@ -854,16 +871,16 @@ const idTmsUrl = computed(() => {
 // Georeferencing functions
 function startGeoreferencing() {
   georeferencingStatus.value = { loading: true }
-  showGeoreferencingModal.value = true
+  openGeoreferencingModal()
+  
 }
 
-function closeGeoreferencing() {
-  showGeoreferencingModal.value = false
+function handleGeoreferencingClose() {
   georeferencingStatus.value = null
+  closeGeoreferencingModal()
 }
 
-function onGeoreferencingCompleted(result) {
-  showGeoreferencingModal.value = false
+function handleGeoreferencingCompleted(result) {
   georeferencingStatus.value = null
   
   // Update file tags to reflect georeferencing status
@@ -1012,7 +1029,7 @@ async function checkActiveTasks() {
       
       if (activeTask.state === 'PROGRESS' || activeTask.state === 'PENDING') {
         activeTaskId.value = activeTask.task_id
-        showTaskProgress.value = true
+        openTaskProgressModal();
         console.log('[FileViewer] Showing task progress modal for active task:', activeTask.task_id)
       }
     } else {
@@ -1037,25 +1054,12 @@ async function startConversion() {
     
     // Set the active task ID and show the modal
     activeTaskId.value = response.task_id
-    showTaskProgress.value = true
+    openTaskProgressModal()
     console.log('[FileViewer] Task modal shown for new task:', response.task_id)
   } catch (err) {
     console.error('[FileViewer] Failed to start conversion:', err)
     alert(`Failed to start conversion: ${err.message}`)
   }
-}
-
-async function handleTaskComplete(state) {
-  console.log('[FileViewer] Task completed successfully:', state)
-  
-  // Wait a moment to show completion
-  setTimeout(async () => {
-    showTaskProgress.value = false
-    activeTaskId.value = null
-    
-    // Reload the file to get the latest state
-    await loadFile()
-  }, 1500)
 }
 
 function handleTaskError(state) {
@@ -1065,7 +1069,7 @@ function handleTaskError(state) {
 
 function handleTaskProgressClose() {
   console.log('[FileViewer] Closing task progress modal')
-  showTaskProgress.value = false
+  closeTaskProgressModal()
   activeTaskId.value = null
 }
 

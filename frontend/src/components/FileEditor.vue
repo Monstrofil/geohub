@@ -267,20 +267,12 @@
         </div>
       </div>
     </div>
-    
-    <!-- Georeferencing Modal -->
-    <GeoreferencingModal 
-      v-if="showGeoreferencingModal && file"
-      :file-id="file.id"
-      :file-info="file.tags"
-      @close="closeGeoreferencing"
-      @completed="onGeoreferencingCompleted" 
-    />
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useModal } from 'vue-final-modal'
 import ObjectTypeSelector from './ObjectTypeSelector.vue'
 import TagList from './TagList.vue'
 import InteractiveMap from './InteractiveMap.vue'
@@ -317,8 +309,24 @@ const error = ref(null)
 const collectionFilesList = ref(null)
 
 // Georeferencing state
-const showGeoreferencingModal = ref(false)
 const georeferencingStatus = ref(null)
+
+// Georeferencing Modal
+const { open: openGeoreferencingModal, close: closeGeoreferencingModal } = useModal({
+  component: GeoreferencingModal,
+  attrs: {
+    "file-id": file?.id,
+    "file-info": file?.tags,
+    onClose() {
+      handleGeoreferencingClose()
+      close()
+    },
+    onCompleted(result) {
+      handleGeoreferencingCompleted(result)
+      close()
+    },
+  },
+})
 
 // Tags editor state
 const selectedType = ref(null)
@@ -610,16 +618,14 @@ function handleCollectionFilesUpdated(files) {
 // Georeferencing functions
 function startGeoreferencing() {
   georeferencingStatus.value = { loading: true }
-  showGeoreferencingModal.value = true
+  openGeoreferencingModal()
 }
 
-function closeGeoreferencing() {
-  showGeoreferencingModal.value = false
+function handleGeoreferencingClose() {
   georeferencingStatus.value = null
 }
 
-function onGeoreferencingCompleted(result) {
-  showGeoreferencingModal.value = false
+function handleGeoreferencingCompleted(result) {
   georeferencingStatus.value = null
   
   // Update file tags to reflect georeferencing status
