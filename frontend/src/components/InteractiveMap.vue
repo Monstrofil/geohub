@@ -132,7 +132,8 @@ export default {
                 tiles: [
                   'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
                 ],
-                tileSize: 256
+                tileSize: 256,
+                attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
               }
             },
             layers: [
@@ -146,7 +147,8 @@ export default {
             ]
           },
           center: [0, 0],
-          zoom: 2
+          zoom: 2,
+          attributionControl: true
         })
         
         // Listen to map events
@@ -170,7 +172,8 @@ export default {
               tiles: [
                 `${mapUrl}&SERVICE=WMS&VERSION=1.3.0&STYLES=&REQUEST=GetMap&FORMAT=image/png&TRANSPARENT=true&LAYERS=geotiff_layer&CRS=EPSG:3857&WIDTH=256&HEIGHT=256&BBOX={bbox-epsg-3857}`
               ],
-              tileSize: 256
+              tileSize: 256,
+              attribution: '© MapServer'
             })
             
             map.value.addLayer({
