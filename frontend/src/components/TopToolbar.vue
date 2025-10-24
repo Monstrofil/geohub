@@ -14,12 +14,21 @@
       </router-link>
       
       <!-- Collections button -->
-      <router-link :to="{'name': 'FileList'}" class="collections-btn" :title="$t('navigation.viewCollections')">
+      <router-link :to="{'name': 'FileList'}" class="nav-btn" :title="$t('navigation.viewCollections')">
         <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path d="M3 6a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V6z" stroke="currentColor" stroke-width="1.5" fill="none"/>
           <path d="M7 6v12M13 6v12" stroke="currentColor" stroke-width="1.5"/>
         </svg>
-        <span class="collections-text">{{ $t('navigation.collections') }}</span>
+        <span class="nav-text">{{ $t('navigation.collections') }}</span>
+      </router-link>
+
+      <!-- Preset Wiki button -->
+      <router-link to="/explorer/preset-wiki" class="nav-btn" :title="$t('presetWiki.title')">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M4 3h12a1 1 0 011 1v12a1 1 0 01-1 1H4a1 1 0 01-1-1V4a1 1 0 011-1z" stroke="currentColor" stroke-width="1.5" fill="none"/>
+          <path d="M8 7h4M8 11h4M8 15h2" stroke="currentColor" stroke-width="1.5"/>
+        </svg>
+        <span class="nav-text">{{ $t('navigation.presetWiki') }}</span>
       </router-link>
     </div>
 
@@ -89,7 +98,7 @@ import LanguageSwitcher from './LanguageSwitcher.vue'
   letter-spacing: 0.5px;
 }
 
-.collections-btn {
+.nav-btn {
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -105,19 +114,19 @@ import LanguageSwitcher from './LanguageSwitcher.vue'
   cursor: pointer;
 }
 
-.collections-btn:hover {
+.nav-btn:hover {
   background: rgba(255, 255, 255, 0.2);
   border-color: rgba(255, 255, 255, 0.3);
   color: white;
   text-decoration: none;
 }
 
-.collections-btn svg {
+.nav-btn svg {
   width: 18px;
   height: 18px;
 }
 
-.collections-text {
+.nav-text {
   white-space: nowrap;
 }
 
@@ -140,17 +149,17 @@ import LanguageSwitcher from './LanguageSwitcher.vue'
     height: 20px;
   }
   
-  .collections-btn {
+  .nav-btn {
     padding: 0.4rem 0.75rem;
     font-size: 0.85rem;
   }
   
-  .collections-btn svg {
+  .nav-btn svg {
     width: 16px;
     height: 16px;
   }
   
-  .collections-text {
+  .nav-text {
     display: none; /* Hide text on very small screens */
   }
 }

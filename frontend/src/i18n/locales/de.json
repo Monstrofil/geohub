@@ -28,6 +28,14 @@
       "label": "Standort",
       "description": "Geografische Lage oder Gebietsbeschreibung"
     },
+    "source": {
+      "label": "Quelle",
+      "description": "Quelle oder Herkunft des Dokuments oder der Daten"
+    },
+    "developer": {
+      "label": "Entwickler",
+      "description": "Person oder Organisation, die das Dokument entwickelt oder erstellt hat"
+    },
     "fieldsTitle": "Felder",
     "collapse": "einklappen",
     "fieldTypes": {
@@ -96,7 +104,8 @@
   "navigation": {
     "appTitle": "GeoDocs Hub",
     "collections": "Sammlungen",
-    "viewCollections": "Sammlungen anzeigen"
+    "viewCollections": "Sammlungen anzeigen",
+    "presetWiki": "Preset-Wiki"
   },
   "objectType": {
     "title": "Objekttyp",
@@ -212,6 +221,37 @@
       "noChanges": "Keine ausstehenden Änderungen",
       "committing": "Speichern...",
       "commitButton": "Änderungen speichern"
+    }
+  },
+  "presetWiki": {
+    "title": "Preset-Dokumentation",
+    "description": "Erkunden Sie alle verfügbaren Presets und ihre Felddefinitionen",
+    "loading": "Presets werden geladen...",
+    "error": "Fehler beim Laden der Presets",
+    "retry": "Wiederholen",
+    "searchPlaceholder": "Presets, Felder oder Begriffe suchen...",
+    "allCategories": "Alle Kategorien",
+    "fields": "Felder",
+    "fieldsList": "Felder",
+    "fieldKey": "Schlüssel",
+    "requiredTags": "Erforderliche Tags",
+    "tagsDescription": "Diese Tags müssen in den Dateimetadaten vorhanden sein, um diesem Preset zu entsprechen:",
+    "exampleUsage": "Beispielverwendung:",
+    "objectTypes": "Objekttypen",
+    "previewFields": "Vorschau-Felder",
+    "tags": "Tags",
+    "searchTerms": "Suchbegriffe",
+    "possibleValues": "Mögliche Werte",
+    "more": "weitere",
+    "noResults": "Keine Presets gefunden",
+    "noResultsDescription": "Versuchen Sie, Ihre Such- oder Filterkriterien anzupassen",
+    "fieldTypes": {
+      "str": "Text",
+      "richtext": "Rich Text",
+      "bool": "Boolean",
+      "enum": "Aufzählung",
+      "number": "Zahl",
+      "koatoth": "KOATOTH"
     }
   }
 }

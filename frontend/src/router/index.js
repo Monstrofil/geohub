@@ -5,6 +5,7 @@ import Explorer from '../components/Explorer.vue'
 import FileEditor from '../pages/FileEditor/FileEditor.vue'
 import FileList from '../pages/FileList/FileList.vue'
 import FileViewer from '../pages/FileViewer/FileViewer.vue'
+import PresetWiki from '../pages/PresetWiki/PresetWiki.vue'
 import { isAuthenticated, initializeAuth } from '../stores/auth.js'
 
 const routes = [
@@ -52,6 +53,11 @@ const routes = [
           props: route => ({ 
             treeItemId: route.query.id
           })
+      },
+      {
+          path: 'preset-wiki',
+          name: 'PresetWiki',
+          component: PresetWiki
       },
     ],
     props: true

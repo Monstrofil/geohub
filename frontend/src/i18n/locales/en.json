@@ -28,6 +28,14 @@
       "label": "Location",
       "description": "Geographic location or area description"
     },
+    "source": {
+      "label": "Source",
+      "description": "Source or origin of the document or data"
+    },
+    "developer": {
+      "label": "Developer",
+      "description": "Person or organization who developed or created the document"
+    },
     "fieldsTitle": "Fields",
     "collapse": "collapse",
     "fieldTypes": {
@@ -96,7 +104,8 @@
   "navigation": {
     "appTitle": "GeoDocs Hub",
     "collections": "Collections",
-    "viewCollections": "View collections"
+    "viewCollections": "View collections",
+    "presetWiki": "Preset Wiki"
   },
   "objectType": {
     "title": "Object Type",
@@ -212,6 +221,37 @@
       "noChanges": "No pending changes",
       "committing": "Saving...",
       "commitButton": "Save Changes"
+    }
+  },
+  "presetWiki": {
+    "title": "Preset Documentation",
+    "description": "Explore all available presets and their field definitions",
+    "loading": "Loading presets...",
+    "error": "Error loading presets",
+    "retry": "Retry",
+    "searchPlaceholder": "Search presets, fields, or terms...",
+    "allCategories": "All Categories",
+    "fields": "fields",
+    "fieldsList": "Fields",
+    "fieldKey": "Key",
+    "requiredTags": "Required Tags",
+    "tagsDescription": "These tags must be present in the file metadata to match this preset:",
+    "exampleUsage": "Example usage:",
+    "objectTypes": "Object Types",
+    "previewFields": "Preview Fields",
+    "tags": "Tags",
+    "searchTerms": "Search Terms",
+    "possibleValues": "Possible values",
+    "more": "more",
+    "noResults": "No presets found",
+    "noResultsDescription": "Try adjusting your search or filter criteria",
+    "fieldTypes": {
+      "str": "Text",
+      "richtext": "Rich Text",
+      "bool": "Boolean",
+      "enum": "Enumeration",
+      "number": "Number",
+      "koatoth": "KOATOTH"
     }
   }
 }
