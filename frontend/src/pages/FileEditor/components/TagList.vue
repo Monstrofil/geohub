@@ -114,9 +114,9 @@
 <script setup>
 import { reactive, watch, nextTick, ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { resolveFields } from '../utils/fieldResolver.js'
+import { resolveFields } from '../../../utils/fieldResolver.js'
 import FieldRenderer from './fields/FieldRenderer.vue'
-import apiService from '../services/api.js'
+import apiService from '../../../services/api.js'
 
 const { t } = useI18n()
 

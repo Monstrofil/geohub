@@ -289,8 +289,8 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import ObjectTypeSelector from '../../components/ObjectTypeSelector.vue'
-import TagList from '../../components/TagList.vue'
+import ObjectTypeSelector from './components/ObjectTypeSelector.vue'
+import TagList from './components/TagList.vue'
 import InteractiveMap from '../../components/InteractiveMap.vue'
 import { matchTagsToPreset, getAllPresets } from '../../utils/tagMatcher.js'
 import { loadFieldDefinitions, resolveFields } from '../../utils/fieldResolver.js'
@@ -358,9 +358,6 @@ async function loadFile() {
     selectedType.value = matchedPreset
     // Initialize previousType to avoid removing tags on first type change
     previousType.value = matchedPreset
-  
-    
-    // Collection files will be loaded by the CollectionFilesList component
   } catch (e) {
     error.value = e.message || 'Failed to load file'
     file.value = null

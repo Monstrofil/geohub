@@ -91,7 +91,7 @@ import { getBaseFileType } from '../../../utils/fileHelpers.js'
 import { matchTagsToPreset } from '../../../utils/tagMatcher.js'
 import { loadFieldDefinitions } from '../../../utils/fieldResolver.js'
 import { isAuthenticated } from '../../../stores/auth.js'
-import MoveModal from '../../../components/MoveModal.vue'
+import MoveModal from '../../../components/MoveModal/MoveModal.vue'
 
 const props = defineProps({
   name: { type: String, required: true },

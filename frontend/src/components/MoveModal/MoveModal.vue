@@ -136,7 +136,7 @@
 <script setup>
 import { ref, watch, computed } from 'vue'
 import { VueFinalModal } from 'vue-final-modal'
-import apiService from '../services/api.js'
+import apiService from '../../services/api.js'
 import TreeNodeRecursive from './TreeNodeRecursive.vue'
 
 const props = defineProps({

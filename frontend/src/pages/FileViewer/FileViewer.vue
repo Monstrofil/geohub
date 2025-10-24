@@ -73,14 +73,7 @@
               </div>
               
               <div class="collection-content">
-                <p>This is a collection of files. You can view the contents below.</p>
-                
-                <!-- Collection files list -->
-                <CollectionFilesList 
-                  :collection-id="props.treeItemId"
-                  @files-updated="handleCollectionFilesUpdated"
-                  ref="collectionFilesList"
-                />
+                <p>This is a collection of files. You can view the contents in tree.</p>
               </div>
             </div>
             
@@ -270,14 +263,13 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import InteractiveMap from '../../components/InteractiveMap.vue'
-import CollectionFilesList from '../../components/CollectionFilesList.vue'
 import GeoreferencingModal from '../../components/GeoreferencingModal.vue'
 import TaskProgressModal from './components/TaskProgressModal.vue'
 import ObjectInformation from './components/ObjectInformation.vue'
 import FileInfoSection from './components/FileInfoSection.vue'
 import FileActions from './components/FileActions.vue'
 import MapLinksSection from './components/MapLinksSection.vue'
-import MoveModal from '../../components/MoveModal.vue'
+import MoveModal from '../../components/MoveModal/MoveModal.vue'
 import { isAuthenticated } from '../../stores/auth.js'
 import apiService from '../../services/api.js'
 import { getFileSize, getBaseFileType } from '../../utils/fileHelpers.js'

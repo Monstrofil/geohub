@@ -58,8 +58,8 @@
 
 <script setup>
 import { ref, onMounted, watch, computed } from 'vue'
-import { loadFieldDefinitions } from '../utils/fieldResolver.js'
-import { matchTagsToPreset, getAllPresets } from '../utils/tagMatcher.js'
+import { loadFieldDefinitions } from '../../../utils/fieldResolver.js'
+import { matchTagsToPreset, getAllPresets } from '../../../utils/tagMatcher.js'
 
 const props = defineProps({
   modelValue: Object,
