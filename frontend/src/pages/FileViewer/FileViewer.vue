@@ -192,105 +192,10 @@
             />
             
             <!-- WMS/TMS Links section for georeferenced files -->
-            <div v-if="file && isFileGeoreferenced" class="map-links-section">
-              <div class="links-header">
-                <h3>{{ $t('mapService.title') }}</h3>
-                <p>{{ $t('mapService.description') }}</p>
-              </div>
-              
-              <div class="links-grid">
-                <!-- WMS Link -->
-                <div class="link-item">
-                  <div class="link-header">
-                    <div class="link-main-content">
-                      <div class="link-icon">
-                        <svg width="20" height="20" viewBox="0 0 24 24">
-                          <path d="M12 2L2 7v10c0 5.55 3.84 10 9 11 1.06.21 2.17.21 3.23 0 5.16-1 9-5.45 9-11V7l-10-5zM10 17l-5-5 1.41-1.41L10 14.17l7.59-7.58L19 8l-9 9z" fill="currentColor"/>
-                        </svg>
-                      </div>
-                      <div class="link-info">
-                        <h4>{{ $t('mapService.wms.title') }} <span class="type">wms</span></h4>
-                        <p>{{ $t('mapService.wms.description') }}</p>
-                      </div>
-                    </div>
-                    <div class="remote-control-links">
-                      <span class="remote-control">
-                        <a :href="josmWmsUrl" :title="$t('mapService.wms.addToJosm')" target="_blank" class="remote-control-btn">JOSM</a>
-                      </span>
-                      <span class="remote-control">
-                        <a :href="idWmsUrl" :title="$t('mapService.wms.addToId')" target="_blank" class="remote-control-btn">iD</a>
-                      </span>
-                    </div>
-                  </div>
-                  <div class="link-url-container">
-                    <input 
-                      type="text" 
-                      :value="wmsUrl" 
-                      readonly 
-                      class="link-url"
-                      ref="wmsUrlInput"
-                    />
-                    <button @click="copyToClipboard(wmsUrl, $t('mapService.wms.copyUrl'))" class="copy-btn" :title="$t('mapService.wms.copyUrl')">
-                      <svg width="16" height="16" viewBox="0 0 24 24">
-                        <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z" fill="currentColor"/>
-                      </svg>
-                    </button>
-                  </div>
-                  <div class="link-details">
-                    <div><strong>{{ $t('mapService.wms.layerName') }}</strong> {{ $t('mapService.wms.layerValue') }}</div>
-                    <div><strong>{{ $t('mapService.wms.bestFor') }}</strong> {{ $t('mapService.wms.bestForValue') }}</div>
-                  </div>
-                </div>
-                
-                <!-- TMS Link -->
-                <div class="link-item">
-                  <div class="link-header">
-                    <div class="link-main-content">
-                      <div class="link-icon">
-                        <svg width="20" height="20" viewBox="0 0 24 24">
-                          <path d="M3 3v18h18V3H3zm16 16H5V5h14v14zm-8-2h2v-2h-2v2zm0-4h2V9h-2v2zm0-4h2V5h-2v2z" fill="currentColor"/>
-                        </svg>
-                      </div>
-                      <div class="link-info">
-                        <h4>{{ $t('mapService.tms.title') }} <span class="type">tms</span></h4>
-                        <p>{{ $t('mapService.tms.description') }}</p>
-                      </div>
-                    </div>
-                    <div class="remote-control-links">
-                      <span class="remote-control">
-                        <a :href="josmTmsUrl" :title="$t('mapService.tms.addToJosm')" target="_blank" class="remote-control-btn">JOSM</a>
-                      </span>
-                      <span class="remote-control">
-                        <a :href="idTmsUrl" :title="$t('mapService.tms.addToId')" target="_blank" class="remote-control-btn">iD</a>
-                      </span>
-                    </div>
-                  </div>
-                  <div class="link-url-container">
-                    <input 
-                      type="text" 
-                      :value="tmsUrl" 
-                      readonly 
-                      class="link-url"
-                      ref="tmsUrlInput"
-                    />
-                    <button @click="copyToClipboard(tmsUrl, $t('mapService.tms.copyUrl'))" class="copy-btn" :title="$t('mapService.tms.copyUrl')">
-                      <svg width="16" height="16" viewBox="0 0 24 24">
-                        <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z" fill="currentColor"/>
-                      </svg>
-                    </button>
-                  </div>
-                  <div class="link-details">
-                    <div><strong>{{ $t('mapService.tms.format') }}</strong> {{ $t('mapService.tms.formatValue') }}</div>
-                  </div>
-                </div>
-              </div>
-              
-              <!-- Copy status notification -->
-              <div v-if="copyStatus" class="copy-status" :class="{ 'success': copyStatus.success, 'error': !copyStatus.success }">
-                {{ copyStatus.message }}
-              </div>
-              
-            </div>
+            <MapLinksSection 
+              v-if="file && isFileGeoreferenced"
+              :map-url="mapUrl"
+            />
               
               <!-- File Preview Section - displays regardless of georeferencing ability -->
               <div v-if="!isFileGeoreferenced && previewComponent" class="file-preview-section">
@@ -316,10 +221,6 @@
 
           <!-- Right panel: Object Information -->
           <div class="content-sidebar">
-            <!-- Unified Object Type and Properties section -->
-            <ObjectInformation 
-              :file="file"
-            />
 
             <!-- File Actions -->
             <FileActions 
@@ -331,6 +232,11 @@
               @convert="startConversion"
               @georeference="startGeoreferencing"
               @regeoreference="confirmResetGeoreferencing"
+            />
+
+            <!-- Unified Object Type and Properties section -->
+            <ObjectInformation 
+              :file="file"
             />
 
             <!-- File Information section -->
@@ -385,6 +291,7 @@ import TaskProgressModal from './components/TaskProgressModal.vue'
 import ObjectInformation from './components/ObjectInformation.vue'
 import FileInfoSection from './components/FileInfoSection.vue'
 import FileActions from './components/FileActions.vue'
+import MapLinksSection from './components/MapLinksSection.vue'
 import MoveModal from '../../components/MoveModal.vue'
 import { isAuthenticated } from '../../stores/auth.js'
 import apiService from '../../services/api.js'
@@ -432,7 +339,6 @@ const interactiveMapRef = ref(null)
 
 // Map service URLs state
 const mapUrl = ref(null)
-const copyStatus = ref(null)
 
 
 const props = defineProps({
@@ -647,81 +553,6 @@ function handleCollectionFilesUpdated(files) {
 }
 
 
-// WMS URL computed property (GetCapabilities)
-const wmsUrl = computed(() => {
-  if (!mapUrl.value) return ''
-  
-  // Extract base URL and MAP parameter from the mapserver URL
-  const baseUrl = mapUrl.value.split('?')[0] + '?'
-  const mapParam = mapUrl.value.includes('map=') ? mapUrl.value.split('map=')[1].split('&')[0] : ''
-  
-  if (!mapParam) return ''
-  
-  // Generate WMS GetCapabilities URL
-  return `${baseUrl}SERVICE=WMS&VERSION=1.1.1&REQUEST=GetCapabilities&MAP=${mapParam}`
-})
-
-// TMS URL computed property  
-const tmsUrl = computed(() => {
-  if (!mapUrl.value) return ''
-  
-  // Extract base URL and MAP parameter from the mapserver URL
-  const baseUrl = mapUrl.value.split('?')[0] + '?'
-  const mapParam = mapUrl.value.includes('map=') ? mapUrl.value.split('map=')[1].split('&')[0] : ''
-  
-  if (!mapParam) return ''
-  
-  // Generate TMS URL with tile placeholders
-  return `${baseUrl}MAP=${mapParam}&MODE=tile&TILEMODE=gmap&TILE={x}+{y}+{z}&LAYERS=geotiff_layer`
-})
-
-// JOSM Remote Control URLs
-const josmWmsUrl = computed(() => {
-  if (!wmsUrl.value || !file.value) return '#'
-  
-  const title = encodeURIComponent(file.value.name || 'GeoTIFF Layer')
-  const wmsBaseUrl = wmsUrl.value.split('?')[0]
-  const mapParam = wmsUrl.value.includes('MAP=') ? wmsUrl.value.split('MAP=')[1].split('&')[0] : ''
-  
-  if (!mapParam) return '#'
-  
-  const wmsGetMapUrl = encodeURIComponent(`${wmsBaseUrl}?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&STYLES=&LAYERS=geotiff_layer&MAP=${mapParam}&SRS=EPSG:3857&FORMAT=image/png&TRANSPARENT=TRUE&BBOX={bbox}&WIDTH={width}&HEIGHT={height}`)
-  
-  return `http://127.0.0.1:8111/imagery?title=${title}&type=wms&url=${wmsGetMapUrl}`
-})
-
-const josmTmsUrl = computed(() => {
-  if (!tmsUrl.value || !file.value) return '#'
-  
-  const title = encodeURIComponent(file.value.name || 'GeoTIFF Layer')
-  const tmsFormatted = tmsUrl.value.replace('{x}', '{x}').replace('{y}', '{y}').replace('{z}', '{zoom}')
-  const encodedUrl = encodeURIComponent(tmsFormatted)
-  
-  return `http://127.0.0.1:8111/imagery?title=${title}&type=tms&min_zoom=1&max_zoom=18&url=${encodedUrl}`
-})
-
-// iD Editor Remote Control URLs  
-const idWmsUrl = computed(() => {
-  if (!wmsUrl.value || !file.value) return '#'
-  
-  const wmsBaseUrl = wmsUrl.value.split('?')[0]
-  const mapParam = wmsUrl.value.includes('MAP=') ? wmsUrl.value.split('MAP=')[1].split('&')[0] : ''
-  
-  if (!mapParam) return '#'
-  
-  const wmsGetMapUrl = encodeURIComponent(`${wmsBaseUrl}?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&LAYERS=geotiff_layer&MAP=${mapParam}&SRS=EPSG:3857&FORMAT=image/png&TRANSPARENT=TRUE&BBOX={bbox}&WIDTH={width}&HEIGHT={height}`)
-  
-  return `https://www.openstreetmap.org/edit?editor=id&background=custom:${wmsGetMapUrl}`
-})
-
-const idTmsUrl = computed(() => {
-  if (!tmsUrl.value || !file.value) return '#'
-  
-  const tmsFormatted = tmsUrl.value.replace('{x}', '{x}').replace('{y}', '{y}').replace('{z}', '{zoom}')
-  const encodedUrl = encodeURIComponent(tmsFormatted)
-  
-  return `https://www.openstreetmap.org/edit?editor=id&background=custom:${encodedUrl}`
-})
 
 // Georeferencing functions
 function startGeoreferencing() {
@@ -952,39 +783,6 @@ async function loadMapUrl() {
   }
 }
 
-async function copyToClipboard(text, label) {
-  if (!text) {
-    copyStatus.value = { success: false, message: `${label} is not available` }
-    setTimeout(() => { copyStatus.value = null }, 3000)
-    return
-  }
-  
-  try {
-    await navigator.clipboard.writeText(text)
-    copyStatus.value = { success: true, message: `${label} copied to clipboard!` }
-  } catch (err) {
-    // Fallback for older browsers
-    try {
-      const textArea = document.createElement('textarea')
-      textArea.value = text
-      textArea.style.position = 'fixed'
-      textArea.style.left = '-999999px'
-      textArea.style.top = '-999999px'
-      document.body.appendChild(textArea)
-      textArea.focus()
-      textArea.select()
-      document.execCommand('copy')
-      document.body.removeChild(textArea)
-      copyStatus.value = { success: true, message: `${label} copied to clipboard!` }
-    } catch (fallbackErr) {
-      console.error('Failed to copy to clipboard:', fallbackErr)
-      copyStatus.value = { success: false, message: `Failed to copy ${label}` }
-    }
-  }
-  
-  // Clear status after 3 seconds
-  setTimeout(() => { copyStatus.value = null }, 3000)
-}
 
 // File Actions handlers
 function handleEdit() {
@@ -1699,235 +1497,6 @@ watch(() => props.treeItemId, async () => {
   opacity: 0.7;
 }
 
-/* Map Links Section */
-.map-links-section {
-  background: white;
-  border-radius: 8px;
-  padding: 1.5rem;
-  margin-bottom: 2rem;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-.links-header h3 {
-  margin: 0 0 0.5rem 0;
-  font-size: 1.2rem;
-  color: #333;
-  font-weight: 600;
-}
-
-.links-header p {
-  margin: 0 0 1.5rem 0;
-  color: #666;
-  font-size: 0.9rem;
-  line-height: 1.4;
-}
-
-.links-grid {
-  display: grid;
-  gap: 1.5rem;
-}
-
-.link-item {
-  border: 1px solid #e9ecef;
-  border-radius: 8px;
-  padding: 1.25rem;
-  background: #f8f9fa;
-  transition: all 0.2s ease;
-}
-
-.link-item:hover {
-  border-color: #007bff;
-  background: #f0f7ff;
-}
-
-.link-header {
-  display: flex;
-  align-items: flex-start;
-  gap: 1rem;
-  margin-bottom: 1rem;
-}
-
-.link-main-content {
-  display: flex;
-  align-items: flex-start;
-  gap: 1rem;
-  flex: 1;
-}
-
-.link-info {
-  flex: 1;
-}
-
-.link-icon {
-  flex-shrink: 0;
-  color: #007bff;
-  background: white;
-  padding: 0.5rem;
-  border-radius: 6px;
-  border: 1px solid #e9ecef;
-}
-
-.link-info h4 {
-  margin: 0 0 0.25rem 0;
-  font-size: 1rem;
-  color: #333;
-  font-weight: 600;
-}
-
-.link-info p {
-  margin: 0;
-  color: #666;
-  font-size: 0.85rem;
-  line-height: 1.3;
-}
-
-.link-url-container {
-  display: flex;
-  gap: 0.5rem;
-  margin-bottom: 0.75rem;
-}
-
-.link-url {
-  flex: 1;
-  padding: 0.75rem;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  background: white;
-  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-  font-size: 0.8rem;
-  color: #333;
-  word-break: break-all;
-  resize: none;
-}
-
-.link-url:focus {
-  outline: none;
-  border-color: #007bff;
-  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
-}
-
-.copy-btn {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.75rem;
-  background: #007bff;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  width: 44px;
-  height: 44px;
-}
-
-.copy-btn:hover {
-  background: #0056b3;
-  transform: translateY(-1px);
-}
-
-.copy-btn:active {
-  transform: translateY(0);
-}
-
-.link-details {
-  font-size: 0.8rem;
-  color: #495057;
-  background: white;
-  padding: 0.5rem;
-  border-radius: 4px;
-  border: 1px solid #e9ecef;
-}
-
-.link-details div {
-  margin-bottom: 0.25rem;
-}
-
-.link-details div:last-child {
-  margin-bottom: 0;
-}
-
-.copy-status {
-  margin-top: 1rem;
-  padding: 0.75rem 1rem;
-  border-radius: 6px;
-  font-size: 0.9rem;
-  font-weight: 500;
-  text-align: center;
-  transition: all 0.3s ease;
-}
-
-.copy-status.success {
-  background: #d4edda;
-  color: #155724;
-  border: 1px solid #c3e6cb;
-}
-
-.copy-status.error {
-  background: #f8d7da;
-  color: #721c24;
-  border: 1px solid #f5c6cb;
-}
-
-/* Remote Control Links */
-.remote-control-links {
-  display: flex;
-  gap: 0.375rem;
-  align-items: flex-start;
-  flex-shrink: 0;
-  margin-top: 0.25rem;
-}
-
-.remote-control {
-  display: inline-block;
-}
-
-.remote-control-btn {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.25rem 0.5rem;
-  background: #6c757d;
-  color: white;
-  text-decoration: none;
-  border-radius: 3px;
-  font-size: 0.7rem;
-  font-weight: 500;
-  transition: all 0.15s ease;
-  border: 1px solid #5a6268;
-  line-height: 1;
-  min-height: 20px;
-  opacity: 0.8;
-}
-
-.remote-control-btn:hover {
-  background: #28a745;
-  border-color: #1e7e34;
-  color: white;
-  text-decoration: none;
-  opacity: 1;
-  transform: translateY(-1px);
-  box-shadow: 0 1px 3px rgba(0,0,0,0.15);
-}
-
-.remote-control-btn:active {
-  transform: translateY(0);
-}
-
-/* Type badge styling */
-.type {
-  display: inline-block;
-  background: #6c757d;
-  color: white;
-  padding: 0.125rem 0.375rem;
-  border-radius: 3px;
-  font-size: 0.7rem;
-  font-weight: 500;
-  text-transform: uppercase;
-  margin-left: 0.5rem;
-  line-height: 1;
-}
-
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .layer-controls-grid {
@@ -1940,53 +1509,6 @@ watch(() => props.treeItemId, async () => {
   
   .filter-header {
     padding: 10px 12px;
-  }
-  
-  .links-grid {
-    grid-template-columns: 1fr;
-  }
-  
-  .link-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.75rem;
-  }
-  
-  .link-icon {
-    align-self: flex-start;
-  }
-  
-  .copy-btn {
-    width: 100%;
-    height: auto;
-    padding: 0.75rem 1rem;
-  }
-  
-  .link-url-container {
-    flex-direction: column;
-  }
-  
-  .link-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.75rem;
-  }
-  
-  .link-main-content {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.75rem;
-  }
-  
-  .remote-control-links {
-    align-self: flex-end;
-    margin-top: 0;
-  }
-  
-  .remote-control-btn {
-    font-size: 0.65rem;
-    padding: 0.2rem 0.4rem;
-    min-height: 18px;
   }
 }
 
