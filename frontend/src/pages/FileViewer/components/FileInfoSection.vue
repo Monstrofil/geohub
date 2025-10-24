@@ -32,7 +32,7 @@
 
 <script setup>
 import { computed } from 'vue'
-import { getFileSize, getBaseFileType, getMimeType, getOriginalName, formatFileSize as formatSize } from '../utils/fileHelpers.js'
+import { getFileSize, getBaseFileType, getMimeType, getOriginalName, formatFileSize as formatSize } from '../../../utils/fileHelpers.js'
 
 const props = defineProps({
   file: {

@@ -139,7 +139,7 @@
 
 <script setup>
 import { computed, ref, watch } from 'vue'
-import apiService from '../services/api.js'
+import apiService from '../../../services/api.js'
 
 const props = defineProps({
   file: {

@@ -36,9 +36,9 @@
 
 <script setup>
 import { computed, ref, onMounted } from 'vue'
-import { resolveFields } from '../utils/fieldResolver.js'
-import { matchTagsToPreset, getAllPresets } from '../utils/tagMatcher.js'
-import { loadFieldDefinitions } from '../utils/fieldResolver.js'
+import { resolveFields } from '../../../utils/fieldResolver.js'
+import { matchTagsToPreset, getAllPresets } from '../../../utils/tagMatcher.js'
+import { loadFieldDefinitions } from '../../../utils/fieldResolver.js'
 
 const props = defineProps({
   file: {

@@ -4,7 +4,7 @@ import Login from '../components/Login.vue'
 import Explorer from '../components/Explorer.vue'
 import FileEditor from '../components/FileEditor.vue'
 import FileList from '../components/FileList.vue'
-import FileViewer from '../components/FileViewer.vue'
+import FileViewer from '../pages/FileViewer/FileViewer.vue'
 import { isAuthenticated, initializeAuth } from '../stores/auth.js'
 
 const routes = [

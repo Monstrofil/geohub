@@ -98,7 +98,7 @@
 
 <script setup>
 import { computed } from 'vue'
-import Icon from './Icon.vue'
+import Icon from '../../../components/Icon.vue'
 
 const props = defineProps({
   task: {
@@ -168,9 +168,9 @@ const handleRefresh = () => {
 <style scoped>
 /* CSS Custom Properties for this component */
 .task-content {
-  --color-primary: #3b82f6;
   --color-primary-hover: #2563eb;
   --color-success: #28a745;
+  --color-primary: #3b82f6;
   --color-error: #dc3545;
   --color-warning: #f59e0b;
   

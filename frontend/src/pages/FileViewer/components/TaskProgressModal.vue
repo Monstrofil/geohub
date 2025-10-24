@@ -48,7 +48,7 @@
 import { ref, computed, watch, onUnmounted } from 'vue'
 import { VueFinalModal } from 'vue-final-modal'
 import TaskContent from './TaskContent.vue'
-import apiService from '../services/api.js'
+import apiService from '../../../services/api.js'
 
 // Props
 const props = defineProps({
