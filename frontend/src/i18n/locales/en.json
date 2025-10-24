@@ -126,7 +126,13 @@
     "checkingCompatibility": "Checking file compatibility...",
     "analyzingGeoreference": "Analyzing if this file can be georeferenced...",
     "fileAnalysisFailed": "File Analysis Failed",
-    "georeferencingNeeded": "Georeferencing needed"
+    "georeferencingNeeded": "Georeferencing needed",
+    "loadingActions": "Loading actions...",
+    "preparingActions": "Preparing available actions for this file...",
+    "actionsError": "Actions Error",
+    "availableActions": "Available Actions",
+    "selectAction": "Select an action to perform on this file",
+    "actionsTitle": "Actions"
   },
   "mapService": {
     "title": "Map Service Links",
@@ -151,5 +157,26 @@
       "addToJosm": "Add TMS to JOSM",
       "addToId": "Add TMS to iD"
     }
+  },
+  "actions": {
+    "edit": "Edit",
+    "download": "Download",
+    "move": "Move",
+    "delete": "Delete",
+    "convert": "Convert",
+    "georeference": "Georeference",
+    "continueGeoreference": "Continue Georeferencing",
+    "regeoreference": "Re-georeference",
+    "viewOnMap": "View on Map",
+    "addToCollection": "Add to Collection",
+    "editFile": "Edit file properties and metadata",
+    "downloadFile": "Download this file to your computer",
+    "moveFile": "Move this file to another location",
+    "deleteFile": "Delete this file permanently",
+    "convertFile": "Convert file for georeferencing",
+    "georeferenceFile": "Add georeferencing to this file",
+    "regeoreferenceFile": "Reset and re-georeference this file",
+    "viewOnMapTooltip": "View this file on the interactive map",
+    "addToCollectionTooltip": "Add this file to a collection"
   }
 }

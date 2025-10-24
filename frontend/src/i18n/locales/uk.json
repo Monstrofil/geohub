@@ -126,7 +126,13 @@
     "checkingCompatibility": "Перевірка сумісності файлу...",
     "analyzingGeoreference": "Аналіз можливості геоприв'язки файлу...",
     "fileAnalysisFailed": "Аналіз файлу не вдався",
-    "georeferencingNeeded": "Потрібна геоприв'язка"
+    "georeferencingNeeded": "Потрібна геоприв'язка",
+    "loadingActions": "Завантаження дій...",
+    "preparingActions": "Підготовка доступних дій для цього файлу...",
+    "actionsError": "Помилка дій",
+    "availableActions": "Доступні дії",
+    "selectAction": "Виберіть дію для цього файлу",
+    "actionsTitle": "Дії"
   },
   "mapService": {
     "title": "Посилання на картографічні сервіси",
@@ -151,5 +157,26 @@
       "addToJosm": "Додати TMS до JOSM",
       "addToId": "Додати TMS до iD"
     }
+  },
+  "actions": {
+    "edit": "Редагувати",
+    "download": "Завантажити",
+    "move": "Перемістити",
+    "delete": "Видалити",
+    "convert": "Конвертувати",
+    "georeference": "Геоприв'язати",
+    "continueGeoreference": "Продовжити геоприв'язку",
+    "regeoreference": "Перегеоприв'язати",
+    "viewOnMap": "Переглянути на карті",
+    "addToCollection": "Додати до колекції",
+    "editFile": "Редагувати властивості та метадані файлу",
+    "downloadFile": "Завантажити цей файл на ваш комп'ютер",
+    "moveFile": "Перемістити цей файл в інше місце",
+    "deleteFile": "Назавжди видалити цей файл",
+    "convertFile": "Конвертувати файл для геоприв'язки",
+    "georeferenceFile": "Додати геоприв'язку до цього файлу",
+    "regeoreferenceFile": "Скинути та перегеоприв'язати цей файл",
+    "viewOnMapTooltip": "Переглянути цей файл на інтерактивній карті",
+    "addToCollectionTooltip": "Додати цей файл до колекції"
   }
 }

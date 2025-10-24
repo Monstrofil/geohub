@@ -321,30 +321,20 @@
               :file="file"
             />
 
-            <!-- File Information section -->
-            <FileInfoSection :file="file" />
-
-            <!-- Georeferencing needed for raster files -->
-            <GeoreferencingStatus 
+            <!-- File Actions -->
+            <FileActions 
               :file="file"
-              @start-conversion="startConversion"
-              @start-georeferencing="startGeoreferencing"
+              @edit="handleEdit"
+              @download="handleDownload"
+              @move="handleMove"
+              @delete="handleDelete"
+              @convert="startConversion"
+              @georeference="startGeoreferencing"
+              @regeoreference="confirmResetGeoreferencing"
             />
 
-            <!-- Georeferencing Actions section for already georeferenced files -->
-            <div v-if="file && isFileGeoreferenced" class="georef-actions-section">
-              <h3>Georeferencing Actions</h3>
-              <p>This file is already georeferenced and displayed on the map.</p>
-              <div class="georef-actions">
-                <button class="btn btn-warning regeoref-btn" @click="confirmResetGeoreferencing">
-                  <svg width="24" height="24" viewBox="0 0 24 24">
-                    <path d="M1 4v6h6" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-                    <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-                  </svg>
-                  Re-georeference
-                </button>
-              </div>
-            </div>
+            <!-- File Information section -->
+            <FileInfoSection :file="file" />
           </div>
         </div>
       </div>
@@ -394,7 +384,8 @@ import GeoreferencingModal from './GeoreferencingModal.vue'
 import TaskProgressModal from './TaskProgressModal.vue'
 import ObjectInformation from './ObjectInformation.vue'
 import FileInfoSection from './FileInfoSection.vue'
-import GeoreferencingStatus from './GeoreferencingStatus.vue'
+import FileActions from './FileActions.vue'
+import MoveModal from './MoveModal.vue'
 import { isAuthenticated } from '../stores/auth.js'
 import apiService from '../services/api.js'
 import { getFileSize, getBaseFileType, getMimeType, getOriginalName, getDisplayName as getFileDisplayName, formatFileSize as formatSize } from '../utils/fileHelpers.js'
@@ -460,7 +451,6 @@ const { open: openTaskProgressModal, close: closeTaskProgressModal } = useModal(
       "task-id": activeTaskId,
       onComplete() {
         handleTaskProgressClose()
-        close()
       },
       onError() {
         handleTaskError()
@@ -484,6 +474,22 @@ const { open: openGeoreferencingModal, close: closeGeoreferencingModal } = useMo
       },
       onCompleted(result) {
         handleGeoreferencingCompleted(result)
+      },
+    },
+  })
+
+const { open: openMoveModal, close: closeMoveModal } = useModal({
+    component: MoveModal,
+    attrs: {
+      "item-id": computed(() => file.value?.id),
+      "item-name": computed(() => getDisplayName()),
+      "item-type": computed(() => file.value?.object_type === 'collection' ? 'collection' : 'file'),
+      "current-path": computed(() => file.value?.parent_path || 'root'),
+      onClose() {
+        closeMoveModal()
+      },
+      onMoved() {
+        handleMoveCompleted()
       },
     },
   })
@@ -624,8 +630,8 @@ const fileTypeLabel = computed(() => {
 // Check if file is georeferenced
 const isFileGeoreferenced = computed(() => {
   // For geo_raster_file objects, check the is_georeferenced field from the database
-  if (file.value && file.value.object_type === 'geo_raster_file' && file.value.object_details) {
-    return file.value.object_details.is_georeferenced === true
+  if (file.value && file.value.object_type === 'geo_raster_file') {
+    return true;
   }
   
   // Default to false if no conclusive information
@@ -978,6 +984,49 @@ async function copyToClipboard(text, label) {
   
   // Clear status after 3 seconds
   setTimeout(() => { copyStatus.value = null }, 3000)
+}
+
+// File Actions handlers
+function handleEdit() {
+  if (!file.value?.id) return
+  router.push({ name: 'FileEditor', query: { id: file.value.id } })
+}
+
+function handleDownload() {
+  if (!file.value?.id) return
+  // Open download URL in new tab
+  window.open(`/api/v1/files/${file.value.id}/download`, '_blank')
+}
+
+function handleMove() {
+  if (!file.value?.id) return
+  openMoveModal()
+}
+
+function handleMoveCompleted() {
+  // Reload the file to reflect any changes
+  loadFile()
+}
+
+async function handleDelete() {
+  if (!file.value?.id) return
+  
+  const fileName = getDisplayName()
+  if (confirm(`Are you sure you want to delete "${fileName}"? This action cannot be undone.`)) {
+    try {
+      loading.value = true
+      await apiService.deleteFile(file.value.id)
+      
+      // Show success message and go back
+      alert(`"${fileName}" has been deleted successfully.`)
+      goBack()
+    } catch (err) {
+      console.error('Failed to delete file:', err)
+      alert(`Failed to delete file: ${err.message}`)
+    } finally {
+      loading.value = false
+    }
+  }
 }
 
 

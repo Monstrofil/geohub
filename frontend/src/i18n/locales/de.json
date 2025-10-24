@@ -126,7 +126,13 @@
     "checkingCompatibility": "Dateikompatibilität wird überprüft...",
     "analyzingGeoreference": "Analyse der Georeferenzierungsmöglichkeit...",
     "fileAnalysisFailed": "Dateianalyse fehlgeschlagen",
-    "georeferencingNeeded": "Georeferenzierung erforderlich"
+    "georeferencingNeeded": "Georeferenzierung erforderlich",
+    "loadingActions": "Aktionen werden geladen...",
+    "preparingActions": "Verfügbare Aktionen für diese Datei werden vorbereitet...",
+    "actionsError": "Aktionsfehler",
+    "availableActions": "Verfügbare Aktionen",
+    "selectAction": "Wählen Sie eine Aktion für diese Datei aus",
+    "actionsTitle": "Aktionen"
   },
   "mapService": {
     "title": "Kartendienst-Links",
@@ -151,5 +157,26 @@
       "addToJosm": "TMS zu JOSM hinzufügen",
       "addToId": "TMS zu iD hinzufügen"
     }
+  },
+  "actions": {
+    "edit": "Bearbeiten",
+    "download": "Herunterladen",
+    "move": "Verschieben",
+    "delete": "Löschen",
+    "convert": "Konvertieren",
+    "georeference": "Georeferenzieren",
+    "continueGeoreference": "Georeferenzierung fortsetzen",
+    "regeoreference": "Neu georeferenzieren",
+    "viewOnMap": "Auf Karte anzeigen",
+    "addToCollection": "Zu Sammlung hinzufügen",
+    "editFile": "Dateieigenschaften und Metadaten bearbeiten",
+    "downloadFile": "Diese Datei auf Ihren Computer herunterladen",
+    "moveFile": "Diese Datei an einen anderen Ort verschieben",
+    "deleteFile": "Diese Datei dauerhaft löschen",
+    "convertFile": "Datei für Georeferenzierung konvertieren",
+    "georeferenceFile": "Georeferenzierung zu dieser Datei hinzufügen",
+    "regeoreferenceFile": "Georeferenzierung zurücksetzen und neu durchführen",
+    "viewOnMapTooltip": "Diese Datei auf der interaktiven Karte anzeigen",
+    "addToCollectionTooltip": "Diese Datei zu einer Sammlung hinzufügen"
   }
 }
