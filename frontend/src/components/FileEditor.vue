@@ -190,47 +190,12 @@
         <div class="editor-main">
           <!-- Interactive Map for GeoTIFF files -->
           <InteractiveMap 
-            v-if="file && isFileGeoreferenced"
+            v-if="file && file.object_type === 'geo_raster_file'"
             :fileId="file.id"
             :filename="file.name"
             class="interactive-map-container"
           />
-          
-          <!-- Georeferencing needed for raster files -->
-          <div v-else-if="!isCollection && file && !isFileGeoreferenced" class="georeferencing-needed">
-            <div class="georef-header">
-              <div class="georef-icon">
-                <svg width="64" height="64" viewBox="0 0 64 64">
-                  <circle cx="32" cy="32" r="30" fill="#ffc107"/>
-                  <path d="M32 16v16M32 40h0" stroke="white" stroke-width="4" fill="none" stroke-linecap="round"/>
-                </svg>
-              </div>
-              <h3>Georeferencing Required</h3>
-              <p>This raster file needs georeferencing to be displayed on a map. Add control points to georeference it.</p>
-            </div>
-            
-            <div class="georef-actions">
-              <button class="btn btn-primary georef-btn" @click="startGeoreferencing">
-                <svg width="24" height="24" viewBox="0 0 24 24">
-                  <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/>
-                  <circle cx="12" cy="12" r="2" fill="currentColor"/>
-                  <path d="M12 2v4M12 18v4M2 12h4M18 12h4" stroke="currentColor" stroke-width="2"/>
-                </svg>
-                Start Georeferencing
-              </button>
-            </div>
-            
-            <div v-if="georeferencingStatus" class="georef-status">
-              <div v-if="georeferencingStatus.loading" class="status-loading">
-                <div class="spinner"></div>
-                <span>Loading georeferencing interface...</span>
-              </div>
-              <div v-else-if="georeferencingStatus.error" class="status-error">
-                <span>Error: {{ georeferencingStatus.error }}</span>
-              </div>
-            </div>
-          </div>
-          
+                    
           <!-- Collection view -->
           <div v-else-if="isCollection && file" class="collection-view">
             <div class="collection-header">
@@ -277,7 +242,6 @@ import ObjectTypeSelector from './ObjectTypeSelector.vue'
 import TagList from './TagList.vue'
 import InteractiveMap from './InteractiveMap.vue'
 import CollectionFilesList from './CollectionFilesList.vue'
-import GeoreferencingModal from './GeoreferencingModal.vue'
 import { matchTagsToPreset, getAllPresets } from '../utils/tagMatcher.js'
 import { loadFieldDefinitions, resolveFields } from '../utils/fieldResolver.js'
 import apiService from '../services/api.js'
@@ -307,26 +271,6 @@ const error = ref(null)
 
 // Collection files list ref
 const collectionFilesList = ref(null)
-
-// Georeferencing state
-const georeferencingStatus = ref(null)
-
-// Georeferencing Modal
-const { open: openGeoreferencingModal, close: closeGeoreferencingModal } = useModal({
-  component: GeoreferencingModal,
-  attrs: {
-    "file-id": file?.id,
-    "file-info": file?.tags,
-    onClose() {
-      handleGeoreferencingClose()
-      close()
-    },
-    onCompleted(result) {
-      handleGeoreferencingCompleted(result)
-      close()
-    },
-  },
-})
 
 // Tags editor state
 const selectedType = ref(null)
@@ -408,12 +352,6 @@ const fileType = computed(() => {
 // Check if object is a collection
 const isCollection = computed(() => {
   return fileType.value === 'collection'
-})
-
-// Check if file is georeferenced
-const isFileGeoreferenced = computed(() => {
-  // Check if it's a geo_raster_file (already georeferenced)
-  return file.value?.object_type === 'geo_raster_file'
 })
 
 // Tags editor functions
@@ -615,27 +553,6 @@ function handleCollectionFilesUpdated(files) {
   }
 }
 
-// Georeferencing functions
-function startGeoreferencing() {
-  georeferencingStatus.value = { loading: true }
-  openGeoreferencingModal()
-}
-
-function handleGeoreferencingClose() {
-  georeferencingStatus.value = null
-}
-
-function handleGeoreferencingCompleted(result) {
-  georeferencingStatus.value = null
-  
-  // Update file tags to reflect georeferencing status
-  if (file.value && result.fileInfo) {
-    file.value.tags = { ...file.value.tags, ...result.fileInfo }
-  }
-  
-  // Force re-render to show the map
-  loadFile()
-}
 </script>
 
 <style scoped>
@@ -1070,91 +987,5 @@ function handleGeoreferencingCompleted(result) {
 }
 
 
-/* Georeferencing needed styles */
-.georeferencing-needed {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 3rem;
-  text-align: center;
-  background: #fff;
-  border-radius: 8px;
-  margin: 2rem;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-}
-
-.georef-header {
-  margin-bottom: 2rem;
-}
-
-.georef-icon {
-  margin-bottom: 1rem;
-}
-
-.georef-header h3 {
-  margin: 0 0 0.5rem 0;
-  color: #333;
-  font-size: 1.5rem;
-  font-weight: 600;
-}
-
-.georef-header p {
-  margin: 0;
-  color: #666;
-  font-size: 1rem;
-  max-width: 500px;
-}
-
-.georef-actions {
-  margin-bottom: 1rem;
-}
-
-.georef-btn {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.75rem 1.5rem;
-  background: #007bff;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  font-size: 1rem;
-  cursor: pointer;
-  transition: background-color 0.15s;
-}
-
-.georef-btn:hover {
-  background: #0056b3;
-}
-
-.georef-status {
-  min-height: 40px;
-}
-
-.status-loading {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  color: #666;
-}
-
-.status-error {
-  color: #dc3545;
-}
-
-.spinner {
-  width: 16px;
-  height: 16px;
-  border: 2px solid #f3f3f3;
-  border-top: 2px solid #007bff;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
 
 </style> 
