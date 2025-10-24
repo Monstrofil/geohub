@@ -181,7 +181,7 @@
   },
   "fileEditor": {
     "title": "Редактор файлу",
-    "backButton": "Назад до списку",
+    "backButton": "Назад",
     "collection": {
       "title": "Колекція: {name}",
       "itemCount": "{count} елементів",

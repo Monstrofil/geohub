@@ -6,7 +6,7 @@
         <svg width="16" height="16" viewBox="0 0 16 16">
           <path d="M10 2L4 8L10 14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
-        Назад до списку
+        Назад
       </button>
       <div class="header-actions">
         <router-link v-if="isAuthenticated" :to="{name: 'FileEditor', query: { id: props.treeItemId }}" class="edit-btn">
