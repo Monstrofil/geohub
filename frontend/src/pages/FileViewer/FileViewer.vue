@@ -27,21 +27,6 @@
       </div>
     </div>
 
-    <!-- File info section moved below header -->
-    <div class="file-info-header" v-if="file">
-      <div class="file-info">
-        <div class="file-icon" v-html="fileIcon"></div>
-        <div class="file-details">
-          <h1 class="file-name">{{ getDisplayName() }}</h1>
-          <div class="file-meta">
-            <span class="file-type">{{ fileTypeLabel }}</span>
-            <span class="file-size" v-if="getFileSize(file)">{{ formatFileSize(getFileSize(file)) }}</span>
-            <span class="file-date" v-if="file?.created_at">{{ formatDate(file.created_at) }}</span>
-            <span class="file-id" v-if="file?.id">ID: {{ file.id }}</span>
-          </div>
-        </div>
-      </div>
-    </div>
 
     <div class="viewer-content">
       <div v-if="loading" class="loading">
@@ -401,49 +386,6 @@ const { open: openMoveModal, close: closeMoveModal } = useModal({
   })
 
 
-// Computed
-const fileIcon = computed(() => {
-  switch (fileType.value) {
-    case 'raster':
-      return `<svg width="40" height="40" viewBox="0 0 40 40">
-        <rect x="2" y="6" width="36" height="28" rx="4" fill="#e0e7ef" stroke="#7faaff" stroke-width="2"/>
-        <circle cx="14" cy="24" r="4" fill="#7faaff"/>
-        <rect x="20" y="16" width="12" height="8" fill="#b3d1ff"/>
-        <path d="M6 6l4 4M10 6l4 4M14 6l4 4" stroke="#7faaff" stroke-width="1" fill="none"/>
-      </svg>`
-    case 'vector':
-      return `<svg width="40" height="40" viewBox="0 0 40 40">
-        <rect x="2" y="6" width="36" height="28" rx="4" fill="#e0f7e7" stroke="#2ecc71" stroke-width="2"/>
-        <circle cx="12" cy="28" r="3" fill="#2ecc71"/>
-        <circle cx="28" cy="14" r="3" fill="#2ecc71"/>
-        <line x1="12" y1="28" x2="28" y2="14" stroke="#27ae60" stroke-width="2"/>
-        <path d="M6 6l4 4M10 6l4 4M14 6l4 4" stroke="#2ecc71" stroke-width="1" fill="none"/>
-      </svg>`
-    case 'raw':
-      return `<svg width="40" height="40" viewBox="0 0 40 40">
-        <rect x="4" y="6" width="32" height="28" rx="4" fill="#f7f7e7" stroke="#6c757d" stroke-width="2"/>
-        <rect x="12" y="16" width="16" height="2" fill="#6c757d"/>
-        <rect x="12" y="22" width="10" height="2" fill="#6c757d"/>
-        <rect x="12" y="28" width="14" height="2" fill="#6c757d"/>
-      </svg>`
-    case 'collection':
-      return `<svg width="40" height="40" viewBox="0 0 40 40">
-        <rect x="3" y="8" width="34" height="24" rx="4" fill="#ffe082" stroke="#ffb300" stroke-width="2"/>
-        <path d="M3 8l4-6h12l4 6" fill="#ffe082" stroke="#ffb300" stroke-width="2"/>
-        <rect x="8" y="14" width="4" height="2" fill="#ffb300"/>
-        <rect x="14" y="14" width="4" height="2" fill="#ffb300"/>
-        <rect x="20" y="14" width="4" height="2" fill="#ffb300"/>
-        <rect x="8" y="18" width="4" height="2" fill="#ffb300"/>
-        <rect x="14" y="18" width="4" height="2" fill="#ffb300"/>
-        <rect x="20" y="18" width="4" height="2" fill="#ffb300"/>
-      </svg>`
-    default:
-      return `<svg width="40" height="40" viewBox="0 0 40 40">
-        <rect x="6" y="6" width="28" height="28" rx="6" fill="#f8f9fa" stroke="#dee2e6" stroke-width="2"/>
-        <path d="M12 12h16M12 16h12M12 20h8" stroke="#6c757d" stroke-width="2" fill="none"/>
-      </svg>`
-  }
-})
 
 // Methods
 
@@ -486,13 +428,6 @@ async function loadFile() {
   }
 }
 
-function formatFileSize(bytes) {
-  if (!bytes || bytes === 0) return '0 B'
-  const k = 1024
-  const sizes = ['B', 'KB', 'MB', 'GB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i]
-}
 
 function formatDate(dateString) {
   return new Date(dateString).toLocaleDateString()
@@ -523,15 +458,6 @@ const fileType = computed(() => {
   return getBaseFileType(file.value)
 })
 
-const fileTypeLabel = computed(() => {
-  const labels = {
-    'raster': 'Georeferenced Raster Image',
-    'vector': 'Georeferenced Vector File', 
-    'raw': 'Regular File',
-    'collection': 'File Collection',
-  }
-  return labels[fileType.value] || 'Unknown Type'
-})
 
 // Check if file is georeferenced
 const isFileGeoreferenced = computed(() => {
@@ -880,63 +806,6 @@ watch(() => props.treeItemId, async () => {
   }
 }
 
-.file-info {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.file-icon {
-  flex-shrink: 0;
-}
-
-.file-details {
-  min-width: 0;
-}
-
-.file-name {
-  margin: 0 0 0.5rem 0;
-  font-size: 1.5rem;
-  font-weight: 600;
-  color: #333;
-  word-break: break-word;
-}
-
-.file-meta {
-  display: flex;
-  gap: 1rem;
-  font-size: 0.9rem;
-  color: #666;
-}
-
-/* Mobile file info styles */
-@media (max-width: 768px) {
-  .file-info-header {
-    padding: 0.75rem;
-    margin-bottom: 0.5rem;
-  }
-  
-  .file-info {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.75rem;
-  }
-  
-  .file-name {
-    font-size: 1.25rem;
-  }
-  
-  .file-meta {
-    flex-direction: column;
-    gap: 0.25rem;
-    font-size: 0.85rem;
-  }
-}
-
-.file-type {
-  text-transform: uppercase;
-  font-weight: 500;
-}
 
 .back-btn {
   display: flex;

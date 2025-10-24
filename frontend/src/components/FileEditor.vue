@@ -107,7 +107,8 @@
         </div>
         
         <!-- File upload section moved to left panel -->
-        <div class="upload-section" v-if="!isCollection">
+        <!-- TODO: Add file upload section back in -->
+        <div class="upload-section" v-if="!isCollection && false">
           <div class="upload-header">
             <h3>Завантажити нову версію</h3>
             <p>Виберіть файл для заміни поточної версії</p>

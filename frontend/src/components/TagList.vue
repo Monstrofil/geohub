@@ -686,5 +686,6 @@ watch(
   font-family: monospace;
   font-size: 0.9em;
   resize: vertical;
+  box-sizing: border-box;
 }
 </style> 
