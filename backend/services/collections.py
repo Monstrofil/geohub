@@ -182,11 +182,21 @@ class CollectionsService:
             params.append(object_type)
             param_idx += 1
 
-        # Filter by tags using JSONB containment (@>)
+        # Filter by tags: null value = key exists (any value), otherwise exact match
         if tags:
-            conditions.append(f"tags @> ${param_idx}::jsonb")
-            params.append(json.dumps(tags))
-            param_idx += 1
+            # Split into key-existence checks (null) and exact-match checks (non-null)
+            exact_match = {k: v for k, v in tags.items() if v is not None}
+            key_exists = [k for k, v in tags.items() if v is None]
+
+            if exact_match:
+                conditions.append(f"tags @> ${param_idx}::jsonb")
+                params.append(json.dumps(exact_match))
+                param_idx += 1
+
+            for key in key_exists:
+                conditions.append(f"tags ? ${param_idx}")
+                params.append(key)
+                param_idx += 1
 
         # Filter by name (case-insensitive substring)
         # Escape ILIKE special characters so user input is treated literally
