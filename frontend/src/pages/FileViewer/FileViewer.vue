@@ -89,9 +89,10 @@
             />
             
             <!-- WMS/TMS Links section for georeferenced files -->
-            <MapLinksSection 
+            <MapLinksSection
               v-if="file && isFileGeoreferenced"
               :map-url="mapUrl"
+              :file-id="file.id"
             />
               
               <!-- File Preview Section - displays regardless of georeferencing ability -->

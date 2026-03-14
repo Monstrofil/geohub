@@ -90,38 +90,37 @@ const props = defineProps({
   mapUrl: {
     type: String,
     default: null
+  },
+  fileId: {
+    type: String,
+    default: null
   }
 })
 
 // State
 const copyStatus = ref(null)
 
+const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1'
+
 // WMS URL computed property (GetCapabilities)
 const wmsUrl = computed(() => {
   if (!props.mapUrl) return ''
-  
+
   // Extract base URL and MAP parameter from the mapserver URL
   const baseUrl = props.mapUrl.split('?')[0] + '?'
   const mapParam = props.mapUrl.includes('map=') ? props.mapUrl.split('map=')[1].split('&')[0] : ''
-  
+
   if (!mapParam) return ''
-  
+
   // Generate WMS GetCapabilities URL
   return `${baseUrl}SERVICE=WMS&VERSION=1.1.1&REQUEST=GetCapabilities&MAP=${mapParam}`
 })
 
-// TMS URL computed property  
+// XYZ tile URL computed property
 const tmsUrl = computed(() => {
-  if (!props.mapUrl) return ''
-  
-  // Extract base URL and MAP parameter from the mapserver URL
-  const baseUrl = props.mapUrl.split('?')[0] + '?'
-  const mapParam = props.mapUrl.includes('map=') ? props.mapUrl.split('map=')[1].split('&')[0] : ''
-  
-  if (!mapParam) return ''
-  
-  // Generate TMS URL with tile placeholders
-  return `${baseUrl}MAP=${mapParam}&MODE=tile&TILEMODE=gmap&TILE={x}+{y}+{z}&LAYERS=geotiff_layer`
+  if (!props.fileId) return ''
+
+  return `${apiBase}/files/${props.fileId}/tiles/{z}/{x}/{y}.png`
 })
 
 
