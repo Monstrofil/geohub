@@ -289,10 +289,11 @@ export default {
           
           // Add the GeoTIFF layer after the base map loads
           if (map.value && mapUrl) {
+            const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1'
             map.value.addSource('geotiff', {
               type: 'raster',
               tiles: [
-                `${mapUrl}&SERVICE=WMS&VERSION=1.3.0&STYLES=&REQUEST=GetMap&FORMAT=image/png&TRANSPARENT=true&LAYERS=geotiff_layer&CRS=EPSG:3857&WIDTH=256&HEIGHT=256&BBOX={bbox-epsg-3857}`
+                `${apiBase}/files/${props.fileId}/tiles/{z}/{x}/{y}.png`
               ],
               tileSize: 256,
               attribution: '© MapServer'

@@ -10,6 +10,7 @@ import aiofiles
 from pathlib import Path
 from pydantic import BaseModel, ConfigDict
 
+import aiohttp
 import models
 import models_factory
 from models import TreeItem, User, ChunkedUploadSession, TaskRecord
@@ -675,6 +676,51 @@ async def get_file_map(file_id: uuid.UUID):
         raise HTTPException(status_code=400, detail="Failed to generate map URL")
     
     return {"map_url": map_url}
+
+
+# Module-level session for tile proxying (connection pooling)
+_tile_session: aiohttp.ClientSession | None = None
+
+async def _get_tile_session() -> aiohttp.ClientSession:
+    global _tile_session
+    if _tile_session is None or _tile_session.closed:
+        _tile_session = aiohttp.ClientSession()
+    return _tile_session
+
+
+@router.get("/files/{file_id}/tiles/{z}/{x}/{y}.png")
+async def get_tile(file_id: uuid.UUID, z: int, x: int, y: int):
+    """Get an XYZ tile for a GeoTIFF file"""
+    file_obj = await FileService.get_file(str(file_id))
+    if not file_obj:
+        raise HTTPException(status_code=404, detail="File not found")
+
+    if file_obj.object_type != "geo_raster_file":
+        raise HTTPException(status_code=400, detail="File type not supported for tiling")
+
+    geo_raster_file = await file_obj.get_object()
+    if not geo_raster_file.map_config_path:
+        raise HTTPException(status_code=400, detail="No map configuration available")
+
+    bbox = mapserver_service.xyz_to_bbox_3857(z, x, y)
+    wms_url = mapserver_service.get_wms_tile_url(geo_raster_file.map_config_path, bbox)
+    if not wms_url:
+        raise HTTPException(status_code=400, detail="Failed to generate tile URL")
+
+    session = await _get_tile_session()
+    async with session.get(wms_url) as resp:
+        if resp.status != 200:
+            raise HTTPException(status_code=502, detail="MapServer returned an error")
+        content = await resp.read()
+        content_type = resp.headers.get("Content-Type", "image/png")
+
+    return Response(
+        content=content,
+        media_type=content_type,
+        headers={
+            "Cache-Control": "public, max-age=3600",
+        }
+    )
 
 
 @router.get("/files/{file_id}/extent")

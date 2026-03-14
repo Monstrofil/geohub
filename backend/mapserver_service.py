@@ -1,3 +1,4 @@
+import math
 import os
 from pathlib import Path
 import uuid
@@ -15,6 +16,35 @@ class MapServerService:
         self.shared_mapserver_dir.mkdir(parents=True, exist_ok=True)
         
     
+    @staticmethod
+    def xyz_to_bbox_3857(z, x, y):
+        """Convert XYZ tile coordinates to EPSG:3857 bounding box (minx, miny, maxx, maxy)."""
+        n = 2 ** z
+        lon_min = x / n * 360.0 - 180.0
+        lon_max = (x + 1) / n * 360.0 - 180.0
+        lat_max = math.degrees(math.atan(math.sinh(math.pi * (1 - 2 * y / n))))
+        lat_min = math.degrees(math.atan(math.sinh(math.pi * (1 - 2 * (y + 1) / n))))
+
+        def lon_to_3857(lon):
+            return lon * 20037508.342789244 / 180.0
+
+        def lat_to_3857(lat):
+            return math.log(math.tan((90 + lat) * math.pi / 360.0)) * 20037508.342789244 / math.pi
+
+        return (lon_to_3857(lon_min), lat_to_3857(lat_min), lon_to_3857(lon_max), lat_to_3857(lat_max))
+
+    def get_wms_tile_url(self, config_path, bbox):
+        """Build a WMS GetMap URL for a given BBOX."""
+        base_url = self.get_map_url_from_config(config_path)
+        if not base_url:
+            return None
+        bbox_str = f"{bbox[0]},{bbox[1]},{bbox[2]},{bbox[3]}"
+        return (
+            f"{base_url}&SERVICE=WMS&VERSION=1.3.0&STYLES=&REQUEST=GetMap"
+            f"&FORMAT=image/png&TRANSPARENT=true&LAYERS=geotiff_layer"
+            f"&CRS=EPSG:3857&WIDTH=256&HEIGHT=256&BBOX={bbox_str}"
+        )
+
     def get_map_url_from_config(self, config_path):
         """
         Generate a MapServer URL using an existing config file path
