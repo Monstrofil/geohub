@@ -1,6 +1,7 @@
 from models import TreeItem, Collection
 import uuid
-from typing import List, Optional
+import datetime
+from typing import List, Optional, Dict, Any, Tuple
 
 
 # Constants
@@ -129,16 +130,124 @@ class CollectionsService:
             # Create TreeItem instance with all fields
             item = TreeItem(
                 id=row['id'],
-                name=row['name'], 
+                name=row['name'],
                 object_type=row['object_type'],
                 object_id=row['object_id'],
                 tags=row['tags'],
                 created_at=row['created_at'],
                 updated_at=row['updated_at'],
-                path=row['path']
+                path=row['path'],
+                permissions=row['permissions'],
             )
+            item.owner_user_id = row.get('owner_user_id')
+            item.owner_group_id = row.get('owner_group_id')
             # Mark as fetched from DB so it behaves like a proper model instance
             item._saved_in_db = True
             items.append(item)
         
         return items
+
+    @classmethod
+    async def search_items(
+        cls,
+        type: Optional[str] = None,
+        object_type: Optional[str] = None,
+        tags: Optional[Dict[str, Any]] = None,
+        name: Optional[str] = None,
+        collection_path: Optional[str] = None,
+        created_after: Optional[datetime.datetime] = None,
+        created_before: Optional[datetime.datetime] = None,
+        skip: int = 0,
+        limit: int = 100,
+    ) -> Tuple[List[TreeItem], int]:
+        """Search tree items with filters. Returns (items, total_count)."""
+        from tortoise import connections
+        import json
+
+        connection = connections.get("default")
+
+        conditions = []
+        params = []
+        param_idx = 1
+
+        # Filter by high-level type ("file" or "collection")
+        if type == "file":
+            conditions.append("object_type IN ('raw_file', 'geo_raster_file')")
+        elif type == "collection":
+            conditions.append("object_type = 'collection'")
+
+        # Filter by specific object_type
+        if object_type:
+            conditions.append(f"object_type = ${param_idx}")
+            params.append(object_type)
+            param_idx += 1
+
+        # Filter by tags using JSONB containment (@>)
+        if tags:
+            conditions.append(f"tags @> ${param_idx}::jsonb")
+            params.append(json.dumps(tags))
+            param_idx += 1
+
+        # Filter by name (case-insensitive substring)
+        # Escape ILIKE special characters so user input is treated literally
+        if name:
+            escaped_name = name.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            conditions.append(f"name ILIKE ${param_idx}")
+            params.append(f"%{escaped_name}%")
+            param_idx += 1
+
+        # Scope to collection subtree
+        if collection_path:
+            conditions.append(f"path <@ ${param_idx}")
+            params.append(collection_path)
+            param_idx += 1
+
+        # Date range filters
+        if created_after:
+            conditions.append(f"created_at >= ${param_idx}")
+            params.append(created_after)
+            param_idx += 1
+
+        if created_before:
+            conditions.append(f"created_at <= ${param_idx}")
+            params.append(created_before)
+            param_idx += 1
+
+        where_clause = " AND ".join(conditions) if conditions else "TRUE"
+
+        # Get total count
+        count_query = f"SELECT COUNT(*) as count FROM tree_items WHERE {where_clause}"
+        count_result = await connection.execute_query_dict(count_query, list(params))
+        total = count_result[0]["count"]
+
+        # Get paginated results (use a copy of params to avoid mutation issues)
+        data_params = list(params)
+        data_params.extend([skip, limit])
+        data_query = f"""
+            SELECT * FROM tree_items
+            WHERE {where_clause}
+            ORDER BY created_at DESC
+            OFFSET ${param_idx} LIMIT ${param_idx + 1}
+        """
+
+        results = await connection.execute_query_dict(data_query, data_params)
+
+        items = []
+        for row in results:
+            item = TreeItem(
+                id=row["id"],
+                name=row["name"],
+                object_type=row["object_type"],
+                object_id=row["object_id"],
+                tags=row["tags"],
+                created_at=row["created_at"],
+                updated_at=row["updated_at"],
+                path=row["path"],
+                permissions=row["permissions"],
+            )
+            item.owner_user_id = row.get("owner_user_id")
+            item.owner_group_id = row.get("owner_group_id")
+            item._saved_in_db = True
+            items.append(item)
+
+        return items, total

@@ -79,13 +79,27 @@ class TreeItemCreateRequest(BaseModel):
     parent_path: Optional[str] = "root"
 
 
+VALID_OBJECT_TYPES = {"raw_file", "geo_raster_file", "collection"}
+VALID_SEARCH_TYPES = {"file", "collection"}
+
+
 class TreeItemSearchRequest(BaseModel):
     type: Optional[str] = None  # "file" or "collection"
-    tags: Optional[Dict[str, Any]] = None
-    base_type: Optional[str] = None  # For files: "raster", "vector", "raw"
-    collection_path: Optional[str] = None
+    object_type: Optional[str] = None  # "raw_file", "geo_raster_file", "collection"
+    tags: Optional[Dict[str, Any]] = None  # Match items containing these tag key-value pairs
+    name: Optional[str] = None  # Substring match on item name (case-insensitive)
+    collection_path: Optional[str] = None  # Scope search to descendants of this path
+    created_after: Optional[datetime.datetime] = None
+    created_before: Optional[datetime.datetime] = None
     skip: int = 0
     limit: int = 100
+
+
+class TreeItemSearchResponse(BaseModel):
+    items: list[TreeItemResponse]
+    total: int
+    skip: int
+    limit: int
 
 
 # Georeferencing-specific models
@@ -185,6 +199,74 @@ async def list_tree_items(
         skip=skip,
         limit=limit,
         leaf=TreeItemResponse.model_validate(collection)
+    )
+
+
+@router.post("/search", response_model=TreeItemSearchResponse)
+async def search_tree_items(
+    search: TreeItemSearchRequest,
+    current_user: Optional[User] = Depends(get_current_user_optional)
+):
+    """Search files and collections with filters.
+
+    Supports filtering by:
+    - type: "file" or "collection"
+    - object_type: "raw_file", "geo_raster_file", "collection"
+    - tags: JSONB containment match (items whose tags contain all specified key-value pairs)
+    - name: case-insensitive substring match
+    - collection_path: scope search to a subtree
+    - created_after / created_before: date range filters
+    """
+    if search.limit < 1 or search.limit > 1000:
+        raise HTTPException(status_code=422, detail="limit must be between 1 and 1000")
+    if search.skip < 0:
+        raise HTTPException(status_code=422, detail="skip must be non-negative")
+    if search.type and search.type not in VALID_SEARCH_TYPES:
+        raise HTTPException(status_code=422, detail=f"type must be one of: {', '.join(VALID_SEARCH_TYPES)}")
+    if search.object_type and search.object_type not in VALID_OBJECT_TYPES:
+        raise HTTPException(status_code=422, detail=f"object_type must be one of: {', '.join(VALID_OBJECT_TYPES)}")
+
+    # Validate type and object_type are not contradictory
+    if search.type and search.object_type:
+        type_to_object_types = {
+            "file": {"raw_file", "geo_raster_file"},
+            "collection": {"collection"},
+        }
+        if search.object_type not in type_to_object_types.get(search.type, set()):
+            raise HTTPException(
+                status_code=422,
+                detail=f"object_type '{search.object_type}' conflicts with type '{search.type}'"
+            )
+
+    # Require collection_path to scope the search — prevents unrestricted enumeration
+    if not search.collection_path:
+        raise HTTPException(
+            status_code=422,
+            detail="collection_path is required to scope the search"
+        )
+
+    collection = await CollectionsService.get_collection_by_path(search.collection_path)
+    if not collection:
+        raise HTTPException(status_code=404, detail="Collection not found")
+    await require_permission(collection, current_user, Permission.READ)
+
+    items, total = await CollectionsService.search_items(
+        type=search.type,
+        object_type=search.object_type,
+        tags=search.tags,
+        name=search.name,
+        collection_path=search.collection_path,
+        created_after=search.created_after,
+        created_before=search.created_before,
+        skip=search.skip,
+        limit=search.limit,
+    )
+
+    return TreeItemSearchResponse(
+        items=[TreeItemResponse.model_validate(item) for item in items],
+        total=total,
+        skip=search.skip,
+        limit=search.limit,
     )
 
 
